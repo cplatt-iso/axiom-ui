@@ -1,36 +1,39 @@
 // src/components/LoginButton.tsx
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
+import React from 'react';
 
 interface LoginButtonProps {
-  onLoginSuccess: (idToken: string) => void; // Define prop type for callback
+  // Renamed prop for clarity: receives the Google token string
+  onGoogleSignInSuccess: (googleIdToken: string) => void;
 }
 
-const LoginButton: React.FC<LoginButtonProps> = ({ onLoginSuccess }) => {
+const LoginButton: React.FC<LoginButtonProps> = ({ onGoogleSignInSuccess }) => {
 
-  const handleLoginSuccess = (credentialResponse: CredentialResponse) => {
-    console.log('Google Login Success:', credentialResponse);
+  const handleInternalGoogleSuccess = (credentialResponse: CredentialResponse) => {
+    console.log('LoginButton: Google credential response received:', credentialResponse);
     if (credentialResponse.credential) {
-        console.log("ID Token:", credentialResponse.credential);
-        // Call the callback passed from App component
-        onLoginSuccess(credentialResponse.credential);
+        console.log("LoginButton: Passing Google ID Token up:", credentialResponse.credential.substring(0,30)+"...");
+        // Call the callback passed from LoginPage, providing ONLY the Google token
+        onGoogleSignInSuccess(credentialResponse.credential);
     } else {
-        console.error("Login success, but no credential received.");
+        console.error("LoginButton: Login success, but no credential received.");
     }
   };
 
   const handleLoginError = () => {
-    console.error('Google Login Failed');
+    console.error('LoginButton: Google Login Failed');
     // Optionally call an error handler prop if needed
   };
 
   return (
-    <div style={{ marginTop: '20px', marginLeft: '20px' }}>
+    // Add some basic styling if needed, or handle in parent
+     <div className="inline-block">
         <GoogleLogin
-            onSuccess={handleLoginSuccess}
+            onSuccess={handleInternalGoogleSuccess}
             onError={handleLoginError}
             useOneTap
             shape="rectangular"
-            theme="outline"
+            theme="outline" // Or "filled_blue", etc.
             size="medium"
         />
     </div>
