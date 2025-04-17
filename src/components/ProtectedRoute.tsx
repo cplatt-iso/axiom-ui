@@ -1,48 +1,56 @@
 // src/components/ProtectedRoute.tsx
 import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext'; // Use relative path
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
-    allowedRoles?: string[]; // Optional roles for RBAC
+    allowedRoles?: string[];
+    children?: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
-    const { user, isLoading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
+    const { user, isLoading, isAuthenticated } = useAuth();
+    const location = useLocation();
+
+    // --- Keep console logs for debugging if needed ---
+    console.log(`--- ProtectedRoute Check (${location.pathname}) ---`);
+    console.log("Props:", { allowedRoles });
+    console.log("Auth State:", { isAuthenticated, isLoading });
+    console.log("User Object:", user);
+    // --- End Logs ---
 
     if (isLoading) {
-        // You can replace this with a more sophisticated loading component later
+        console.log("ProtectedRoute: Auth Loading...");
+        // --- Return an actual element for the loading state ---
         return (
             <div className="flex items-center justify-center min-h-screen">
-                <div className="p-4 text-center text-gray-600 dark:text-gray-300">Loading session...</div>
-                {/* Optional: Add a spinner here */}
+                <div className="p-4 text-center text-gray-600 dark:text-gray-300">
+                    Loading session...
+                    {/* Optional: Add spinner SVG or component here */}
+                </div>
             </div>
         );
+        // --- End Loading Element ---
     }
 
-    if (!user) {
-        // User not logged in, redirect to login page
-        // Pass the current location so the user can be redirected back after login (optional)
-        // const location = useLocation(); // If needed: import { useLocation } from 'react-router-dom';
-        console.log("ProtectedRoute: No user found, redirecting to /login");
-        return <Navigate to="/login" replace />; // state={{ from: location }}
+    if (!isAuthenticated) {
+        console.log(`ProtectedRoute: Not authenticated (isAuthenticated: ${isAuthenticated}). Redirecting to /login.`);
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // Optional: RBAC check
     if (allowedRoles && allowedRoles.length > 0) {
-        const userRoles = user.roles || [];
+        const userRoles = user?.roles || [];
+        console.log(`ProtectedRoute: Checking roles for ${location.pathname}. Required: [${allowedRoles.join(', ')}]. User roles found: [${userRoles.join(', ')}]`);
         const hasRequiredRole = allowedRoles.some(role => userRoles.includes(role));
         if (!hasRequiredRole) {
-            // User logged in but doesn't have required role
-            console.warn(`ProtectedRoute: Access denied for user ${user.email}. Required roles: ${allowedRoles.join(', ')}, User roles: ${userRoles.join(', ')}`);
-            return <Navigate to="/unauthorized" replace />; // Redirect to an 'Unauthorized' page
+            console.warn(`ProtectedRoute: Role check FAILED for user ${user?.email} at ${location.pathname}. Redirecting to /unauthorized.`);
+            return <Navigate to="/unauthorized" state={{ from: location }} replace />;
         }
-         console.debug(`ProtectedRoute: User ${user.email} has required roles (${allowedRoles.join(', ')}). Access granted.`);
+        console.log(`ProtectedRoute: Role check PASSED for user ${user?.email} at ${location.pathname}.`);
     }
 
-    // User is authenticated (and has roles if required), render the child route component
-    // console.debug("ProtectedRoute: User authenticated. Rendering child route.");
-    return <Outlet />; // Outlet renders the nested child route defined in App.tsx
+    console.log(`ProtectedRoute: Access GRANTED for ${location.pathname}. Rendering child/outlet.`);
+    return children ? <>{children}</> : <Outlet />;
 };
 
 export default ProtectedRoute;

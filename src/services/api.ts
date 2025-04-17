@@ -14,6 +14,20 @@ export const setAuthContextRef = (auth: AuthContextType) => {
 // --- Interfaces (Define or Import from src/schemas.ts) ---
 // It's highly recommended to move these to a dedicated schemas file (e.g., src/schemas.ts)
 
+export interface ComponentStatus {
+    status: 'ok' | 'degraded' | 'error' | 'down' | 'unknown' | string; // Allow string for flexibility
+    details: string | null;
+}
+
+export interface SystemStatusReport {
+    database: ComponentStatus;
+    message_broker: ComponentStatus;
+    api_service: ComponentStatus;
+    dicom_listener: ComponentStatus;
+    celery_workers: ComponentStatus;
+    // Add more components as needed
+}
+
 export interface Role {
     id: number;
     name: string;
@@ -273,16 +287,18 @@ export const updateUser = (userId: number, payload: UserUpdatePayload) =>
         body: JSON.stringify(payload)
     });
 export const assignRoleToUser = (userId: number, roleId: number) =>
-    apiClient<UserWithRoles>(`${USER_ENDPOINT}/${userId}/roles/`, { // POST /users/{id}/roles/
+    apiClient<UserWithRoles>(`${USER_ENDPOINT}/${userId}/roles`, { // POST /users/{id}/roles/
         method: 'POST',
         body: JSON.stringify({ role_id: roleId })
     });
 export const removeRoleFromUser = (userId: number, roleId: number) =>
-    apiClient<UserWithRoles>(`${USER_ENDPOINT}/${userId}/roles/${roleId}/`, { // DELETE /users/{id}/roles/{id}/
+    apiClient<UserWithRoles>(`${USER_ENDPOINT}/${userId}/roles/${roleId}`, { // DELETE /users/{id}/roles/{id}/
         method: 'DELETE',
         parseResponse: false // Expect 204 No Content or similar
     });
 
+export const getSystemStatus = () =>
+    apiClient<SystemStatusReport>('/dashboard/status'); // No trailing slash    
 
 // --- Role API Functions --- (Assuming trailing slash based on previous context)
 const ROLE_ENDPOINT = '/roles';

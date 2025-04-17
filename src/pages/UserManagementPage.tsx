@@ -1,98 +1,108 @@
 // src/pages/UserManagementPage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { UserWithRoles, Role, getUsers, getRoles, updateUser } from '../services/api';
 import UserManagementTable from '../components/UserManagementTable';
 import ManageUserRolesModal from '../components/ManageUserRolesModal';
+import { UserCircleIcon } from '@heroicons/react/24/outline';
 
 const UserManagementPage: React.FC = () => {
     const [users, setUsers] = useState<UserWithRoles[]>([]);
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoading, setIsLoading] = useState<boolean>(true); // For initial load only
     const [error, setError] = useState<string | null>(null);
-
     const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
     const [isRolesModalOpen, setIsRolesModalOpen] = useState<boolean>(false);
+    const isInitialLoad = useRef(true);
 
-    // Fetch both users and roles
+    // Fetch both users and roles - Stabilized useCallback
     const fetchData = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
+        console.log("fetchData START");
         try {
-            // Fetch in parallel
-            const [fetchedUsers, fetchedRoles] = await Promise.all([
-                getUsers(), // Add pagination params later if needed
-                getRoles()
-            ]);
+            console.log("fetchData: Calling getUsers and getRoles...");
+            const [fetchedUsers, fetchedRoles] = await Promise.all([ getUsers(), getRoles() ]);
+            console.log("fetchData: API calls successful");
             setUsers(fetchedUsers);
             setAvailableRoles(fetchedRoles);
+            setError(null); // Clear error on success
         } catch (err: any) {
-            setError(err.message || "Failed to fetch data.");
+            console.error("Failed to fetch user management data:", err);
+            setError(err.message || "Failed to fetch users or roles.");
+            setUsers([]); setAvailableRoles([]); // Clear data on error
         } finally {
-            setIsLoading(false);
+            if (isInitialLoad.current) {
+                console.log("fetchData FINALLY - Setting initial isLoading to false");
+                setIsLoading(false);
+                isInitialLoad.current = false;
+            } else {
+                console.log("fetchData FINALLY - Subsequent fetch, not changing isLoading");
+            }
         }
-    }, []);
+    }, []); // Empty dependency array makes fetchData stable
 
+    // Initial data fetch effect - Runs only ONCE
     useEffect(() => {
+        console.log("UserManagementPage Mounted - Running initial fetch effect");
+        setIsLoading(true);
+        isInitialLoad.current = true;
         fetchData();
-    }, [fetchData]);
+    }, [fetchData]); // Depend on stable fetchData
 
-    // Handler for opening the roles modal
-    const handleEditRoles = (user: UserWithRoles) => {
-        setSelectedUser(user);
-        setIsRolesModalOpen(true);
+    // --- Handlers for Modal, Toggle, etc. ---
+    const handleEditRoles = (user: UserWithRoles) => { setSelectedUser(user); setIsRolesModalOpen(true); };
+    const handleCloseRolesModal = () => { setIsRolesModalOpen(false); setSelectedUser(null); };
+    const handleRoleUpdateSuccess = () => { fetchData(); /* TODO: notify */ };
+    const handleToggleActive = async (userToToggle: UserWithRoles) => {
+        const originalUsers = [...users]; const newStatus = !userToToggle.is_active; const actionText = newStatus ? 'ACTIVATE' : 'DEACTIVATE';
+        if (!window.confirm(`Are you sure you want to ${actionText} user ${userToToggle.email}?`)) return;
+        setUsers(prevUsers => prevUsers.map(user => user.id === userToToggle.id ? { ...user, is_active: newStatus } : user )); setError(null);
+        try { await updateUser(userToToggle.id, { is_active: newStatus }); console.log(`User ${userToToggle.email} status toggled successfully.`); /* TODO: notify */ }
+        catch (err: any) { console.error(`Failed to toggle status for user ${userToToggle.email}:`, err); setError(err.message || `Failed to update user status.`); setUsers(originalUsers); /* TODO: notify */ }
     };
 
-    // Handler for closing the roles modal
-    const handleCloseRolesModal = () => {
-        setIsRolesModalOpen(false);
-        setSelectedUser(null); // Clear selected user
-    };
 
-    // Handler for toggling user active status
-    const handleToggleActive = async (user: UserWithRoles) => {
-        // Optimistic UI update can be added later
-         if (!window.confirm(`Are you sure you want to ${user.is_active ? 'DEACTIVATE' : 'ACTIVATE'} user ${user.email}?`)) {
-             return;
-         }
-
-        try {
-            await updateUser(user.id, { is_active: !user.is_active });
-            // Refresh data after successful update
-            fetchData();
-             // Show success notification later
-        } catch (err: any) {
-             setError(err.message || `Failed to update user status.`);
-              // Revert optimistic update if implemented
-        }
-    };
-
-    // Callback for when roles are successfully updated in the modal
-    const handleRoleUpdateSuccess = () => {
-        fetchData(); // Refresh the user list
-         // Show success notification later
-    };
+    // --- Render Logic ---
+    let content;
+    if (isLoading) {
+        content = <p className="text-center text-gray-500 dark:text-gray-400 py-10">Loading users and roles...</p>;
+    } else if (error) {
+         // --- Replace comment with actual JSX ---
+         content = (
+            <div className="my-4 rounded-md bg-red-50 p-4 dark:bg-red-900">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">Error: {error}</p>
+            </div>
+         );
+         // --- End Replace ---
+    } else if (users.length === 0) {
+         // --- Replace comment with actual JSX ---
+         content = (
+            <div className="text-center py-10">
+                <UserCircleIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No users found</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">No users match the current criteria or exist in the system yet.</p>
+            </div>
+         );
+          // --- End Replace ---
+    }
+    else {
+        content = (
+            <UserManagementTable
+                users={users}
+                onEditRoles={handleEditRoles}
+                onToggleActive={handleToggleActive}
+            />
+        );
+    }
 
     return (
-        <div>
+        <div className="container mx-auto px-4 py-8">
             <div className="sm:flex sm:items-center sm:justify-between mb-6">
-                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">User Management</h1>
-                {/* Add Create User button later if needed */}
+                <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
+                    User Management
+                </h1>
             </div>
-
-            {isLoading && <p className="text-gray-500 dark:text-gray-400">Loading users and roles...</p>}
-            {error && <p className="text-red-600 dark:text-red-400">Error: {error}</p>}
-
-            {!isLoading && !error && (
-                <UserManagementTable
-                    users={users}
-                    onEditRoles={handleEditRoles}
-                    onToggleActive={handleToggleActive}
-                />
-            )}
-
-            {/* Render modal conditionally */}
+            {content}
             <ManageUserRolesModal
-                isOpen={isRolesModalOpen}
+                isOpen={isRolesModalOpen && selectedUser !== null}
                 onClose={handleCloseRolesModal}
                 user={selectedUser}
                 availableRoles={availableRoles}

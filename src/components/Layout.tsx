@@ -1,5 +1,5 @@
 // src/components/Layout.tsx
-import React, { Fragment, useState } from 'react';
+import React, { useEffect, Fragment, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom'; // Import useLocation
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
@@ -16,6 +16,10 @@ const Layout: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation(); // Get current location
 
+    useEffect(() => {
+        console.log("Layout - User context:", user);
+    }, [user]);
+
     // Standard navigation items
     const navigation = [
         { name: 'Dashboard', href: '/' },
@@ -28,7 +32,10 @@ const Layout: React.FC = () => {
     ];
 
     // Determine if user is admin
-    const isAdmin = user?.roles?.includes('Admin');
+    const isAdmin = user?.roles?.some(role => role === 'Admin');
+    useEffect(() => {
+        console.log("Layout - isAdmin check result:", isAdmin);
+    }, [isAdmin]); // Log when isAdmin changes
 
     return (
         // Use flex layout for the main structure
