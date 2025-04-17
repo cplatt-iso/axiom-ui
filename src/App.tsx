@@ -8,13 +8,14 @@ import { setAuthContextRef } from './services/api'; // Import the setter for the
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Import Page Components (Create these files with basic content)
+// Import Page Components
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import UserManagementPage from './pages/UserManagementPage';
-import RulesetsPage from './pages/RulesetsPage'; // Example page for rules
-import SettingsPage from './pages/SettingsPage'; // Example page for settings
+import RulesetsPage from './pages/RulesetsPage';
+import RulesetDetailPage from './pages/RulesetDetailPage'; // <-- Import the new page
+import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -27,7 +28,6 @@ function AppContent() {
   const auth = useAuth();
 
   // Effect to update the API service helper with the current auth context instance
-  // This ensures the API client always has access to the latest token/logout function
   useEffect(() => {
       setAuthContextRef(auth);
   }, [auth]); // Re-run this effect if the auth object changes
@@ -38,32 +38,51 @@ function AppContent() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Protected Routes */}
+            {/* Protected Routes (Standard Users & Admins) */}
             {/* This outer ProtectedRoute ensures a user must be logged in */}
             <Route element={<ProtectedRoute />}>
-                {/* Routes using the main Layout (Sidebar, Header etc.) */}
+                {/* Routes using the main Layout */}
                 <Route element={<Layout />}>
                     {/* Default route maps to Dashboard */}
+                    {/* Use index route for cleaner default */}
                     <Route index element={<DashboardPage />} />
-                    <Route path="/" element={<DashboardPage />} />
+                    {/* Removed redundant path="/" */}
 
                     {/* Standard user routes */}
+                    <Route path="/dashboard" element={<DashboardPage />} /> {/* Explicit dashboard route */}
                     <Route path="/api-keys" element={<ApiKeysPage />} />
-                    <Route path="/rulesets" element={<RulesetsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    {/* Add more standard user routes here as needed */}
+
+                    {/* Rules Engine Routes (accessible by standard logged-in users) */}
+                    <Route path="/rulesets" element={<RulesetsPage />} />
+                    {/* --- New Route for Ruleset Details/Rules --- */}
+                    <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
+
+                    {/* --- Admin Only Route (Nested Inside Layout) --- */}
+                    {/* Apply admin role check specifically here */}
+                    <Route
+                        path="/admin/users"
+                        element={
+                            <ProtectedRoute allowedRoles={['Admin']}>
+                                <UserManagementPage />
+                            </ProtectedRoute>
+                        }
+                    />
+                    {/* Add more routes accessible by standard users OR admins here */}
                 </Route>
             </Route>
 
-             {/* Protected Admin Routes */}
-             {/* This outer ProtectedRoute ensures user is logged in AND has 'Admin' role */}
-            <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-                 {/* Admin routes also use the main Layout */}
-                 <Route element={<Layout />}>
-                    <Route path="/admin/users" element={<UserManagementPage />} />
-                     {/* Add more admin-specific routes here */}
-                 </Route>
+             {/* --- Alternative: Separate block for Admin routes if they don't use standard Layout or need different protection --- */}
+             {/* If admin routes used a different Layout or protection mechanism, they could be structured like this:
+             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
+                  <Route element={<AdminLayout />}> // Or <Layout /> if same
+                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                     <Route path="/admin/users" element={<UserManagementPage />} />
+                  </Route>
              </Route>
+             */}
+             {/* Based on your current structure, nesting the admin check within the main protected layout seems correct. */}
+
 
             {/* Catch-all Not Found Route - Must be last */}
             <Route path="*" element={<NotFoundPage />} />
@@ -73,9 +92,6 @@ function AppContent() {
 
 /**
  * The main App component.
- * Its primary role now is to render AppContent, which handles the routing logic.
- * The necessary providers (BrowserRouter, GoogleOAuthProvider, AuthProvider)
- * are wrapped around App in main.tsx.
  */
 function App() {
      return <AppContent />;
