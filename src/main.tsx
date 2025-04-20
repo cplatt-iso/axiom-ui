@@ -3,6 +3,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
 import App from './App'; // Import App
 import './index.css';
@@ -20,9 +21,20 @@ if (!googleClientId) {
   throw new Error("Missing Google Client ID");
 }
 
+const queryClient = new QueryClient({
+    defaultOptions: {
+        queries: {
+            // Optional: Configure default options like staleTime, gcTime, refetchOnWindowFocus
+            // staleTime: 1000 * 60 * 5, // 5 minutes
+            // gcTime: 1000 * 60 * 30, // 30 minutes (garbage collection time)
+            refetchOnWindowFocus: false, // Optional: disable auto refetch on focus
+        },
+    },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+   <QueryClientProvider client={queryClient}>
     <BrowserRouter> { /* Wrap with Router */ }
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider> { /* Wrap with Auth Provider */ }
@@ -30,44 +42,6 @@ createRoot(document.getElementById('root')!).render(
         </AuthProvider>
       </GoogleOAuthProvider>
     </BrowserRouter>
+   </QueryClientProvider>
   </StrictMode>,
 );
-
-// src/components/ProtectedRoute.tsx
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-
-interface ProtectedRouteProps {
-    allowedRoles?: string[]; // Optional roles for RBAC
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles }) => {
-    const { user, isLoading } = useAuth();
-
-    if (isLoading) {
-        // Show a loading spinner or skeleton screen while checking auth state
-        return <div className="p-4 text-center">Loading session...</div>;
-    }
-
-    if (!user) {
-        // User not logged in, redirect to login page
-        return <Navigate to="/login" replace />;
-    }
-
-    // Optional: RBAC check
-    if (allowedRoles && allowedRoles.length > 0) {
-        const userRoles = user.roles || [];
-        const hasRequiredRole = allowedRoles.some(role => userRoles.includes(role));
-        if (!hasRequiredRole) {
-            // User logged in but doesn't have required role
-            console.warn(`Access denied: User lacks required roles (${allowedRoles.join(', ')})`);
-            return <Navigate to="/unauthorized" replace />; // Redirect to an 'Unauthorized' page
-        }
-    }
-
-    // User is authenticated (and has roles if required), render the child route
-    return <Outlet />;
-};
-
-export default ProtectedRoute;

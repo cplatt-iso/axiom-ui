@@ -29,7 +29,6 @@ export enum MatchOperation {
     NOT_IN = "not_in",
 }
 
-// Updated to include new modification actions
 export enum ModifyAction {
     SET = "set",
     DELETE = "delete",
@@ -42,7 +41,7 @@ export enum ModifyAction {
 
 export interface ApiKeyBase {
     name: string;
-    expires_at?: string | null; // ISO 8601 format date-time string or null
+    expires_at?: string | null;
 }
 
 export interface ApiKeyCreate extends ApiKeyBase {}
@@ -50,43 +49,37 @@ export interface ApiKeyCreate extends ApiKeyBase {}
 export interface ApiKeyUpdate {
     name?: string | null;
     is_active?: boolean | null;
-    expires_at?: string | null; // ISO 8601 format date-time string or null
+    expires_at?: string | null;
 }
 
-// Represents an API Key returned by the API (excluding the full key)
 export interface ApiKey extends ApiKeyBase {
     id: number;
     prefix: string;
     is_active: boolean;
-    last_used_at?: string | null; // ISO 8601 format date-time string or null
-    created_at: string; // ISO 8601 format date-time string
-    updated_at: string; // ISO 8601 format date-time string
+    last_used_at?: string | null;
+    created_at: string;
+    updated_at: string;
     user_id: number;
 }
 
-// Response specifically for the creation endpoint, includes the one-time key
 export interface ApiKeyCreateResponse extends Omit<ApiKey, 'last_used_at'> {
     full_key: string;
 }
 
-// Specific payload type for creating an API Key via the API
 export interface ApiKeyCreatePayload extends ApiKeyCreate {}
-
-// Specific payload type for updating an API Key via the API
 export interface ApiKeyUpdatePayload extends ApiKeyUpdate {}
 
 
 // --- Authentication Schemas ---
 
 export interface GoogleToken {
-    token: string; // The ID token received from Google
+    token: string;
 }
 
-// Represents the response from the backend after Google token verification
 export interface TokenResponse {
-    access_token: string; // The JWT issued by our backend
-    token_type: string; // Typically "bearer"
-    user?: User; // Include user details on login/token refresh
+    access_token: string;
+    token_type: string;
+    user?: User;
 }
 
 // --- Role Schemas ---
@@ -95,163 +88,101 @@ export interface Role {
     id: number;
     name: string;
     description?: string | null;
-    created_at: string; // ISO 8601 format date-time string
-    updated_at: string; // ISO 8601 format date-time string
+    created_at: string;
+    updated_at: string;
 }
 
 // --- User Schemas ---
 
-// Base fields for a User
 export interface UserBase {
-    email?: string | null; // Email might be null if using other auth methods
-    is_active?: boolean | null; // Default: true
-    is_superuser?: boolean | null; // Default: false
+    email?: string | null;
+    is_active?: boolean | null;
+    is_superuser?: boolean | null;
     full_name?: string | null;
-    google_id?: string | null; // Store the unique Google ID
-    picture?: string | null; // URL to profile picture from Google
+    google_id?: string | null;
+    picture?: string | null;
 }
 
-// Payload for updating a user (typically by an admin)
 export interface UserUpdatePayload {
     is_active?: boolean;
-    // Add other fields admin might update (e.g., full_name?)
-    // Note: Roles are updated via separate endpoints
 }
 
-// User representation returned by the API
 export interface User extends UserBase {
     id: number;
-    created_at: string; // ISO 8601 format date-time string
-    updated_at: string; // ISO 8601 format date-time string
-    roles: Role[]; // List of roles assigned to the user
+    created_at: string;
+    updated_at: string;
+    roles: Role[];
 }
 
 
 // --- Rule Engine Schemas ---
 
-// Match Criterion for a Rule
 export interface MatchCriterion {
-    tag: string; // DICOM tag string (e.g., "0010,0010" or "PatientName")
-    op: MatchOperation; // The comparison operation enum value
-    value?: any; // Value for comparison (required for most ops, type depends on op)
+    tag: string;
+    op: MatchOperation;
+    value?: any;
 }
 
 // --- Tag Modification Discriminated Union ---
-
-// Base interface for all tag modifications
-export interface TagModificationBase {
-    tag: string; // DICOM tag string
-}
-
-// Interface for the 'set' action
-export interface TagSetModification extends TagModificationBase {
-    action: ModifyAction.SET;
-    value: any; // Required value to set
-    vr?: string | null; // Optional explicit VR
-}
-
-// Interface for the 'delete' action
-export interface TagDeleteModification extends TagModificationBase {
-    action: ModifyAction.DELETE;
-    // No other fields needed for delete
-}
-
-// Interface for the 'prepend' action
-export interface TagPrependModification extends TagModificationBase {
-    action: ModifyAction.PREPEND;
-    value: string; // Required string value to prepend
-}
-
-// Interface for the 'suffix' action
-export interface TagSuffixModification extends TagModificationBase {
-    action: ModifyAction.SUFFIX;
-    value: string; // Required string value to append
-}
-
-// Interface for the 'regex_replace' action
-export interface TagRegexReplaceModification extends TagModificationBase {
-    action: ModifyAction.REGEX_REPLACE;
-    pattern: string; // Required regex pattern
-    replacement: string; // Required replacement string
-}
-
-// The discriminated union type for Tag Modification
-export type TagModification =
-    | TagSetModification
-    | TagDeleteModification
-    | TagPrependModification
-    | TagSuffixModification
-    | TagRegexReplaceModification;
-
+export interface TagModificationBase { tag: string; }
+export interface TagSetModification extends TagModificationBase { action: ModifyAction.SET; value: any; vr?: string | null; }
+export interface TagDeleteModification extends TagModificationBase { action: ModifyAction.DELETE; }
+export interface TagPrependModification extends TagModificationBase { action: ModifyAction.PREPEND; value: string; }
+export interface TagSuffixModification extends TagModificationBase { action: ModifyAction.SUFFIX; value: string; }
+export interface TagRegexReplaceModification extends TagModificationBase { action: ModifyAction.REGEX_REPLACE; pattern: string; replacement: string; }
+export type TagModification = TagSetModification | TagDeleteModification | TagPrependModification | TagSuffixModification | TagRegexReplaceModification;
 // --- End Tag Modification ---
 
-
-// Storage Destination configuration for a Rule
 export interface StorageDestination {
-    type: string; // Type identifier (e.g., 'filesystem', 'cstore', 'gcs')
-    config: Record<string, any>; // Backend-specific config (path, ae_title, bucket etc.)
+    type: string;
+    config: Record<string, any>;
 }
 
-// Base structure for a Rule (common fields for create/update/read)
 export interface RuleBase {
-    name: string; // Max length 100
+    name: string;
     description?: string | null;
-    is_active?: boolean; // Default: true in backend schema
-    priority?: number; // Default: 0 in backend schema
-    match_criteria?: MatchCriterion[]; // List of criteria (implicit AND)
-    tag_modifications?: TagModification[]; // <-- Updated to use the union type
-    destinations?: StorageDestination[]; // List of destinations
-    applicable_sources?: string[] | null; // List of source IDs or null/empty for all
+    is_active?: boolean;
+    priority?: number;
+    match_criteria: MatchCriterion[]; // Changed from optional for create/read
+    tag_modifications: TagModification[]; // Changed from optional for create/read
+    destinations: StorageDestination[]; // Changed from optional for create/read
+    applicable_sources?: string[] | null;
 }
 
-// Schema for creating a new Rule (requires linking to a RuleSet)
 export interface RuleCreate extends RuleBase {
-    ruleset_id: number; // Must link to a ruleset on creation
-    // Ensure the lists are initialized if needed when creating objects
-    match_criteria: MatchCriterion[];
-    tag_modifications: TagModification[]; // <-- Updated to use the union type
-    destinations: StorageDestination[];
+    ruleset_id: number;
 }
 
-// Schema for updating an existing Rule (all fields optional)
+// Make fields truly optional for update payload
 export interface RuleUpdate {
     name?: string | null;
     description?: string | null;
     is_active?: boolean | null;
     priority?: number | null;
     match_criteria?: MatchCriterion[] | null;
-    tag_modifications?: TagModification[] | null; // <-- Updated to use the union type
+    tag_modifications?: TagModification[] | null;
     destinations?: StorageDestination[] | null;
-    applicable_sources?: string[] | null; // Allow updating/clearing sources
+    applicable_sources?: string[] | null;
 }
 
-// Schema for a Rule as returned by the API (includes generated fields)
 export interface Rule extends RuleBase {
     id: number;
     ruleset_id: number;
-    created_at: string; // ISO 8601 format date-time string
-    updated_at?: string | null; // ISO 8601 format date-time string or null
-    // Ensure the lists are properly typed here too
-    match_criteria: MatchCriterion[];
-    tag_modifications: TagModification[]; // <-- Updated to use the union type
-    destinations: StorageDestination[];
-    applicable_sources?: string[] | null; // Allow updating/clearing sources
+    created_at: string;
+    updated_at?: string | null;
 }
 
-
-// Base structure for a RuleSet
+// Renamed Ruleset -> RuleSet for consistency
 export interface RuleSetBase {
-    name: string; // Max length 100
+    name: string;
     description?: string | null;
-    is_active?: boolean; // Default: true in backend schema
-    priority?: number; // Default: 0 in backend schema
-    execution_mode?: RuleSetExecutionMode; // Default: FIRST_MATCH in backend schema
+    is_active?: boolean;
+    priority?: number;
+    execution_mode?: RuleSetExecutionMode;
 }
 
-// Schema for creating a new RuleSet
 export interface RuleSetCreate extends RuleSetBase {}
 
-// Schema for updating an existing RuleSet (all fields optional)
 export interface RuleSetUpdate {
     name?: string | null;
     description?: string | null;
@@ -260,16 +191,13 @@ export interface RuleSetUpdate {
     execution_mode?: RuleSetExecutionMode | null;
 }
 
-// Schema for a RuleSet as returned by the API (includes generated fields)
-// Note: 'rules' might only be included when fetching a single RuleSet detail
 export interface RuleSet extends RuleSetBase {
     id: number;
-    created_at: string; // ISO 8601 format date-time string
-    updated_at?: string | null; // ISO 8601 format date-time string or null
-    rules?: Rule[]; // List of associated rules (eagerly loaded in some cases)
+    created_at: string;
+    updated_at?: string | null;
+    rules: Rule[]; // Now uses correct Rule type
 }
 
-// Schema for RuleSet list views (more lightweight)
 export interface RuleSetSummary {
     id: number;
     name: string;
@@ -277,58 +205,63 @@ export interface RuleSetSummary {
     is_active: boolean;
     priority: number;
     execution_mode: RuleSetExecutionMode;
-    rule_count: number; // Calculated count of rules in the ruleset
-    created_at: string; // ISO 8601 format date-time string
-    updated_at?: string | null; // ISO 8601 format date-time string or null
+    rule_count: number;
+    created_at: string;
+    updated_at?: string | null;
 }
 
 
 // --- System & Health Schemas ---
 
-// Represents the status of a single component
 export interface ComponentStatus {
-    status: 'ok' | 'degraded' | 'error' | 'down' | 'unknown' | string; // Allow string for flexibility
+    status: 'ok' | 'degraded' | 'error' | 'down' | 'unknown' | string;
     details: string | null;
 }
 
-// Structure for the /health endpoint response
 export interface HealthCheckResponse {
-    status: 'ok' | string; // Overall status
+    status: 'ok' | string;
     components: {
         database: ComponentStatus;
         // Add other components reported by backend health check if available
-        // message_queue?: ComponentStatus;
-        // cache?: ComponentStatus;
     }
 }
 
-// Structure for the /dashboard/status endpoint (may be same as HealthCheck or different)
-// Assuming it's different for now, define as needed based on actual backend response
+// Structure for the /dashboard/status endpoint response
 export interface SystemStatusReport {
     database: ComponentStatus;
     message_broker: ComponentStatus;
     api_service: ComponentStatus;
     dicom_listener: ComponentStatus;
     celery_workers: ComponentStatus;
-    // Add more components if returned by the /dashboard/status endpoint
 }
 
+// --- NEW DICOMweb Poller Schemas ---
+export interface DicomWebSourceStatus {
+    source_name: string;
+    is_enabled: boolean;
+    last_processed_timestamp?: string | null; // ISO 8601 datetime string
+    last_successful_run?: string | null;    // ISO 8601 datetime string
+    last_error_run?: string | null;       // ISO 8601 datetime string
+    last_error_message?: string | null;
+}
+
+export interface DicomWebPollersStatusResponse {
+    pollers: DicomWebSourceStatus[];
+}
+// --- END NEW SCHEMAS ---
 
 // --- Error Schemas ---
 
-// Represents a single validation error item from FastAPI (HTTP 422)
 export interface ValidationError {
-    loc: (string | number)[]; // Location of the error (e.g., ['body', 'name'])
-    msg: string; // Error message
-    type: string; // Type of error (e.g., 'value_error')
+    loc: (string | number)[];
+    msg: string;
+    type: string;
 }
 
-// Represents the structure of the HTTP 422 response body
 export interface HTTPValidationError {
     detail?: ValidationError[];
 }
 
-// General API error structure (can be used for non-422 errors)
 export interface ApiError {
-    detail?: string | any; // Error detail message or object
+    detail?: string | any;
 }

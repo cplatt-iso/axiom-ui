@@ -1,14 +1,17 @@
 // src/services/api.ts
+
+import axios from 'axios'; // Assuming axios is used, adjust if using fetch directly in apiClient
 import { AuthContextType } from '../context/AuthContext';
-import { API_V1_PREFIX } from '../config/constants'; // Keep this import
+import { API_V1_PREFIX } from '../config/constants';
 
 // --- Import Schemas ---
 import {
     Rule,
     RuleCreate,
     RuleUpdate,
-    Ruleset,
-    RulesetCreate,
+    RuleSet, // Changed from Ruleset to RuleSet for consistency
+    RuleSetCreate,
+    RuleSetUpdate, // Added update type
     ApiKey,
     ApiKeyCreatePayload,
     ApiKeyCreateResponse,
@@ -16,8 +19,12 @@ import {
     User,
     UserUpdatePayload,
     Role,
-    HealthCheckResponse, // Keep using the schema type
-} from './schemas';
+    HealthCheckResponse,
+    SystemStatusReport, // Added for dashboard status
+    // --- NEW IMPORTS ---
+    DicomWebPollersStatusResponse,
+    // --- END NEW IMPORTS ---
+} from './schemas'; // Correct path
 
 // --- Auth Context Reference ---
 let authContextRef: AuthContextType | null = null;
@@ -26,27 +33,24 @@ export const setAuthContextRef = (auth: AuthContextType) => {
     authContextRef = auth;
 };
 
-
-// --- apiClient Implementation (Reverted: remove skipApiPrefix) ---
+// --- apiClient Implementation ---
 interface FetchOptions extends RequestInit {
     useAuth?: boolean;
     parseResponse?: boolean;
-    // skipApiPrefix?: boolean; // <-- REMOVE this option
 }
 
 export const apiClient = async <T>(
     endpoint: string, // Path AFTER /api/v1
     options: FetchOptions = {}
 ): Promise<T> => {
-    // const { useAuth = true, headers: customHeaders, parseResponse = true, body, skipApiPrefix = false, ...restOptions } = options; // <-- Revert
-    const { useAuth = true, headers: customHeaders, parseResponse = true, body, ...restOptions } = options; // <-- Use this line
+    const { useAuth = true, headers: customHeaders, parseResponse = true, body, ...restOptions } = options;
 
     const defaultHeaders: Record<string, string> = {
         ...(body && !(body instanceof FormData) && { 'Content-Type': 'application/json' }),
         'Accept': 'application/json',
     };
 
-    // --- Auth Check (remains the same) ---
+    // Auth Check
     if (useAuth && !authContextRef?.getToken()) {
         const errorMessage = `API call to ${endpoint} requires authentication, but no token or AuthContext is available.`;
         console.error(errorMessage);
@@ -58,7 +62,6 @@ export const apiClient = async <T>(
     if (token) {
         defaultHeaders['Authorization'] = `Bearer ${token}`;
     }
-    // --- End Auth Check ---
 
     const headers = { ...defaultHeaders, ...customHeaders };
     const apiBaseUrl = typeof window !== 'undefined' ? window.location.origin : '';
@@ -67,22 +70,19 @@ export const apiClient = async <T>(
         throw new Error("Cannot determine API base URL.");
     }
 
-    // --- URL Construction (Reverted: Always use prefix) ---
+    // Always prepend API prefix
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    // if (skipApiPrefix) { ... } else { ... } // <-- REMOVE conditional logic
-    let apiUrl = `${apiBaseUrl}${API_V1_PREFIX}${cleanEndpoint}`; // <-- Always prepend API prefix
-    // --- End URL Construction ---
+    let apiUrl = `${apiBaseUrl}${API_V1_PREFIX}${cleanEndpoint}`;
 
-    // --- Cache Buster (remains the same) ---
+    // Cache Buster for GET
     if (!options.method || options.method.toUpperCase() === 'GET') {
         const cacheBuster = `_=${Date.now()}`;
         apiUrl += (apiUrl.includes('?') ? '&' : '?') + cacheBuster;
     }
 
-    // --- Fetch and Response Handling (remains the same) ---
+    // Fetch and Response Handling
     try {
-        // ... (fetch logic, response handling, error handling) ...
-        console.debug(`API Request: ${options.method || 'GET'} ${apiUrl}`, body ? { body } : {});
+        console.debug(`API Request: ${options.method || 'GET'} ${apiUrl}`, body ? { body: '<hidden>' } : {}); // Hide body in debug
         const response = await fetch(apiUrl, {
             ...restOptions,
             headers,
@@ -100,10 +100,7 @@ export const apiClient = async <T>(
                     authContextRef.logout();
                 } else if (errorStatus === 422 && errorData.detail && Array.isArray(errorData.detail)) {
                     console.warn("Received 422 Validation Error:", errorData.detail);
-                    errorDetail = "Validation Error(s): " + errorData.detail.map((err: any) => {
-                        const field = err.loc?.slice(1).join('.') || 'general';
-                        return `${field}: ${err.msg}`;
-                    }).join('; ');
+                    errorDetail = errorData; // Pass the raw detail for component handling
                 } else {
                     errorDetail = errorData.detail || errorData;
                 }
@@ -113,7 +110,7 @@ export const apiClient = async <T>(
             console.error(`API Response Error for ${apiUrl}: Status ${errorStatus}, Detail:`, errorDetail);
             const error: Error & { status?: number, detail?: any } = new Error(typeof errorDetail === 'string' ? errorDetail : `HTTP ${errorStatus}`);
             error.status = errorStatus;
-            error.detail = errorDetail;
+            error.detail = errorDetail; // Attach parsed detail if available
             throw error;
         }
 
@@ -127,7 +124,7 @@ export const apiClient = async <T>(
     } catch (error) {
         console.error(`API Fetch/Processing Error for ${apiUrl}:`, error instanceof Error ? error.message : error);
         if (error instanceof Error) {
-             throw error;
+             throw error; // Rethrow the original error (potentially with status/detail)
         } else {
              throw new Error('An unexpected issue occurred during the API call.');
         }
@@ -138,18 +135,30 @@ export const apiClient = async <T>(
 // === API Function Definitions ===
 
 // --- System & Health ---
-const SYSTEM_ENDPOINT = '/system'; // Base path for system endpoints
+const SYSTEM_ENDPOINT = '/system';
 
 /** Retrieves the list of configured identifiers for known system input sources. */
 export const getKnownInputSources = () =>
-    apiClient<string[]>(`${SYSTEM_ENDPOINT}/input-sources`); // GET /api/v1/system/input-sources
+    apiClient<string[]>(`${SYSTEM_ENDPOINT}/input-sources`);
 
-/** Retrieves the system health check report. */
-export const getDashboardStatus = () =>
+/** Retrieves the basic system health check report. */
+export const getSystemHealth = () =>
+    apiClient<HealthCheckResponse>(`${SYSTEM_ENDPOINT}/health`, { useAuth: false }); // Health check likely doesn't need auth
+
+/** Retrieves the detailed dashboard status report. */
+export const getDashboardStatus = () => // Assumes uses auth
     apiClient<SystemStatusReport>('/dashboard/status');
 
+// --- NEW DICOMweb Poller Status Function ---
+/** Fetches the status of configured DICOMweb pollers. */
+export const getDicomWebPollersStatus = async (): Promise<DicomWebPollersStatusResponse> => {
+    // Uses apiClient which handles auth and errors
+    return apiClient<DicomWebPollersStatusResponse>(`${SYSTEM_ENDPOINT}/dicomweb-pollers/status`);
+};
+// --- END NEW FUNCTION ---
+
+
 // --- User Management ---
-// ... (functions remain the same) ...
 const USER_ENDPOINT = '/users';
 
 export const getCurrentUser = () => apiClient<User>(`${USER_ENDPOINT}/me`);
@@ -198,20 +207,19 @@ export const updateApiKey = (id: number, data: ApiKeyUpdatePayload) =>
     });
 
 // --- Ruleset Management ---
-// ... (functions remain the same) ...
 const RULESET_ENDPOINT_BASE = '/rules-engine/rulesets';
 
 export const getRulesets = (skip: number = 0, limit: number = 100) =>
-    apiClient<Ruleset[]>(`${RULESET_ENDPOINT_BASE}?skip=${skip}&limit=${limit}`);
+    apiClient<RuleSet[]>(`${RULESET_ENDPOINT_BASE}?skip=${skip}&limit=${limit}`); // Use RuleSet type
 export const getRulesetById = (id: number) =>
-    apiClient<Ruleset>(`${RULESET_ENDPOINT_BASE}/${id}`);
-export const createRuleset = (data: RulesetCreate) =>
-    apiClient<Ruleset>(`${RULESET_ENDPOINT_BASE}`, {
+    apiClient<RuleSet>(`${RULESET_ENDPOINT_BASE}/${id}`); // Use RuleSet type
+export const createRuleset = (data: RuleSetCreate) =>
+    apiClient<RuleSet>(`${RULESET_ENDPOINT_BASE}`, { // Use RuleSet type
         method: 'POST',
         body: JSON.stringify(data)
     });
-export const updateRuleset = (id: number, data: Partial<RulesetCreate>) =>
-    apiClient<Ruleset>(`${RULESET_ENDPOINT_BASE}/${id}`, {
+export const updateRuleset = (id: number, data: RuleSetUpdate) => // Use RuleSetUpdate type
+    apiClient<RuleSet>(`${RULESET_ENDPOINT_BASE}/${id}`, { // Use RuleSet type
         method: 'PUT',
         body: JSON.stringify(data)
     });
@@ -222,7 +230,6 @@ export const deleteRuleset = (id: number) =>
     });
 
 // --- Rule Management ---
-// ... (functions remain the same) ...
 const RULE_ENDPOINT_BASE = '/rules-engine/rules';
 
 export const getRulesByRuleset = (rulesetId: number, skip: number = 0, limit: number = 100) =>
