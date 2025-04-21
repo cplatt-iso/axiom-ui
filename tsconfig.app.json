@@ -10,6 +10,7 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
+    // "resolveJsonModule": true, // Already implied by bundler mode usually
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
@@ -20,7 +21,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true, // Keep existing option
+
+    /* Path Aliases (NEW) */
+    "baseUrl": ".",                   // Sets the base for path resolution
+    "paths": {
+      "@/*": ["./src/*"]            // Defines the @/* alias to point to ./src/*
+    }
   },
   "include": ["src"]
 }

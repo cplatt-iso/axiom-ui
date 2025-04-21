@@ -21,10 +21,10 @@ import {
     Role,
     HealthCheckResponse,
     SystemStatusReport, // Added for dashboard status
-    // --- NEW IMPORTS ---
     DicomWebPollersStatusResponse,
-    // --- END NEW IMPORTS ---
-} from './schemas'; // Correct path
+    DimseListenerStatus, 
+    DimseListenersStatusResponse,
+} from './schemas'; // Correct path - Assuming schemas.ts is in the same dir, adjust if not
 
 // --- Auth Context Reference ---
 let authContextRef: AuthContextType | null = null;
@@ -114,8 +114,11 @@ export const apiClient = async <T>(
             throw error;
         }
 
+        // Handle 204 No Content or cases where we don't parse
         if (response.status === 204 || !parseResponse) {
-             return undefined as unknown as T;
+             // Return null for 204, which might happen if the listener status isn't found
+             // Cast to T, assuming caller handles potential null/undefined
+             return response.status === 204 ? null as T : undefined as T;
         }
 
         const data: T = await response.json();
@@ -149,11 +152,23 @@ export const getSystemHealth = () =>
 export const getDashboardStatus = () => // Assumes uses auth
     apiClient<SystemStatusReport>('/dashboard/status');
 
-// --- NEW DICOMweb Poller Status Function ---
 /** Fetches the status of configured DICOMweb pollers. */
 export const getDicomWebPollersStatus = async (): Promise<DicomWebPollersStatusResponse> => {
-    // Uses apiClient which handles auth and errors
     return apiClient<DicomWebPollersStatusResponse>(`${SYSTEM_ENDPOINT}/dicomweb-pollers/status`);
+};
+
+// --- NEW Dimse Listener Status Function ---
+/** Fetches the status of the main DIMSE listener. Returns null if no status found. */
+// export const getDimseListenerStatus = async (): Promise<DimseListenerStatus | null> => {
+    // Use apiClient which handles auth and errors.
+    // The endpoint returns 200 OK with data OR 200 OK with null body if not found.
+    // apiClient handles the null body case gracefully based on the response_model in the endpoint.
+//    return apiClient<DimseListenerStatus | null>(`${SYSTEM_ENDPOINT}/dimse-listener/status`);
+//};
+
+export const getDimseListenersStatus = async (): Promise<DimseListenersStatusResponse> => { // Update return type
+    // Use the plural API path
+    return apiClient<DimseListenersStatusResponse>(`${SYSTEM_ENDPOINT}/dimse-listeners/status`); // Update expected type
 };
 // --- END NEW FUNCTION ---
 
@@ -207,7 +222,7 @@ export const updateApiKey = (id: number, data: ApiKeyUpdatePayload) =>
     });
 
 // --- Ruleset Management ---
-const RULESET_ENDPOINT_BASE = '/rules-engine/rulesets';
+const RULESET_ENDPOINT_BASE = '/rules-engine/rulesets'; // <-- Check if this prefix is correct
 
 export const getRulesets = (skip: number = 0, limit: number = 100) =>
     apiClient<RuleSet[]>(`${RULESET_ENDPOINT_BASE}?skip=${skip}&limit=${limit}`); // Use RuleSet type
@@ -230,7 +245,7 @@ export const deleteRuleset = (id: number) =>
     });
 
 // --- Rule Management ---
-const RULE_ENDPOINT_BASE = '/rules-engine/rules';
+const RULE_ENDPOINT_BASE = '/rules-engine/rules'; // <-- Check if this prefix is correct
 
 export const getRulesByRuleset = (rulesetId: number, skip: number = 0, limit: number = 100) =>
     apiClient<Rule[]>(`${RULE_ENDPOINT_BASE}?ruleset_id=${rulesetId}&skip=${skip}&limit=${limit}`);

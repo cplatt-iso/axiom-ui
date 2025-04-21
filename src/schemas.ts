@@ -213,42 +213,67 @@ export interface RuleSetSummary {
 
 // --- System & Health Schemas ---
 
+// --- Existing health schemas (moved here for clarity) ---
 export interface ComponentStatus {
-    status: 'ok' | 'degraded' | 'error' | 'down' | 'unknown' | string;
+    status: 'ok' | 'error' | 'degraded' | 'unknown' | string; // Allow string for flexibility
     details: string | null;
 }
 
 export interface HealthCheckResponse {
-    status: 'ok' | string;
+    status: 'ok' | 'error' | 'degraded' | 'unknown' | string; // Allow string for flexibility
     components: {
-        database: ComponentStatus;
+        [key: string]: ComponentStatus; // Use index signature for flexibility
+        database: ComponentStatus; // Ensure database is present
         // Add other components reported by backend health check if available
     }
 }
+// --- End existing health schemas ---
 
-// Structure for the /dashboard/status endpoint response
+
+// --- Existing /dashboard/status endpoint schema (adjust if needed) ---
 export interface SystemStatusReport {
     database: ComponentStatus;
     message_broker: ComponentStatus;
     api_service: ComponentStatus;
-    dicom_listener: ComponentStatus;
+    dicom_listener: ComponentStatus; // This might need refinement based on new status endpoint
     celery_workers: ComponentStatus;
 }
+// --- End /dashboard/status schema ---
 
-// --- NEW DICOMweb Poller Schemas ---
+
+// --- DICOMweb Poller Schemas ---
+// Corrected based on DB model
 export interface DicomWebSourceStatus {
+    id: number;
     source_name: string;
-    is_enabled: boolean;
-    last_processed_timestamp?: string | null; // ISO 8601 datetime string
-    last_successful_run?: string | null;    // ISO 8601 datetime string
-    last_error_run?: string | null;       // ISO 8601 datetime string
-    last_error_message?: string | null;
+    status: string; // e.g., idle, polling, processing, error
+    last_successful_poll_time?: string | null; // ISO 8601 datetime string
+    last_status_message?: string | null;
+    created_at: string; // ISO 8601 datetime string
+    last_heartbeat: string; // ISO 8601 datetime string - Changed from last_updated_at
 }
 
 export interface DicomWebPollersStatusResponse {
     pollers: DicomWebSourceStatus[];
 }
-// --- END NEW SCHEMAS ---
+// --- End DICOMweb Poller Schemas ---
+
+// --- DIMSE Listener Status Schema (NEW) ---
+export interface DimseListenerStatus {
+    id: number;
+    listener_id: string; // Unique identifier (e.g., hostname)
+    status: string;      // e.g., starting, running, stopped, error
+    status_message?: string | null;
+    host?: string | null;
+    port?: number | null;
+    ae_title?: string | null;
+    last_heartbeat: string; // ISO 8601 datetime string
+    created_at: string;     // ISO 8601 datetime string
+}
+// --- End Listener Status Schema ---
+export interface DimseListenersStatusResponse {
+    listeners: DimseListenerStatus[];
+}
 
 // --- Error Schemas ---
 
