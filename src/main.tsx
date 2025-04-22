@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'; // Import BrowserRouter
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'; // Import AuthProvider
+import { Toaster } from 'sonner';
 import App from './App'; // Import App
 import './index.css';
 
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')!).render(
       <GoogleOAuthProvider clientId={googleClientId}>
         <AuthProvider> { /* Wrap with Auth Provider */ }
           <App />
+	  <Toaster richColors position="top-right" />
         </AuthProvider>
       </GoogleOAuthProvider>
     </BrowserRouter>

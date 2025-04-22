@@ -1,8 +1,9 @@
 // src/App.tsx
 import React, { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { useAuth } from './context/AuthContext'; // Import the custom hook
-import { setAuthContextRef } from './services/api'; // Import the setter for the API service
+// --- ADDED: Import Navigate for potential default redirect ---
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { setAuthContextRef } from './services/api';
 
 // Import Core Layout and Route Protection Components
 import Layout from './components/Layout';
@@ -14,23 +15,26 @@ import DashboardPage from './pages/DashboardPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import UserManagementPage from './pages/UserManagementPage';
 import RulesetsPage from './pages/RulesetsPage';
-import RulesetDetailPage from './pages/RulesetDetailPage'; // <-- Import the new page
+import RulesetDetailPage from './pages/RulesetDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
+
+// --- ADDED: Import new configuration pages (will be created next) ---
+import ConfigurationPage from './pages/ConfigurationPage'; // Parent page with Tabs
+import DicomWebSourcesConfigPage from './pages/DicomWebSourcesConfigPage'; // Specific config page
+// --- END ADDED IMPORTS ---
 
 /**
  * AppContent component sets up the main routing logic and connects
  * the authentication context to the API service helper.
  */
 function AppContent() {
-  // Get the auth context instance
   const auth = useAuth();
 
-  // Effect to update the API service helper with the current auth context instance
   useEffect(() => {
       setAuthContextRef(auth);
-  }, [auth]); // Re-run this effect if the auth object changes
+  }, [auth]);
 
   return (
         <Routes>
@@ -39,50 +43,41 @@ function AppContent() {
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             {/* Protected Routes (Standard Users & Admins) */}
-            {/* This outer ProtectedRoute ensures a user must be logged in */}
-            <Route element={<ProtectedRoute />}>
-                {/* Routes using the main Layout */}
-                <Route element={<Layout />}>
-                    {/* Default route maps to Dashboard */}
-                    {/* Use index route for cleaner default */}
+            <Route element={<ProtectedRoute />}> {/* Outer: User must be logged in */}
+                <Route element={<Layout />}> {/* Apply standard layout */}
+                    {/* --- Standard Routes --- */}
                     <Route index element={<DashboardPage />} />
-                    {/* Removed redundant path="/" */}
-
-                    {/* Standard user routes */}
-                    <Route path="/dashboard" element={<DashboardPage />} /> {/* Explicit dashboard route */}
+                    <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/api-keys" element={<ApiKeysPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-
-                    {/* Rules Engine Routes (accessible by standard logged-in users) */}
+                    <Route path="/settings" element={<SettingsPage />} /> {/* User settings */}
                     <Route path="/rulesets" element={<RulesetsPage />} />
-                    {/* --- New Route for Ruleset Details/Rules --- */}
                     <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
 
-                    {/* --- Admin Only Route (Nested Inside Layout) --- */}
-                    {/* Apply admin role check specifically here */}
-                    <Route
-                        path="/admin/users"
-                        element={
-                            <ProtectedRoute allowedRoles={['Admin']}>
-                                <UserManagementPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    {/* Add more routes accessible by standard users OR admins here */}
-                </Route>
-            </Route>
+                    {/* --- Admin Routes Section (Nested within Layout) --- */}
+                    {/* Group admin routes under a common protected element */}
+                    <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
+                        {/* User Management */}
+                        <Route path="/admin/users" element={<UserManagementPage />} />
 
-             {/* --- Alternative: Separate block for Admin routes if they don't use standard Layout or need different protection --- */}
-             {/* If admin routes used a different Layout or protection mechanism, they could be structured like this:
-             <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-                  <Route element={<AdminLayout />}> // Or <Layout /> if same
-                     <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                     <Route path="/admin/users" element={<UserManagementPage />} />
-                  </Route>
-             </Route>
-             */}
-             {/* Based on your current structure, nesting the admin check within the main protected layout seems correct. */}
+                        {/* Configuration Section */}
+                        <Route path="/admin/config" element={<ConfigurationPage />}>
+                            {/* Default/Index route for config: Navigate to the first config page */}
+                            <Route index element={<Navigate to="dicomweb-sources" replace />} />
 
+                            {/* Specific Configuration Pages */}
+                            <Route path="dicomweb-sources" element={<DicomWebSourcesConfigPage />} />
+                            {/* Add other config pages here later, e.g., */}
+                            {/* <Route path="dimse-listeners" element={<DimseListenersConfigPage />} /> */}
+                            {/* <Route path="storage-backends" element={<StorageBackendsConfigPage />} /> */}
+                        </Route>
+
+                        {/* Add other top-level admin routes here */}
+                        {/* e.g., <Route path="/admin/audit-log" element={<AuditLogPage />} /> */}
+                    </Route>
+                    {/* --- End Admin Routes Section --- */}
+
+                </Route> {/* End Layout */}
+            </Route> {/* End Outer ProtectedRoute */}
 
             {/* Catch-all Not Found Route - Must be last */}
             <Route path="*" element={<NotFoundPage />} />

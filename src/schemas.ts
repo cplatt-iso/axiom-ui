@@ -5,6 +5,8 @@
  * used in the Axiom Flow backend API (v1).
  */
 
+import { z } from 'zod';
+
 // --- Enums ---
 
 export enum RuleSetExecutionMode {
@@ -143,9 +145,9 @@ export interface RuleBase {
     description?: string | null;
     is_active?: boolean;
     priority?: number;
-    match_criteria: MatchCriterion[]; // Changed from optional for create/read
-    tag_modifications: TagModification[]; // Changed from optional for create/read
-    destinations: StorageDestination[]; // Changed from optional for create/read
+    match_criteria: MatchCriterion[];
+    tag_modifications: TagModification[];
+    destinations: StorageDestination[];
     applicable_sources?: string[] | null;
 }
 
@@ -153,7 +155,6 @@ export interface RuleCreate extends RuleBase {
     ruleset_id: number;
 }
 
-// Make fields truly optional for update payload
 export interface RuleUpdate {
     name?: string | null;
     description?: string | null;
@@ -172,7 +173,6 @@ export interface Rule extends RuleBase {
     updated_at?: string | null;
 }
 
-// Renamed Ruleset -> RuleSet for consistency
 export interface RuleSetBase {
     name: string;
     description?: string | null;
@@ -195,7 +195,7 @@ export interface RuleSet extends RuleSetBase {
     id: number;
     created_at: string;
     updated_at?: string | null;
-    rules: Rule[]; // Now uses correct Rule type
+    rules: Rule[];
 }
 
 export interface RuleSetSummary {
@@ -213,67 +213,199 @@ export interface RuleSetSummary {
 
 // --- System & Health Schemas ---
 
-// --- Existing health schemas (moved here for clarity) ---
 export interface ComponentStatus {
-    status: 'ok' | 'error' | 'degraded' | 'unknown' | string; // Allow string for flexibility
+    status: 'ok' | 'error' | 'degraded' | 'unknown' | string;
     details: string | null;
 }
 
 export interface HealthCheckResponse {
-    status: 'ok' | 'error' | 'degraded' | 'unknown' | string; // Allow string for flexibility
+    status: 'ok' | 'error' | 'degraded' | 'unknown' | string;
     components: {
-        [key: string]: ComponentStatus; // Use index signature for flexibility
-        database: ComponentStatus; // Ensure database is present
-        // Add other components reported by backend health check if available
+        [key: string]: ComponentStatus;
+        database: ComponentStatus;
     }
 }
-// --- End existing health schemas ---
 
-
-// --- Existing /dashboard/status endpoint schema (adjust if needed) ---
 export interface SystemStatusReport {
     database: ComponentStatus;
     message_broker: ComponentStatus;
     api_service: ComponentStatus;
-    dicom_listener: ComponentStatus; // This might need refinement based on new status endpoint
+    dicom_listener: ComponentStatus;
     celery_workers: ComponentStatus;
 }
-// --- End /dashboard/status schema ---
 
-
-// --- DICOMweb Poller Schemas ---
-// Corrected based on DB model
+// --- DICOMweb Poller Status Schemas ---
 export interface DicomWebSourceStatus {
     id: number;
     source_name: string;
-    status: string; // e.g., idle, polling, processing, error
-    last_successful_poll_time?: string | null; // ISO 8601 datetime string
-    last_status_message?: string | null;
-    created_at: string; // ISO 8601 datetime string
-    last_heartbeat: string; // ISO 8601 datetime string - Changed from last_updated_at
+    is_enabled: boolean;
+    last_successful_run?: string | null;
+    last_error_run?: string | null;
+    last_error_message?: string | null;
+    last_processed_timestamp?: string | null;
+    created_at: string;
+    last_heartbeat: string;
 }
 
 export interface DicomWebPollersStatusResponse {
     pollers: DicomWebSourceStatus[];
 }
-// --- End DICOMweb Poller Schemas ---
 
-// --- DIMSE Listener Status Schema (NEW) ---
+// --- DIMSE Listener Status Schema ---
 export interface DimseListenerStatus {
     id: number;
-    listener_id: string; // Unique identifier (e.g., hostname)
-    status: string;      // e.g., starting, running, stopped, error
+    listener_id: string;
+    status: string;
     status_message?: string | null;
     host?: string | null;
     port?: number | null;
     ae_title?: string | null;
-    last_heartbeat: string; // ISO 8601 datetime string
-    created_at: string;     // ISO 8601 datetime string
+    last_heartbeat: string;
+    created_at: string;
 }
-// --- End Listener Status Schema ---
+
 export interface DimseListenersStatusResponse {
     listeners: DimseListenerStatus[];
 }
+
+// --- Configuration Schemas ---
+
+// --- DICOMweb Source Configuration Schemas ---
+
+// Add 'apikey'
+export type DicomWebSourceAuthType = "none" | "basic" | "bearer" | "apikey"; // <-- ADDED 'apikey'
+
+export type DicomWebSourceAuthConfig = Record<string, any> | null;
+export type DicomWebSourceSearchFilters = Record<string, any> | null;
+
+// Interface for reading configurations returned from API (uses 'name')
+// Matches the corrected DicomWebSourceConfigRead Pydantic schema
+export interface DicomWebSourceConfigRead {
+    id: number;
+    name: string; // API response uses 'name'
+    description?: string | null;
+    base_url: string;
+    qido_prefix: string;
+    wado_prefix: string;
+    polling_interval_seconds: number;
+    is_enabled: boolean;
+    auth_type: DicomWebSourceAuthType; // Includes 'apikey'
+    auth_config?: DicomWebSourceAuthConfig;
+    search_filters?: DicomWebSourceSearchFilters;
+}
+
+// Interface for the payload when creating (matches backend Create Pydantic schema)
+export interface DicomWebSourceConfigCreatePayload {
+    name: string; // API expects 'name'
+    description?: string | null;
+    base_url: string;
+    qido_prefix?: string;
+    wado_prefix?: string;
+    polling_interval_seconds?: number;
+    is_enabled?: boolean;
+    auth_type?: DicomWebSourceAuthType; // Includes 'apikey'
+    auth_config?: DicomWebSourceAuthConfig;
+    search_filters?: DicomWebSourceSearchFilters;
+}
+
+// Interface for the payload when updating (matches backend Update Pydantic schema)
+export interface DicomWebSourceConfigUpdatePayload {
+    name?: string | null; // API expects 'name'
+    description?: string | null;
+    base_url?: string | null;
+    qido_prefix?: string | null;
+    wado_prefix?: string | null;
+    polling_interval_seconds?: number | null;
+    is_enabled?: boolean | null;
+    auth_type?: DicomWebSourceAuthType | null; // Includes 'apikey'
+    auth_config?: DicomWebSourceAuthConfig;
+    search_filters?: DicomWebSourceSearchFilters;
+}
+
+// --- Zod Schema for DICOMweb Source Form Validation ---
+// Add 'apikey' to enum
+export const dicomWebSourceAuthTypeSchema = z.enum(["none", "basic", "bearer", "apikey"]); // <-- ADDED 'apikey'
+
+export const dicomWebSourceFormSchema = z.object({
+    // Fields match form/payload structure
+    name: z.string().min(1, "Name is required").max(100, "Name cannot exceed 100 characters"),
+    description: z.string().max(255, "Description cannot exceed 255 characters").optional().nullable(),
+    base_url: z.string().url("Must be a valid URL (e.g., http://host:port/path)").min(1, "Base URL is required"),
+    qido_prefix: z.string().optional().default("qido-rs"),
+    wado_prefix: z.string().optional().default("wado-rs"),
+    polling_interval_seconds: z.coerce
+        .number({ invalid_type_error: "Interval must be a number" })
+        .int("Interval must be a whole number")
+        .positive("Interval must be greater than 0")
+        .min(1, "Interval must be at least 1 second")
+        .max(86400, "Interval cannot exceed 1 day (86400s)")
+        .default(300),
+    is_enabled: z.boolean().default(true),
+    auth_type: dicomWebSourceAuthTypeSchema.default("none"), // Now includes 'apikey'
+    auth_config: z.string().nullable().optional().default(null), // Still string from Textarea
+    search_filters: z.string().nullable().optional().default(null), // Still string from Textarea
+
+// Updated refine block to include 'apikey'
+}).refine(data => {
+    if (data.auth_type === 'basic' || data.auth_type === 'bearer' || data.auth_type === 'apikey') { // <-- Include 'apikey'
+        if (!data.auth_config || !data.auth_config.trim()) {
+            return false; // Require non-empty config for these types
+        }
+        try {
+            const parsed = JSON.parse(data.auth_config);
+            if (data.auth_type === 'basic') {
+                return typeof parsed === 'object' && parsed !== null &&
+                       typeof parsed.username === 'string' && parsed.username.length > 0 &&
+                       typeof parsed.password === 'string' && parsed.password.length > 0;
+            }
+            if (data.auth_type === 'bearer') {
+                 return typeof parsed === 'object' && parsed !== null &&
+                        typeof parsed.token === 'string' && parsed.token.length > 0;
+            }
+            // --- ADDED API Key structure validation ---
+            if (data.auth_type === 'apikey') {
+                 return typeof parsed === 'object' && parsed !== null &&
+                        typeof parsed.header_name === 'string' && parsed.header_name.length > 0 &&
+                        typeof parsed.key === 'string' && parsed.key.length > 0;
+            }
+             // --- END API Key validation ---
+        } catch (e) {
+            return false; // Invalid JSON
+        }
+    }
+    // For 'none' type: reject non-empty JSON
+    if (data.auth_type === 'none' && data.auth_config && data.auth_config.trim()) {
+         try {
+             JSON.parse(data.auth_config);
+             return false;
+         } catch (e) {
+             return true; // Allow non-JSON garbage
+         }
+    }
+    return true;
+}, {
+    message: "Invalid Auth Config JSON or missing required fields for selected Auth Type.",
+    path: ["auth_config"],
+}).refine(data => { // Search filters validation remains same
+    if (data.search_filters && data.search_filters.trim()) {
+        try {
+            const parsed = JSON.parse(data.search_filters);
+            return typeof parsed === 'object' && parsed !== null;
+        } catch (e) {
+            return false;
+        }
+    }
+    return true;
+}, {
+    message: "Search Filters must be valid JSON object if provided.",
+    path: ["search_filters"],
+});
+
+// DicomWebSourceFormData type derived from Zod schema
+export type DicomWebSourceFormData = z.infer<typeof dicomWebSourceFormSchema>;
+
+// --- End Zod Schema ---
+
 
 // --- Error Schemas ---
 
