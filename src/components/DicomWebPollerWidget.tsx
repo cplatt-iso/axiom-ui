@@ -3,18 +3,28 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getDicomWebPollersStatus } from '../services/api';
 import { DicomWebSourceStatus } from '../schemas';
+// --- Corrected Imports ---
 import { ClockIcon, CheckCircleIcon, XCircleIcon, PauseCircleIcon, QuestionMarkCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { Loader2 } from 'lucide-react'; // <-- Import Loader2 from lucide-react
+// --- End Corrected Imports ---
 import { formatDistanceToNowStrict } from 'date-fns';
-// --- Import Card components ---
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// --- End Import ---
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button'; // Import Button
 
+// Constants
+const POLLER_STATUS_STALE_THRESHOLD_SECONDS = 5 * 60; // 5 minutes
 
-// Helper formatOptionalDate remains the same
+// Helper formatOptionalDate (No changes needed)
 const formatOptionalDate = (dateString: string | null | undefined): string => {
     if (!dateString) return 'N/A';
     try {
         const date = new Date(dateString);
+        // Ensure the date parsed correctly before formatting
+        if (isNaN(date.getTime())) {
+            console.warn(`Invalid date string passed to formatOptionalDate: ${dateString}`);
+            return 'Invalid Date';
+        }
         return formatDistanceToNowStrict(date, { addSuffix: true });
     } catch (e) {
         console.error(`Error formatting date string: ${dateString}`, e);
@@ -22,68 +32,117 @@ const formatOptionalDate = (dateString: string | null | undefined): string => {
     }
 };
 
-// Helper getStatusIndicator remains the same
-const getStatusIndicator = (poller: DicomWebSourceStatus): { node: React.ReactNode, tooltip: string } => {
-    // ... (logic as before) ...
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+// Refined status indicator helper
+const getStatusIndicator = (poller: DicomWebSourceStatus): {
+    node: React.ReactNode,
+    tooltip: string,
+    variant: 'default' | 'secondary' | 'destructive' | 'outline', // For Badge variant
+    Icon: React.ElementType
+} => {
+    const now = new Date();
     const lastSuccessRaw = poller.last_successful_run;
     const lastErrorRaw = poller.last_error_run;
     const lastSuccess = lastSuccessRaw ? new Date(lastSuccessRaw) : null;
     const lastError = lastErrorRaw ? new Date(lastErrorRaw) : null;
-    console.log(`getStatusIndicator for ${poller.source_name}:`, { /* ... logs ... */ });
-    let statusClass = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    let Icon = QuestionMarkCircleIcon;
+
+    let variant: 'default' | 'secondary' | 'destructive' | 'outline' = 'outline';
+    let Icon: React.ElementType = QuestionMarkCircleIcon;
     let text = 'Unknown';
     let tooltip = `Source: ${poller.source_name}`;
-    if (!poller.is_enabled) { text = 'Disabled'; Icon = PauseCircleIcon; statusClass='bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'; }
-    else if (poller.last_error_message && lastError && (!lastSuccess || lastError > lastSuccess)) { text = 'Error'; Icon = XCircleIcon; statusClass='bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'; tooltip=`Error on last run (${formatOptionalDate(poller.last_error_run)}): ${poller.last_error_message}`; }
-    else if (lastSuccess && lastSuccess > fiveMinutesAgo) { text = 'OK'; Icon = CheckCircleIcon; statusClass='bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'; tooltip=`Last successful run: ${formatOptionalDate(poller.last_successful_run)}. Last processed: ${formatOptionalDate(poller.last_processed_timestamp)}.`; }
-    else if (lastSuccess) { text = 'Stale'; Icon = ClockIcon; statusClass='bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'; tooltip=`Last successful run was ${formatOptionalDate(poller.last_successful_run)}. Last processed: ${formatOptionalDate(poller.last_processed_timestamp)}.`; }
-    else { text = 'Pending'; Icon = ClockIcon; statusClass='bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'; tooltip=`Polling is enabled but hasn't completed a run successfully yet.`; }
-    const node = ( <span className={`flex items-center text-xs font-medium mr-2 px-2 py-0.5 rounded ${statusClass}`}> <Icon className="w-3.5 h-3.5 mr-1" aria-hidden="true"/> {text} </span> );
-    return { node, tooltip };
+
+    console.debug(`[PollerWidget] Checking status for ${poller.source_name}: enabled=${poller.is_enabled}, lastSuccess=${lastSuccess?.toISOString()}, lastError=${lastError?.toISOString()}`);
+
+    if (!poller.is_enabled) {
+        text = 'Disabled';
+        Icon = PauseCircleIcon;
+        variant = 'secondary'; // Greyish badge for disabled
+        tooltip = `Polling is disabled for ${poller.source_name}.`;
+        console.debug(`[PollerWidget] Status for ${poller.source_name}: Disabled`);
+    } else if (poller.last_error_message && lastError && (!lastSuccess || lastError > lastSuccess)) {
+        text = 'Error';
+        Icon = XCircleIcon;
+        variant = 'destructive';
+        tooltip = `Error on last run (${formatOptionalDate(poller.last_error_run)}): ${poller.last_error_message}`;
+        console.debug(`[PollerWidget] Status for ${poller.source_name}: Error`);
+    } else if (lastSuccess) {
+        const secondsSinceSuccess = (now.getTime() - lastSuccess.getTime()) / 1000;
+        if (secondsSinceSuccess <= POLLER_STATUS_STALE_THRESHOLD_SECONDS) {
+            text = 'OK';
+            Icon = CheckCircleIcon;
+            variant = 'default'; // Green badge for OK
+            tooltip = `Last successful run: ${formatOptionalDate(poller.last_successful_run)}. Last processed item timestamp: ${formatOptionalDate(poller.last_processed_timestamp)}.`;
+            console.debug(`[PollerWidget] Status for ${poller.source_name}: OK (Success within ${POLLER_STATUS_STALE_THRESHOLD_SECONDS}s)`);
+        } else {
+            text = 'Stale';
+            Icon = ClockIcon;
+            variant = 'secondary'; // Use secondary variant for stale (often greyish/yellowish)
+            tooltip = `Last successful run was ${formatOptionalDate(poller.last_successful_run)} (more than ${POLLER_STATUS_STALE_THRESHOLD_SECONDS / 60} mins ago). Last processed: ${formatOptionalDate(poller.last_processed_timestamp)}.`;
+             console.debug(`[PollerWidget] Status for ${poller.source_name}: Stale (Success > ${POLLER_STATUS_STALE_THRESHOLD_SECONDS}s ago)`);
+        }
+    } else {
+        // Enabled, never had a successful run, no error reported after last attempt (or no attempt yet)
+        text = 'Pending';
+        Icon = ClockIcon; // Use Clock for pending initial run
+        variant = 'outline'; // Use outline variant for pending
+        tooltip = `Polling is enabled but hasn't completed a run successfully yet. Last error (if any): ${formatOptionalDate(poller.last_error_run)}.`;
+        console.debug(`[PollerWidget] Status for ${poller.source_name}: Pending`);
+    }
+
+    // Use Badge component for consistent styling
+    const node = (
+        <Badge variant={variant} className="flex items-center gap-1 text-xs font-medium">
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            {text}
+        </Badge>
+    );
+
+    return { node, tooltip, variant, Icon };
 };
 
 
 const DicomWebPollerWidget: React.FC = () => {
-    const { data, isLoading, error, refetch, isFetching } = useQuery({
+    const { data: responseData, isLoading, isError, error, refetch, isFetching } = useQuery({
         queryKey: ['dicomWebPollerStatus'],
         queryFn: getDicomWebPollersStatus,
-        refetchInterval: 30000,
+        refetchInterval: 30000, // Keep 30s refresh
         refetchIntervalInBackground: true,
-        staleTime: 15000,
+        staleTime: 15000, // Keep 15s stale time
     });
 
-    const renderContent = () => {
-        if (isLoading) { return <p className="text-sm text-gray-500 dark:text-gray-400">Loading poller status...</p>; }
-        if (error) { return <p className="text-sm text-red-600 dark:text-red-400">Error loading status: {(error as Error).message || 'Unknown error'}</p>; }
-        if (!data || !data.pollers || data.pollers.length === 0) { return <p className="text-sm text-gray-500 dark:text-gray-400">No DICOMweb pollers configured or status available.</p>; }
+    const pollers = responseData?.pollers ?? [];
 
-        // Return the table directly, CardContent will add padding
+    const renderContent = () => {
+        if (isLoading) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400"><Loader2 className="inline w-4 h-4 mr-2 animate-spin" />Loading poller status...</div>; }
+        if (isError) { return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading status: {(error as Error).message || 'Unknown error'}</div>; }
+        if (pollers.length === 0) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">No DICOMweb pollers configured.</div>; }
+
         return (
             <div className="overflow-x-auto">
-                <table className="min-w-full"> {/* Removed redundant dividers, Card adds border */}
-                    <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase"> {/* Simplified thead style */}
+                <table className="min-w-full text-sm">
+                    <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50">
                         <tr>
-                            <th scope="col" className="px-3 py-2 text-left font-medium tracking-wider">Name</th>
-                            <th scope="col" className="px-3 py-2 text-left font-medium tracking-wider">Status</th>
-                            <th scope="col" className="px-3 py-2 text-left font-medium tracking-wider">Last Success</th>
-                            <th scope="col" className="px-3 py-2 text-left font-medium tracking-wider">Last Processed</th>
-                            <th scope="col" className="px-3 py-2 text-left font-medium tracking-wider">Last Error</th>
+                            <th scope="col" className="px-4 py-2 text-left font-medium tracking-wider">Name</th>
+                            <th scope="col" className="px-4 py-2 text-left font-medium tracking-wider">Status</th>
+                            <th scope="col" className="px-4 py-2 text-left font-medium tracking-wider">Last Success</th>
+                            <th scope="col" className="px-4 py-2 text-left font-medium tracking-wider">Last Processed</th>
+                            <th scope="col" className="px-4 py-2 text-left font-medium tracking-wider">Last Error</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700"> {/* Keep divider for rows */}
-                        {data.pollers.map((poller) => {
-                             const { node: statusNode, tooltip: statusTooltip } = getStatusIndicator(poller);
-                             return (
-                                <tr key={poller.source_name} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50"> {/* Adjusted hover */}
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{poller.source_name}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm" title={statusTooltip}>{statusNode}</td> {/* Removed text color here */}
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{formatOptionalDate(poller.last_successful_run)}</td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{formatOptionalDate(poller.last_processed_timestamp)}</td>
-                                     <td className="px-3 py-2 whitespace-nowrap text-sm text-red-600 dark:text-red-400" title={poller.last_error_message || ''}>{formatOptionalDate(poller.last_error_run)}</td>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {pollers.map((poller) => {
+                            const { node: statusNode, tooltip: statusTooltip } = getStatusIndicator(poller);
+                            return (
+                                <tr key={poller.source_name} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                    <td className="px-4 py-2 whitespace-nowrap font-medium text-gray-900 dark:text-white">{poller.source_name}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap" title={statusTooltip}>{statusNode}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-gray-600 dark:text-gray-400">{formatOptionalDate(poller.last_successful_run)}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-gray-600 dark:text-gray-400">{formatOptionalDate(poller.last_processed_timestamp)}</td>
+                                    <td className="px-4 py-2 whitespace-nowrap text-red-600 dark:text-red-400" title={poller.last_error_message || undefined}> {/* Changed empty string to undefined for title */}
+                                        {poller.last_error_message ? formatOptionalDate(poller.last_error_run) : 'N/A'}
+                                    </td>
                                 </tr>
-                             );
+                            );
                         })}
                     </tbody>
                 </table>
@@ -91,28 +150,28 @@ const DicomWebPollerWidget: React.FC = () => {
         );
     };
 
-    // --- Use Card components for structure ---
     return (
-         <Card className="dark:bg-gray-800"> {/* Replace div with Card */}
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"> {/* Use CardHeader */}
-                 <CardTitle className="text-sm font-medium text-lg"> {/* Use CardTitle */}
+         <Card className="dark:bg-gray-800 shadow-sm"> {/* Added shadow */}
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b dark:border-gray-700">
+                 <CardTitle className="text-base font-semibold"> {/* Adjusted size/weight */}
                     DICOMweb Poller Status
                  </CardTitle>
-                 <button
+                 <Button
+                     variant="ghost" // Use ghost variant for icon button
+                     size="sm" // Use small size
                      onClick={() => refetch()}
                      disabled={isFetching || isLoading}
-                     className="p-1 text-gray-400 rounded-full hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50" // Adjusted hover style slightly
                      aria-label="Refresh poller status"
+                     className="text-muted-foreground hover:text-foreground" // Subtle colors
                  >
-                      <ArrowPathIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /> {/* Adjusted size */}
-                 </button>
+                      <ArrowPathIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                 </Button>
             </CardHeader>
-            <CardContent className="p-0"> {/* Use CardContent, remove default padding if table has its own */}
+            <CardContent className="p-0"> {/* Remove padding as table has its own */}
                  {renderContent()}
             </CardContent>
          </Card>
     );
-    // --- End Use Card components ---
 };
 
 export default DicomWebPollerWidget;
