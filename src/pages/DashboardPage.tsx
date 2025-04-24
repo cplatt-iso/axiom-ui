@@ -5,8 +5,11 @@ import { getDashboardStatus, SystemStatusReport, ComponentStatus } from '../serv
 // Import the generic StatusWidget
 import StatusWidget from '../components/StatusWidget';
 // Import Specific Widgets
-import DicomWebPollerWidget from '../components/DicomWebPollerWidget'; // Use default import
-import DimseListenerStatusWidget from '../components/DimseListenerStatusWidget'; // Use default import
+import DicomWebPollerWidget from '../components/DicomWebPollerWidget';
+import DimseListenerStatusWidget from '../components/DimseListenerStatusWidget';
+// --- ADDED: Import the new DIMSE Q/R widget ---
+import DimseQrSourceStatusWidget from '../components/DimseQrSourceStatusWidget';
+// --- END ADDED ---
 
 const DashboardPage: React.FC = () => {
     // State for the generic status report from /dashboard/status
@@ -96,10 +99,13 @@ const DashboardPage: React.FC = () => {
             <div>
                  {/* No separate title needed if widgets have good titles */}
                 <div className="space-y-6">
-                    {/* Render the new list-based DIMSE Listener Widget */}
+                    {/* Render the list-based DIMSE Listener Widget */}
                     <DimseListenerStatusWidget />
                     {/* Render the DICOMweb Poller Widget */}
                     <DicomWebPollerWidget />
+                    {/* --- ADDED: Render the DIMSE Q/R Source Widget --- */}
+                    <DimseQrSourceStatusWidget />
+                    {/* --- END ADDED --- */}
                     {/* Add other detailed widgets here later */}
                 </div>
             </div>

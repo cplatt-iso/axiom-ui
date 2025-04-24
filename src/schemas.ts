@@ -1,23 +1,6 @@
 // src/schemas.ts
 
-/**
- * TypeScript interfaces and Zod schemas corresponding to the Pydantic schemas
- * used in the Axiom Flow backend API (v1).
- * - Interfaces are used for API data contracts and general type safety.
- * - Enums are standard TS enums for use in component logic (e.g., dropdowns).
- * - Zod schemas (*FormSchema) are used specifically with react-hook-form/zodResolver for form validation.
- */
-
-import { z } from 'zod';
-
-// Helper for optional nullable fields (used in Zod schemas)
-const optionalNullableString = z.string().optional().nullable();
-const optionalNullableNumber = z.number().optional().nullable();
-// const optionalNullableBoolean = z.boolean().optional().nullable(); // Not currently needed
-const optionalNullableDate = z.date().or(z.string()).optional().nullable(); // Accept string for initial parse
-
-// --- Standard TypeScript Enums (for component logic) ---
-
+// --- Enums (Mirroring Backend) ---
 export enum RuleSetExecutionMode {
     FIRST_MATCH = "FIRST_MATCH",
     ALL_MATCHES = "ALL_MATCHES",
@@ -48,285 +31,257 @@ export enum ModifyAction {
     REGEX_REPLACE = "regex_replace",
 }
 
-export enum DicomWebSourceAuthTypeEnum {
-    NONE = "none",
-    BASIC = "basic",
-    BEARER = "bearer",
-    APIKEY = "apikey"
-}
-// Create a string literal type from the enum for stricter interface typing
-export type DicomWebSourceAuthType = `${DicomWebSourceAuthTypeEnum}`;
-
-
-// --- API Key Schemas (TypeScript Interfaces) ---
-
-export interface ApiKeyBase {
-    name: string;
-    expires_at?: string | null; // ISO String date from API
+// --- Base Interfaces ---
+export interface MatchCriterion {
+    tag: string;
+    op: MatchOperation;
+    value?: any;
 }
 
-export interface ApiKeyCreate extends ApiKeyBase {}
-
-export interface ApiKeyUpdate {
-    name?: string | null;
-    is_active?: boolean | null;
-    expires_at?: string | null;
+// --- Tag Modification Interfaces (Discriminated Union Pattern) ---
+export interface TagSetModification {
+    action: ModifyAction.SET;
+    tag: string;
+    value: any;
+    vr?: string;
 }
+export interface TagDeleteModification {
+    action: ModifyAction.DELETE;
+    tag: string;
+}
+export interface TagPrependModification {
+    action: ModifyAction.PREPEND;
+    tag: string;
+    value: string;
+}
+export interface TagSuffixModification {
+    action: ModifyAction.SUFFIX;
+    tag: string;
+    value: string;
+}
+export interface TagRegexReplaceModification {
+    action: ModifyAction.REGEX_REPLACE;
+    tag: string;
+    pattern: string;
+    replacement: string;
+}
+export type TagModification =
+    | TagSetModification
+    | TagDeleteModification
+    | TagPrependModification
+    | TagSuffixModification
+    | TagRegexReplaceModification;
+// --- End Tag Modification ---
 
-export interface ApiKey extends ApiKeyBase {
+// --- REMOVED old StorageDestination interface ---
+// export interface StorageDestination {
+//     /** Storage type (e.g., 'filesystem', 'cstore', 'gcs', 'google_healthcare', 'stow_rs') */
+//     type: string;
+//     /** Backend-specific configuration (e.g., path, ae_title, bucket, project_id, stow_url) */
+//     config: Record<string, any>;
+// }
+// --- END REMOVED ---
+
+// --- ADDED: Storage Backend Config Read Schema (needed for Rule schema) ---
+export type AllowedBackendType =
+    | "filesystem"
+    | "cstore"
+    | "gcs"
+    | "google_healthcare"
+    | "stow_rs";
+
+export interface StorageBackendConfigRead { // Only need the Read version here
     id: number;
-    prefix: string;
-    is_active: boolean;
-    last_used_at?: string | null; // ISO String date from API
-    created_at: string; // ISO String date from API
-    updated_at: string; // ISO String date from API
-    user_id: number;
+    name: string;
+    description?: string | null;
+    backend_type: AllowedBackendType;
+    config: Record<string, any>;
+    is_enabled: boolean;
+    created_at: string;
+    updated_at: string;
+}
+// --- END ADDED ---
+
+
+// --- Rule Schemas ---
+export interface RuleBase {
+    name: string;
+    description?: string | null;
+    is_active?: boolean;
+    priority?: number;
+    match_criteria?: MatchCriterion[];
+    tag_modifications?: TagModification[];
+    // --- REMOVED old destinations field ---
+    // destinations?: StorageDestination[];
+    // --- END REMOVED ---
+    applicable_sources?: string[] | null;
+}
+export interface RuleCreate extends RuleBase {
+    ruleset_id: number;
+    // --- ADDED: List of destination config IDs ---
+    destination_ids?: number[] | null;
+    // --- END ADDED ---
+}
+export interface RuleUpdate extends Partial<RuleBase> { // Use Partial<RuleBase>
+    // --- ADDED: List of destination config IDs ---
+    destination_ids?: number[] | null; // Can be null or empty list to clear
+    // --- END ADDED ---
+}
+export interface Rule extends RuleBase {
+    id: number;
+    ruleset_id: number;
+    created_at: string;
+    updated_at: string;
+    // --- ADDED: Use StorageBackendConfigRead for the relationship ---
+    destinations: StorageBackendConfigRead[]; // List of full backend config objects
+    // --- END ADDED ---
 }
 
-export interface ApiKeyCreateResponse extends Omit<ApiKey, 'last_used_at'> {
-    full_key: string; // This is the only time the full key is shown
+// --- RuleSet Schemas ---
+export interface RuleSetBase {
+    name: string;
+    description?: string | null;
+    is_active?: boolean;
+    priority?: number;
+    execution_mode?: RuleSetExecutionMode;
+}
+export interface RuleSetCreate extends RuleSetBase {}
+export interface RuleSetUpdate extends Partial<RuleSetBase> {}
+export interface RuleSet extends RuleSetBase {
+    id: number;
+    created_at: string;
+    updated_at: string;
+    rules: Rule[]; // Rules will contain populated destinations
 }
 
-export interface ApiKeyCreatePayload extends ApiKeyCreate {}
-export interface ApiKeyUpdatePayload extends ApiKeyUpdate {}
-
-
-// --- Authentication Schemas (TypeScript Interfaces) ---
-
-export interface GoogleToken {
-    token: string;
-}
-
-export interface TokenResponse {
-    access_token: string;
-    token_type: string;
-    user?: User; // User type defined below
-}
-
-// --- Role Schemas (TypeScript Interfaces) ---
-
+// --- User & Role Schemas ---
 export interface Role {
     id: number;
     name: string;
     description?: string | null;
-    created_at: string; // ISO String date from API
-    updated_at: string; // ISO String date from API
-}
-
-// --- User Schemas (TypeScript Interfaces) ---
-
-export interface UserBase {
-    email?: string | null;
-    is_active?: boolean | null;
-    is_superuser?: boolean | null;
-    full_name?: string | null;
-    google_id?: string | null;
-    picture?: string | null;
-}
-
-// Specific payload for the update endpoint if it differs significantly
-export interface UserUpdatePayload {
-    is_active?: boolean;
-    // Add other updatable fields if the PUT endpoint allows them
-}
-
-export interface User extends UserBase {
-    id: number;
-    created_at: string; // ISO String date from API
-    updated_at: string; // ISO String date from API
-    roles: Role[]; // Array of Role interfaces
-}
-// Alias if needed elsewhere, but User usually suffices
-export type UserWithRoles = User;
-
-
-// --- Rule Engine Schemas (TypeScript Interfaces) ---
-
-export interface MatchCriterion {
-    tag: string;
-    op: MatchOperation; // Use the TS Enum here
-    value?: any;
-}
-
-export interface TagModificationBase { tag: string; }
-export interface TagSetModification extends TagModificationBase { action: ModifyAction.SET; value: any; vr?: string | null; }
-export interface TagDeleteModification extends TagModificationBase { action: ModifyAction.DELETE; }
-export interface TagPrependModification extends TagModificationBase { action: ModifyAction.PREPEND; value: string; }
-export interface TagSuffixModification extends TagModificationBase { action: ModifyAction.SUFFIX; value: string; }
-export interface TagRegexReplaceModification extends TagModificationBase { action: ModifyAction.REGEX_REPLACE; pattern: string; replacement: string; }
-// Discriminated union using TS interfaces and enums
-export type TagModification = TagSetModification | TagDeleteModification | TagPrependModification | TagSuffixModification | TagRegexReplaceModification;
-
-export interface StorageDestination {
-    type: string;
-    config: Record<string, any>; // Generic config object
-}
-
-export interface RuleBase {
-    name: string;
-    description?: string | null;
-    is_active?: boolean; // Defaulted to true on backend create typically
-    priority?: number; // Defaulted to 0 on backend create typically
-    match_criteria: MatchCriterion[];
-    tag_modifications: TagModification[];
-    destinations: StorageDestination[];
-    applicable_sources?: string[] | null;
-}
-
-export interface RuleCreate extends RuleBase {
-    ruleset_id: number; // Required when creating a rule
-}
-
-// Interface for the PUT payload (all fields optional)
-export interface RuleUpdate {
-    name?: string | null;
-    description?: string | null;
-    is_active?: boolean | null;
-    priority?: number | null;
-    match_criteria?: MatchCriterion[] | null;
-    tag_modifications?: TagModification[] | null;
-    destinations?: StorageDestination[] | null;
-    applicable_sources?: string[] | null;
-}
-
-export interface Rule extends RuleBase {
-    id: number;
-    ruleset_id: number;
-    created_at: string; // ISO String date from API
-    updated_at?: string | null; // ISO String date from API
-    is_active: boolean; // Ensure this is not optional in the read model
-    priority: number; // Ensure this is not optional in the read model
-}
-
-export interface RuleSetBase {
-    name: string;
-    description?: string | null;
-    is_active?: boolean; // Defaulted to true on backend create typically
-    priority?: number; // Defaulted to 0 on backend create typically
-    execution_mode?: RuleSetExecutionMode; // Use the TS Enum here
-}
-
-export interface RuleSetCreate extends RuleSetBase {}
-
-// Interface for the PUT payload (all fields optional)
-export interface RuleSetUpdate {
-    name?: string | null;
-    description?: string | null;
-    is_active?: boolean | null;
-    priority?: number | null;
-    execution_mode?: RuleSetExecutionMode | null;
-}
-
-export interface RuleSet extends RuleSetBase {
-    id: number;
-    created_at: string; // ISO String date from API
-    updated_at?: string | null; // ISO String date from API
-    rules: Rule[]; // Array of Rule interfaces
-    is_active: boolean; // Ensure this is not optional in the read model
-    priority: number; // Ensure this is not optional in the read model
-    execution_mode: RuleSetExecutionMode; // Ensure this is not optional in the read model
-}
-
-// Summary view if needed by API
-export interface RuleSetSummary {
-    id: number;
-    name: string;
-    description?: string | null;
-    is_active: boolean;
-    priority: number;
-    execution_mode: RuleSetExecutionMode;
-    rule_count: number; // Assuming backend calculates this
     created_at: string;
-    updated_at?: string | null;
+    updated_at: string;
+}
+export interface User {
+    id: number;
+    email: string;
+    google_id?: string | null;
+    full_name?: string | null;
+    picture?: string | null;
+    is_active: boolean;
+    is_superuser: boolean;
+    created_at: string;
+    updated_at: string;
+    roles: Role[];
+}
+export interface UserWithRoles extends User {}
+
+// --- API Key Schemas ---
+export interface ApiKey {
+    id: number;
+    name: string;
+    prefix: string;
+    is_active: boolean;
+    expires_at?: string | null;
+    last_used_at?: string | null;
+    created_at: string;
+    updated_at: string;
+    user_id: number;
+}
+export interface ApiKeyCreateResponse extends ApiKey {
+    full_key: string;
 }
 
+// --- JSON Processing Schemas ---
+export interface JsonProcessRequest {
+    dicom_json: Record<string, any>;
+    ruleset_id?: number | null;
+    source_identifier?: string;
+}
+export interface JsonProcessResponse {
+    original_json: Record<string, any>;
+    morphed_json: Record<string, any>;
+    applied_ruleset_id?: number | null;
+    applied_rule_ids: number[];
+    source_identifier: string;
+    errors: string[];
+    warnings?: string[];
+}
 
-// --- System & Health Schemas (TypeScript Interfaces) ---
-
+// --- System Status Schemas ---
 export interface ComponentStatus {
-    status: string; // Could be 'ok', 'error', 'degraded', 'unknown', etc.
-    details: string | null;
+    status: string;
+    details?: string | null;
 }
-
 export interface HealthCheckResponse {
     status: string;
-    components: {
-        [key: string]: ComponentStatus; // Allows dynamic component keys
-    }
+    components: Record<string, ComponentStatus>;
 }
 
-// Specific structure returned by /dashboard/status (based on previous examples)
-export interface SystemStatusReport {
-    status: string;
-    components: {
-        database?: ComponentStatus;
-        message_broker?: ComponentStatus;
-        api_service?: ComponentStatus;
-        dicom_listener?: ComponentStatus;
-        celery_workers?: ComponentStatus;
-    }
-}
-
-// --- DICOMweb Poller Status Schemas (TypeScript Interface) ---
+// --- DICOMweb Poller Status ---
 export interface DicomWebSourceStatus {
     id: number;
+    created_at: string;
+    updated_at: string;
     source_name: string;
     is_enabled: boolean;
-    last_successful_run?: string | null; // ISO String date from API
-    last_error_run?: string | null; // ISO String date from API
+    last_processed_timestamp?: string | null;
+    last_successful_run?: string | null;
+    last_error_run?: string | null;
     last_error_message?: string | null;
-    last_processed_timestamp?: string | null; // ISO String date from API
-    created_at: string; // ISO String date from API
-    updated_at: string; // ISO String date from API (maps to last update/heartbeat)
+    found_instance_count: number;
+    queued_instance_count: number;
+    processed_instance_count: number;
 }
-
 export interface DicomWebPollersStatusResponse {
     pollers: DicomWebSourceStatus[];
 }
 
-// --- DIMSE Listener Status Schema (TypeScript Interface) ---
+// --- DIMSE Listener Status ---
 export interface DimseListenerStatus {
     id: number;
-    listener_id: string; // The unique instance ID (e.g., storescp_1)
-    name?: string | null; // <<-- ADDED: User-defined name from config
+    listener_id: string;
     status: string;
     status_message?: string | null;
     host?: string | null;
     port?: number | null;
     ae_title?: string | null;
-    last_heartbeat: string; // ISO String date from API
-    created_at: string; // ISO String date from API
+    last_heartbeat: string;
+    created_at: string;
+    received_instance_count: number;
+    processed_instance_count: number;
 }
-
 export interface DimseListenersStatusResponse {
     listeners: DimseListenerStatus[];
 }
 
-// --- Configuration Schemas ---
-
-// --- DICOMweb Source Configuration ---
-
-export type DicomWebSourceAuthConfig = Record<string, any> | null;
-export type DicomWebSourceSearchFilters = Record<string, any> | null;
-
-// TS Interface for reading configurations returned from API
-export interface DicomWebSourceConfigRead {
+// --- DIMSE Q/R Source Status ---
+export interface DimseQrSourceStatus {
     id: number;
+    created_at: string;
+    updated_at: string;
     name: string;
-    description?: string | null;
-    base_url: string;
-    qido_prefix: string;
-    wado_prefix: string;
-    polling_interval_seconds: number;
     is_enabled: boolean;
-    auth_type: DicomWebSourceAuthType; // Use string literal type derived from enum
-    auth_config?: DicomWebSourceAuthConfig;
-    search_filters?: DicomWebSourceSearchFilters;
-    // Note: Does not include created_at/updated_at unless backend adds them to Read schema
+    remote_ae_title: string;
+    remote_host: string;
+    remote_port: number;
+    last_successful_query?: string | null;
+    last_successful_move?: string | null;
+    last_error_time?: string | null;
+    last_error_message?: string | null;
+    found_study_count: number;
+    move_queued_study_count: number;
+    processed_instance_count: number;
+}
+export interface DimseQrSourcesStatusResponse {
+    sources: DimseQrSourceStatus[];
 }
 
-// TS Interface for the payload when creating
-export interface DicomWebSourceConfigCreatePayload {
+
+// --- Configuration Schemas ---
+
+// DICOMweb Source Config
+export interface DicomWebSourceConfigBase {
     name: string;
     description?: string | null;
     base_url: string;
@@ -334,108 +289,235 @@ export interface DicomWebSourceConfigCreatePayload {
     wado_prefix?: string;
     polling_interval_seconds?: number;
     is_enabled?: boolean;
-    auth_type?: DicomWebSourceAuthType;
-    auth_config?: DicomWebSourceAuthConfig;
-    search_filters?: DicomWebSourceSearchFilters;
+    auth_type?: 'none' | 'basic' | 'bearer' | 'apikey';
+    auth_config?: Record<string, any> | null;
+    search_filters?: Record<string, any> | null;
+}
+export interface DicomWebSourceConfigCreatePayload extends DicomWebSourceConfigBase {}
+export interface DicomWebSourceConfigUpdatePayload extends Partial<DicomWebSourceConfigBase> {}
+export interface DicomWebSourceConfigRead extends DicomWebSourceConfigBase {
+    id: number;
+    created_at: string;
+    updated_at: string;
+    last_processed_timestamp?: string | null;
+    last_successful_run?: string | null;
+    last_error_run?: string | null;
+    last_error_message?: string | null;
+    found_instance_count: number;
+    queued_instance_count: number;
+    processed_instance_count: number;
 }
 
-// TS Interface for the payload when updating
-export interface DicomWebSourceConfigUpdatePayload {
-    name?: string | null;
-    description?: string | null;
-    base_url?: string | null;
-    qido_prefix?: string | null;
-    wado_prefix?: string | null;
-    polling_interval_seconds?: number | null;
-    is_enabled?: boolean | null;
-    auth_type?: DicomWebSourceAuthType | null;
-    auth_config?: DicomWebSourceAuthConfig;
-    search_filters?: DicomWebSourceSearchFilters;
-}
-
-// Zod Schema *only* for the DICOMweb Source Form Validation
-export const dicomWebSourceAuthTypeZodSchema = z.nativeEnum(DicomWebSourceAuthTypeEnum);
-export const dicomWebSourceFormSchema = z.object({
-    name: z.string().min(1, "Name is required").max(100, "Name cannot exceed 100 characters"),
-    description: z.string().max(255, "Description cannot exceed 255 characters").optional().nullable(),
-    base_url: z.string().url("Must be a valid URL (e.g., http://host:port/path)").min(1, "Base URL is required"),
-    qido_prefix: z.string().optional().default("qido-rs"),
-    wado_prefix: z.string().optional().default("wado-rs"),
-    polling_interval_seconds: z.coerce.number({ invalid_type_error: "Interval must be a number" }).int("Interval must be a whole number").positive("Interval must be greater than 0").min(1, "Interval must be at least 1 second").max(86400, "Interval cannot exceed 1 day (86400s)").default(300),
-    is_enabled: z.boolean().default(true),
-    auth_type: dicomWebSourceAuthTypeZodSchema.default(DicomWebSourceAuthTypeEnum.NONE),
-    auth_config: z.string().nullable().optional().default(null),
-    search_filters: z.string().nullable().optional().default(null),
-}).refine(data => {
-    if ([DicomWebSourceAuthTypeEnum.BASIC, DicomWebSourceAuthTypeEnum.BEARER, DicomWebSourceAuthTypeEnum.APIKEY].includes(data.auth_type)) {
-        if (!data.auth_config || !data.auth_config.trim()) { return false; }
-        try { const parsed = JSON.parse(data.auth_config);
-            if (data.auth_type === DicomWebSourceAuthTypeEnum.BASIC) { return typeof parsed === 'object' && parsed !== null && typeof parsed.username === 'string' && parsed.username.length > 0 && typeof parsed.password === 'string' && parsed.password.length > 0; }
-            if (data.auth_type === DicomWebSourceAuthTypeEnum.BEARER) { return typeof parsed === 'object' && parsed !== null && typeof parsed.token === 'string' && parsed.token.length > 0; }
-            if (data.auth_type === DicomWebSourceAuthTypeEnum.APIKEY) { return typeof parsed === 'object' && parsed !== null && typeof parsed.header_name === 'string' && parsed.header_name.length > 0 && typeof parsed.key === 'string' && parsed.key.length > 0; }
-        } catch (e) { return false; }
-    }
-    if (data.auth_type === DicomWebSourceAuthTypeEnum.NONE && data.auth_config && data.auth_config.trim()) { try { JSON.parse(data.auth_config); return false; } catch (e) { return true; } }
-    return true;
-}, { message: "Invalid Auth Config JSON or missing required fields for selected Auth Type.", path: ["auth_config"], }).refine(data => {
-    if (data.search_filters && data.search_filters.trim()) { try { const parsed = JSON.parse(data.search_filters); return typeof parsed === 'object' && parsed !== null; } catch (e) { return false; } }
-    return true;
-}, { message: "Search Filters must be valid JSON object if provided.", path: ["search_filters"], });
-export type DicomWebSourceFormData = z.infer<typeof dicomWebSourceFormSchema>;
-// --- End DICOMweb Source Configuration ---
-
-
-// --- DIMSE Listener Configuration Schemas ---
-
-// Define TS Interfaces first for API contracts
+// DIMSE Listener Config
 export interface DimseListenerConfigBase {
     name: string;
     description?: string | null;
     ae_title: string;
     port: number;
-    is_enabled: boolean; // Make non-optional in base, mirroring Pydantic
+    is_enabled?: boolean;
     instance_id?: string | null;
 }
 export interface DimseListenerConfigCreatePayload extends DimseListenerConfigBase {}
-export interface DimseListenerConfigUpdatePayload extends Partial<Omit<DimseListenerConfigBase, 'is_enabled'>> { // Omit boolean with default from Partial
-    is_enabled?: boolean; // Add boolean back explicitly if needed for update
-}
+export interface DimseListenerConfigUpdatePayload extends Partial<DimseListenerConfigBase> {}
 export interface DimseListenerConfigRead extends DimseListenerConfigBase {
     id: number;
     created_at: string;
     updated_at: string;
 }
 
-// Define Zod Schema *only* for the DIMSE Listener Form Validation
+// DIMSE Q/R Source Config
+export interface DimseQueryRetrieveSourceBase {
+    name: string;
+    description?: string | null;
+    remote_ae_title: string;
+    remote_host: string;
+    remote_port: number;
+    local_ae_title?: string;
+    polling_interval_seconds?: number;
+    is_enabled?: boolean;
+    query_level?: 'STUDY' | 'SERIES' | 'PATIENT';
+    query_filters?: Record<string, any> | null;
+    move_destination_ae_title?: string | null;
+}
+export interface DimseQueryRetrieveSourceCreatePayload extends DimseQueryRetrieveSourceBase {}
+export interface DimseQueryRetrieveSourceUpdatePayload extends Partial<DimseQueryRetrieveSourceBase> {}
+export interface DimseQueryRetrieveSourceRead extends DimseQueryRetrieveSourceBase {
+    id: number;
+    created_at: string;
+    updated_at: string;
+    last_successful_query?: string | null;
+    last_successful_move?: string | null;
+    last_error_time?: string | null;
+    last_error_message?: string | null;
+    found_study_count: number;
+    move_queued_study_count: number;
+    processed_instance_count: number;
+}
+
+// Storage Backend Config
+// export type AllowedBackendType = // Already defined above
+//     | "filesystem"
+//     | "cstore"
+//     | "gcs"
+//     | "google_healthcare"
+//     | "stow_rs";
+
+export interface StorageBackendConfigBase {
+    name: string;
+    description?: string | null;
+    backend_type: AllowedBackendType;
+    config: Record<string, any>;
+    is_enabled?: boolean;
+}
+export interface StorageBackendConfigCreatePayload extends StorageBackendConfigBase {}
+export interface StorageBackendConfigUpdatePayload extends Partial<StorageBackendConfigBase> {}
+// export interface StorageBackendConfigRead extends StorageBackendConfigBase { // Already defined above
+//     id: number;
+//     created_at: string;
+//     updated_at: string;
+// }
+
+
+// --- Form Data Schemas (using Zod for frontend validation) ---
+import { z } from 'zod';
+
+// Zod schema for DICOMweb Source Form
+export const dicomWebSourceFormSchema = z.object({
+    name: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).nullable().optional(),
+    base_url: z.string().url("Must be a valid URL (e.g., http://server:port/path)"),
+    qido_prefix: z.string().min(1).max(50).default("qido-rs"),
+    wado_prefix: z.string().min(1).max(50).default("wado-rs"),
+    polling_interval_seconds: z.coerce.number().int().min(1, "Interval must be at least 1 second").default(300),
+    is_enabled: z.boolean().default(true),
+    auth_type: z.enum(["none", "basic", "bearer", "apikey"]).default("none"),
+    auth_config: z.string().nullable().optional()
+        .refine((val) => {
+            if (!val || !val.trim()) return true;
+            try {
+                const parsed = JSON.parse(val);
+                return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+            } catch { return false; }
+        }, { message: "Auth Config must be a valid JSON object string or empty." }),
+    search_filters: z.string().nullable().optional()
+        .refine((val) => {
+            if (!val || !val.trim()) return true;
+            try {
+                const parsed = JSON.parse(val);
+                return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+            } catch { return false; }
+        }, { message: "Search Filters must be a valid JSON object string or empty." }),
+}).refine(data => {
+    if (data.auth_type === 'none') return true;
+    if (!data.auth_config || !data.auth_config.trim()) {
+        return false;
+    }
+    try {
+        const config = JSON.parse(data.auth_config);
+        if (data.auth_type === 'basic') {
+            return typeof config.username === 'string' && config.username.length > 0 &&
+                   typeof config.password === 'string' && config.password.length > 0;
+        }
+        if (data.auth_type === 'bearer') {
+            return typeof config.token === 'string' && config.token.length > 0;
+        }
+        if (data.auth_type === 'apikey') {
+             return typeof config.header_name === 'string' && config.header_name.length > 0 &&
+                    typeof config.key === 'string' && config.key.length > 0;
+        }
+    } catch { return false; }
+    return true;
+}, {
+    message: "Auth Config content does not match the selected Auth Type requirements (e.g., missing 'username'/'password' for basic, 'token' for bearer, 'header_name'/'key' for apikey, or config provided when type is 'none').",
+    path: ["auth_config"],
+});
+
+export type DicomWebSourceFormData = z.infer<typeof dicomWebSourceFormSchema>;
+
+
+// Zod schema for DIMSE Listener Config Form
+const aeTitleRegex = /^[ A-Za-z0-9._-]{1,16}$/;
+const noLeadingTrailingSpace = /^(?!\s)(?!.*\s$).*$/;
+
 export const dimseListenerFormSchema = z.object({
-    name: z.string().min(1, "Listener name is required").max(100),
-    description: z.string().optional().nullable(),
+    name: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).nullable().optional(),
     ae_title: z.string()
         .min(1, "AE Title is required")
         .max(16, "AE Title cannot exceed 16 characters")
-        .regex(/^[ A-Za-z0-9._-]*$/, "AE Title contains invalid characters.")
-        .refine(s => s.trim() === s, "AE Title cannot have leading/trailing spaces")
-        .refine(s => s.length > 0, "AE Title cannot be empty after trimming"),
-    port: z.coerce // Use coerce for number input
-        .number({ invalid_type_error: "Port must be a number" })
-        .int("Port must be a whole number")
-        .min(1, "Port must be between 1 and 65535")
-        .max(65535, "Port must be between 1 and 65535"),
+        .regex(aeTitleRegex, "AE Title contains invalid characters (Allowed: A-Z a-z 0-9 . _ - SPACE)")
+        .regex(noLeadingTrailingSpace, "AE Title cannot have leading or trailing whitespace"),
+    port: z.coerce.number().int().min(1, "Port must be between 1 and 65535").max(65535, "Port must be between 1 and 65535").default(11112),
     is_enabled: z.boolean().default(true),
-    instance_id: z.string()
-        .min(1)
-        .max(255)
-        .regex(/^[a-zA-Z0-9_.-]+$/, "Instance ID can only contain letters, numbers, underscores, periods, hyphens.")
-        .optional()
-        .nullable(),
+    instance_id: z.string().max(255).nullable().optional()
+        .refine(val => !val || /^[a-zA-Z0-9_.-]+$/.test(val), {
+            message: "Instance ID can only contain letters, numbers, underscores, periods, and hyphens.",
+        })
+        .refine(val => !val || noLeadingTrailingSpace.test(val), {
+             message: "Instance ID cannot have leading or trailing whitespace.",
+        }),
 });
+
 export type DimseListenerFormData = z.infer<typeof dimseListenerFormSchema>;
 
-// --- End DIMSE Listener Configuration Schemas ---
+// Zod schema for DIMSE Q/R Source Form
+export const dimseQrSourceFormSchema = z.object({
+    name: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).nullable().optional(),
+    remote_ae_title: z.string()
+        .min(1, "Remote AE Title is required")
+        .max(16, "Remote AE Title cannot exceed 16 characters")
+        .regex(aeTitleRegex, "Remote AE Title contains invalid characters")
+        .regex(noLeadingTrailingSpace, "Remote AE Title cannot have leading/trailing whitespace"),
+    remote_host: z.string().min(1, "Remote Host is required")
+        .regex(noLeadingTrailingSpace, "Remote Host cannot have leading/trailing whitespace"),
+    remote_port: z.coerce.number().int().min(1).max(65535).default(104),
+    local_ae_title: z.string()
+        .min(1, "Local AE Title is required")
+        .max(16, "Local AE Title cannot exceed 16 characters")
+        .regex(aeTitleRegex, "Local AE Title contains invalid characters")
+        .regex(noLeadingTrailingSpace, "Local AE Title cannot have leading/trailing whitespace")
+        .default("AXIOM_QR_SCU"),
+    polling_interval_seconds: z.coerce.number().int().min(1).default(300),
+    is_enabled: z.boolean().default(true),
+    query_level: z.enum(["STUDY", "SERIES", "PATIENT"]).default("STUDY"),
+    query_filters: z.string().nullable().optional()
+        .refine((val) => {
+            if (!val || !val.trim()) return true;
+            try {
+                const parsed = JSON.parse(val);
+                return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+            } catch { return false; }
+        }, { message: "Query Filters must be a valid JSON object string or empty." }),
+    move_destination_ae_title: z.string().max(16).nullable().optional()
+        .refine(val => !val || (aeTitleRegex.test(val) && noLeadingTrailingSpace.test(val)), {
+            message: "Move Destination AE Title is invalid (check format, length, whitespace)."
+        }),
+});
 
+export type DimseQrSourceFormData = z.infer<typeof dimseQrSourceFormSchema>;
 
-// --- Error Schemas (TypeScript Interfaces) ---
+// Zod schema for Storage Backend Config Form
+export const storageBackendFormSchema = z.object({
+    name: z.string().min(1, "Name is required").max(100),
+    description: z.string().max(500).nullable().optional(),
+    backend_type: z.enum([
+        "filesystem",
+        "cstore",
+        "gcs",
+        "google_healthcare",
+        "stow_rs"
+    ]),
+    config: z.string()
+        .min(1, "Config JSON is required.")
+        .refine((val) => {
+            if (!val || !val.trim()) return false;
+            try {
+                const parsed = JSON.parse(val);
+                return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed);
+            } catch { return false; }
+        }, { message: "Config must be a valid JSON object string." }),
+    is_enabled: z.boolean().default(true),
+});
 
-export interface ValidationError { loc: (string | number)[]; msg: string; type: string; }
-export interface HTTPValidationError { detail?: ValidationError[]; }
-export interface ApiError { detail?: string | any; }
+export type StorageBackendFormData = z.infer<typeof storageBackendFormSchema>;

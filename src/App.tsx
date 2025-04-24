@@ -22,7 +22,11 @@ import NotFoundPage from './pages/NotFoundPage';
 // Import new configuration pages
 import ConfigurationPage from './pages/ConfigurationPage';
 import DicomWebSourcesConfigPage from './pages/DicomWebSourcesConfigPage';
-import DimseListenersConfigPage from './pages/DimseListenersConfigPage'; // <-- Import the new page
+import DimseListenersConfigPage from './pages/DimseListenersConfigPage';
+import DimseQrSourcesConfigPage from './pages/DimseQrSourcesConfigPage';
+// --- ADDED: Import new Storage Backend config page ---
+import StorageBackendsConfigPage from './pages/StorageBackendsConfigPage';
+// --- END ADDED ---
 
 /**
  * AppContent component sets up the main routing logic and connects
@@ -61,9 +65,11 @@ function AppContent() {
                         <Route path="/admin/config" element={<ConfigurationPage />}>
                             <Route index element={<Navigate to="dicomweb-sources" replace />} />
                             <Route path="dicomweb-sources" element={<DicomWebSourcesConfigPage />} />
-                            {/* --- ADDED Route for DIMSE Listeners --- */}
                             <Route path="dimse-listeners" element={<DimseListenersConfigPage />} />
-                            {/* --- END ADDED Route --- */}
+                            <Route path="dimse-qr-sources" element={<DimseQrSourcesConfigPage />} />
+                            {/* --- ADDED: Route for Storage Backends --- */}
+                            <Route path="storage-backends" element={<StorageBackendsConfigPage />} />
+                            {/* --- END ADDED --- */}
                             {/* Add other config pages here later */}
                         </Route>
                         {/* Add other top-level admin routes here */}
