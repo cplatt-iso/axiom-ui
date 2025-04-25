@@ -4,64 +4,47 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogClose,
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog';
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-    FormDescription,
+    Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Use the Read schema for source prop, Create/Update for payloads
-import { DicomWebSourceConfigRead, DicomWebSourceConfigCreatePayload, DicomWebSourceConfigUpdatePayload } from '@/schemas';
-// Use the Zod schema and FormData type
-import { dicomWebSourceFormSchema, DicomWebSourceFormData } from '@/schemas';
+// --- Import API/General TYPES from main schemas index ---
+import {
+    DicomWebSourceConfigRead,
+    DicomWebSourceConfigCreatePayload,
+    DicomWebSourceConfigUpdatePayload,
+    AuthType,
+} from '@/schemas';
+// --- END API/General TYPES ---
+
+// --- Import Zod Schema and FORM DATA type DIRECTLY from its file ---
+import {
+    dicomWebSourceFormSchema, // The Zod Schema object
+    DicomWebSourceFormData,   // The TypeScript type derived from the Zod schema
+} from '@/schemas/dicomWebSourceSchema'; // Import from SPECIFIC file
+// --- END Zod Schema Import ---
+
 import { createDicomWebSource, updateDicomWebSource } from '@/services/api';
 
 interface DicomWebSourceFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    source: DicomWebSourceConfigRead | null; // Source prop uses the Read schema (with 'name')
+    source: DicomWebSourceConfigRead | null;
 }
 
-// Define sensible initial default values for the form
 const initialFormDefaults: DicomWebSourceFormData = {
-    name: '',
-    description: null,
-    base_url: '',
-    qido_prefix: 'qido-rs',
-    wado_prefix: 'wado-rs',
-    polling_interval_seconds: 300,
-    is_enabled: true,
-    auth_type: 'none', // Includes 'apikey' via Zod schema enum
-    auth_config: null,
-    search_filters: null,
+    name: '', description: null, base_url: '', qido_prefix: 'qido-rs', wado_prefix: 'wado-rs',
+    polling_interval_seconds: 300, is_enabled: true, auth_type: 'none', auth_config: null, search_filters: null,
 };
-
 
 const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpen, onClose, source }) => {
     const queryClient = useQueryClient();
@@ -77,101 +60,75 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
     useEffect(() => {
         if (isOpen) {
             let resetValues;
-            if (source) { // EDIT MODE: Use data from source prop (which has 'name')
+            if (source) {
                  resetValues = {
-                    name: source.name, // Use source.name here
-                    description: source.description,
-                    base_url: source.base_url,
-                    qido_prefix: source.qido_prefix,
-                    wado_prefix: source.wado_prefix,
-                    polling_interval_seconds: source.polling_interval_seconds,
-                    is_enabled: source.is_enabled,
-                    auth_type: source.auth_type,
+                    name: source.name ?? source.source_name,
+                    description: source.description ?? null,
+                    base_url: source.base_url ?? '',
+                    qido_prefix: source.qido_prefix ?? 'qido-rs',
+                    wado_prefix: source.wado_prefix ?? 'wado-rs',
+                    polling_interval_seconds: source.polling_interval_seconds ?? 300,
+                    is_enabled: source.is_enabled ?? true,
+                    auth_type: source.auth_type ?? 'none',
                     auth_config: source.auth_config ? JSON.stringify(source.auth_config, null, 2) : null,
                     search_filters: source.search_filters ? JSON.stringify(source.search_filters, null, 2) : null,
                  };
-            } else { // CREATE MODE
+            } else {
                  resetValues = initialFormDefaults;
             }
             form.reset(resetValues);
         }
     }, [isOpen, source, form]);
 
-    // --- Mutations ---
     const createMutation = useMutation({
         mutationFn: createDicomWebSource,
         onSuccess: (data) => {
-            // Use 'name' from response data for toast message consistency
-            toast.success(`DICOMweb Source "${data.name}" created successfully.`);
+            toast.success(`DICOMweb Source "${data.name ?? data.source_name}" created successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dicomWebSources'] });
             onClose();
         },
         onError: (error: any) => {
-            // Error handling remains the same
-            let specificError = "Failed to create source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
-                 const errDetail = error.detail[0];
-                 const field = errDetail.loc?.[1] || 'input';
-                 specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
-            } else if (error?.detail){
-                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-            } else {
-                 specificError = error.message || specificError;
-            }
+            let specificError = error?.detail || error.message || "Failed to create source.";
+            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
             toast.error(`Creation failed: ${specificError}`);
-            console.error("Create error details:", error?.detail || error);
+            console.error("Create error:", error?.detail || error);
         },
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { id: number, data: DicomWebSourceConfigUpdatePayload }) =>
-            updateDicomWebSource(payload.id, payload.data),
+        mutationFn: (payload: { id: number, data: DicomWebSourceConfigUpdatePayload }) => updateDicomWebSource(payload.id, payload.data),
         onSuccess: (data) => {
-            // Use 'name' from response data for toast message consistency
-            toast.success(`DICOMweb Source "${data.name}" updated successfully.`);
+            toast.success(`DICOMweb Source "${data.name ?? data.source_name}" updated successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dicomWebSources'] });
             queryClient.invalidateQueries({ queryKey: ['dicomWebSource', data.id] });
             onClose();
         },
         onError: (error: any, variables) => {
-            // Error handling remains the same
-            let specificError = "Failed to update source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
-                 const errDetail = error.detail[0];
-                 const field = errDetail.loc?.[1] || 'input';
-                 specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
-            } else if (error?.detail){
-                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-            } else {
-                 specificError = error.message || specificError;
-            }
+            let specificError = error?.detail || error.message || "Failed to update source.";
+            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
             toast.error(`Update failed for ID ${variables.id}: ${specificError}`);
-            console.error(`Update error details for ID ${variables.id}:`, error?.detail || error);
+            console.error(`Update error for ID ${variables.id}:`, error?.detail || error);
         },
     });
 
-    // --- Form Submission ---
     const onSubmit = (values: DicomWebSourceFormData) => {
-        // JSON parsing logic remains the same
         let parsedAuthConfig: Record<string, any> | null = null;
         let parsedSearchFilters: Record<string, any> | null = null;
 
         const safeJsonParse = (jsonString: string | null | undefined, fieldName: 'auth_config' | 'search_filters'): Record<string, any> | null => {
-            if (jsonString && typeof jsonString === 'string' && jsonString.trim()) {
-                try {
-                    const parsed = JSON.parse(jsonString);
-                    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                         return parsed;
-                    } else {
-                         form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} must be a valid JSON object.` });
-                         throw new Error("Invalid JSON type");
-                    }
-                } catch (e) {
-                    form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} is not valid JSON.` });
-                    throw e;
-                }
-            }
-            return null;
+             if (!jsonString || !jsonString.trim()) return null;
+             try {
+                 const parsed = JSON.parse(jsonString);
+                 if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                     return parsed;
+                 } else {
+                     form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} must be a valid JSON object.` });
+                     throw new Error("Invalid JSON type");
+                 }
+             } catch (e) {
+                 form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} is not valid JSON.` });
+                 throw e;
+             }
         };
 
         try {
@@ -185,102 +142,78 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
             return;
         }
 
-        const apiPayload = { ...values, auth_config: parsedAuthConfig, search_filters: parsedSearchFilters };
 
-        // Payload construction logic remains the same
+        const apiPayload = {
+             ...values,
+             description: values.description?.trim() || null,
+             auth_config: parsedAuthConfig,
+             search_filters: parsedSearchFilters
+        };
+
         if (isEditMode && source) {
-             const updatePayload: DicomWebSourceConfigUpdatePayload = {
-                 name: apiPayload.name,
-                 description: apiPayload.description,
-                 base_url: apiPayload.base_url,
-                 qido_prefix: apiPayload.qido_prefix,
-                 wado_prefix: apiPayload.wado_prefix,
-                 polling_interval_seconds: apiPayload.polling_interval_seconds,
-                 is_enabled: apiPayload.is_enabled,
-                 auth_type: apiPayload.auth_type,
-                 auth_config: apiPayload.auth_config,
-                 search_filters: apiPayload.search_filters,
-             };
-            console.log("Submitting Update Payload:", updatePayload);
+             const updatePayload: DicomWebSourceConfigUpdatePayload = apiPayload;
             updateMutation.mutate({ id: source.id, data: updatePayload });
         } else {
-             const createPayload: DicomWebSourceConfigCreatePayload = {
-                 name: apiPayload.name,
-                 description: apiPayload.description,
-                 base_url: apiPayload.base_url,
-                 qido_prefix: apiPayload.qido_prefix,
-                 wado_prefix: apiPayload.wado_prefix,
-                 polling_interval_seconds: apiPayload.polling_interval_seconds,
-                 is_enabled: apiPayload.is_enabled,
-                 auth_type: apiPayload.auth_type,
-                 auth_config: apiPayload.auth_config,
-                 search_filters: apiPayload.search_filters,
-             };
-            console.log("Submitting Create Payload:", createPayload);
+             const createPayload: DicomWebSourceConfigCreatePayload = apiPayload;
             createMutation.mutate(createPayload);
         }
     };
 
     const isLoading = createMutation.isPending || updateMutation.isPending;
 
-    // --- Update renderAuthConfigFields to include 'apikey' ---
     const renderAuthConfigFields = () => {
+        const placeholderBase = "{\n  ";
+        const placeholderEnd = "\n}";
+        let placeholder = "";
+        let rows = 3;
+
         if (watchedAuthType === 'basic') {
-            return (
-                <>
-                    <FormDescription>
-                        Enter username and password as JSON object: {`{"username": "user", "password": "pwd"}`}
-                    </FormDescription>
-                    <FormControl>
-                        <Textarea placeholder={`{\n  "username": "your_username",\n  "password": "your_password"\n}`} {...form.register("auth_config")} rows={4} />
-                    </FormControl>
-                </>
-            );
+            placeholder = placeholderBase + `"username": "your_username",\n  "password": "your_password"` + placeholderEnd;
+            rows = 4;
+        } else if (watchedAuthType === 'bearer') {
+            placeholder = placeholderBase + `"token": "your_long_bearer_token"` + placeholderEnd;
+            rows = 3;
+        } else if (watchedAuthType === 'apikey') {
+             placeholder = placeholderBase + `"header_name": "X-Api-Key",\n  "key": "your_secret_key_value"` + placeholderEnd;
+             rows = 4;
         }
-        if (watchedAuthType === 'bearer') {
-            return (
-                <>
-                    <FormDescription>
-                         Enter the bearer token as JSON object: {`{"token": "your_bearer_token"}`}
-                    </FormDescription>
-                    <FormControl>
-                        <Textarea placeholder={`{\n  "token": "your_long_bearer_token"\n}`} {...form.register("auth_config")} rows={3} />
-                    </FormControl>
-                 </>
-            );
-        }
-        // --- ADDED API Key Fields ---
-        if (watchedAuthType === 'apikey') {
+
+        if (watchedAuthType !== 'none') {
              return (
                  <>
                      <FormDescription>
-                         Enter the header name and key value as JSON object: {`{"header_name": "X-Api-Key", "key": "your_api_key"}`}
+                         Enter credentials as a JSON object.
                      </FormDescription>
                      <FormControl>
-                         <Textarea placeholder={`{\n  "header_name": "X-Api-Key",\n  "key": "your_secret_key_value"\n}`} {...form.register("auth_config")} rows={4} />
+                         <Textarea
+                             placeholder={placeholder}
+
+                             {...form.register("auth_config")}
+
+                             rows={rows}
+                             className="font-mono text-xs"
+                             disabled={isLoading}
+                         />
                      </FormControl>
                  </>
              );
         }
-        // --- END API Key Fields ---
-        // Default case for 'none'
         return <FormDescription>No authentication configuration required.</FormDescription>;
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit DICOMweb Source' : 'Add DICOMweb Source'}</DialogTitle>
-                    {/* Updated description to use source.name if available */}
                     <DialogDescription>
-                        {isEditMode ? `Modify the configuration for "${source?.name}".` : 'Configure a new source for DICOMweb polling.'}
+                        {isEditMode ? `Modify the configuration for "${source?.name ?? source?.source_name}".` : 'Configure a new source for DICOMweb polling.'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
-                        {/* Name */}
+
                         <FormField
                             control={form.control}
                             name="name"
@@ -294,7 +227,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                        {/* Description */}
+
                         <FormField
                             control={form.control}
                             name="description"
@@ -308,7 +241,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                        {/* Base URL */}
+
                         <FormField
                             control={form.control}
                             name="base_url"
@@ -323,7 +256,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                         {/* QIDO Prefix */}
+
                         <FormField
                             control={form.control}
                             name="qido_prefix"
@@ -338,7 +271,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                        {/* WADO Prefix */}
+
                         <FormField
                             control={form.control}
                             name="wado_prefix"
@@ -353,7 +286,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                        {/* Polling Interval */}
+
                         <FormField
                             control={form.control}
                             name="polling_interval_seconds"
@@ -368,7 +301,6 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                             )}
                         />
 
-                        {/* Auth Type Select - Add Item */}
                         <FormField
                             control={form.control}
                             name="auth_type"
@@ -385,45 +317,53 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                              <SelectItem value="none">None</SelectItem>
                                              <SelectItem value="basic">HTTP Basic</SelectItem>
                                              <SelectItem value="bearer">Bearer Token</SelectItem>
-                                             <SelectItem value="apikey">API Key Header</SelectItem> {/* <-- ADDED */}
+                                             <SelectItem value="apikey">API Key Header</SelectItem>
                                          </SelectContent>
                                      </Select>
                                     <FormMessage />
                                 </FormItem>
                              )}
                         />
-                        {/* Auth Config Field (now handles apikey via renderAuthConfigFields) */}
+
                         <FormField
                             control={form.control}
                             name="auth_config"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Authentication Config</FormLabel>
+
                                     {renderAuthConfigFields()}
+
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        {/* Search Filters */}
-                         <FormField
+
+                        <FormField
                             control={form.control}
                             name="search_filters"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Search Filters (QIDO)</FormLabel>
                                     <FormDescription>
-                                        Enter QIDO-RS query parameters as JSON object (e.g., {`{"StudyDate": "20240101-"}`}). Optional.
+                                        Enter QIDO-RS query parameters as JSON object (e.g., {`{"StudyDate": "-7d"}`}). Optional.
                                     </FormDescription>
                                     <FormControl>
-                                        <Textarea placeholder={`{\n  "ModalitiesInStudy": "CT",\n  "StudyDate": "20240101-"\n}`} {...field} value={field.value ?? ''} rows={4} />
+                                        <Textarea
+                                            placeholder={`{\n  "ModalitiesInStudy": "CT",\n  "StudyDate": "-30d"\n}`}
+                                            {...field}
+                                            value={field.value ?? ''}
+                                            rows={4}
+                                            className="font-mono text-xs"
+                                            disabled={isLoading}
+                                         />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        {/* Is Enabled */}
                         <FormField
                             control={form.control}
                             name="is_enabled"
@@ -433,10 +373,11 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                         <Checkbox
                                             checked={field.value}
                                             onCheckedChange={field.onChange}
+                                            id="dicomweb-enabled"
                                         />
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
-                                         <FormLabel>
+                                         <FormLabel htmlFor="dicomweb-enabled">
                                             Enable Polling
                                          </FormLabel>
                                          <FormDescription>
@@ -447,7 +388,6 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                 </FormItem>
                             )}
                         />
-                        {/* --- Form Fields End --- */}
 
                         <DialogFooter className="pt-4">
                             <DialogClose asChild>

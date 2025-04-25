@@ -4,46 +4,35 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { z } from 'zod';
+import json5 from 'json5';
 
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogClose,
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog';
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-    FormDescription,
+    Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from "@/components/ui/textarea";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Import Schemas and API functions
+// --- Import API/General TYPES from main schemas index ---
 import {
     DimseQueryRetrieveSourceRead,
     DimseQueryRetrieveSourceCreatePayload,
-    DimseQueryRetrieveSourceUpdatePayload,
-    dimseQrSourceFormSchema, // Use the form schema for validation
-    DimseQrSourceFormData, // Type for form data
+    DimseQueryRetrieveSourceUpdatePayload
 } from '@/schemas';
+// --- END API/General TYPES ---
+
+// --- Import Zod Schema and FORM DATA type DIRECTLY from its file ---
+import {
+    dimseQrSourceFormSchema, // The Zod Schema object
+    DimseQrSourceFormData,   // The TypeScript type derived from the Zod schema
+} from '@/schemas/dimseQrSourceSchema'; // Import from SPECIFIC file
+// --- END Zod Schema Import ---
+
 import {
     createDimseQrSource,
     updateDimseQrSource,
@@ -52,22 +41,21 @@ import {
 interface DimseQrSourceFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    source: DimseQueryRetrieveSourceRead | null; // Config object for editing, null for creating
+    source: DimseQueryRetrieveSourceRead | null;
 }
 
-// Define sensible initial default values for the form
 const initialFormDefaults: DimseQrSourceFormData = {
     name: '',
     description: null,
     remote_ae_title: '',
     remote_host: '',
-    remote_port: 104, // Common default DICOM port
+    remote_port: 104,
     local_ae_title: 'AXIOM_QR_SCU',
     polling_interval_seconds: 300,
     is_enabled: true,
     query_level: 'STUDY',
-    query_filters: null, // Start with null
-    move_destination_ae_title: null, // Start with null
+    query_filters: null, // Zod schema expects dict|null, UI uses string|null
+    move_destination_ae_title: null,
 };
 
 
@@ -77,37 +65,40 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
 
     const form = useForm<DimseQrSourceFormData>({
         resolver: zodResolver(dimseQrSourceFormSchema),
-        defaultValues: initialFormDefaults,
+        // Provide default values compatible with the Zod schema *after* transformation
+        defaultValues: initialFormDefaults
     });
 
-    // Reset form when modal opens or source changes
     useEffect(() => {
         if (isOpen) {
-            let resetValues: DimseQrSourceFormData;
-            if (source) { // Edit mode
+            let resetValues;
+            if (source) {
+                 // Convert dicts back to JSON strings for textareas when editing
                  resetValues = {
                     name: source.name,
                     description: source.description ?? null,
                     remote_ae_title: source.remote_ae_title,
                     remote_host: source.remote_host,
                     remote_port: source.remote_port,
-                    local_ae_title: source.local_ae_title ?? 'AXIOM_QR_SCU', // Fallback if somehow null
-                    polling_interval_seconds: source.polling_interval_seconds ?? 300, // Fallback
-                    is_enabled: source.is_enabled ?? true, // Fallback
-                    query_level: source.query_level ?? 'STUDY', // Fallback
-                    // Convert dict to JSON string for textarea, handle null
-                    query_filters: source.query_filters ? JSON.stringify(source.query_filters, null, 2) : null,
+                    local_ae_title: source.local_ae_title ?? 'AXIOM_QR_SCU',
+                    polling_interval_seconds: source.polling_interval_seconds ?? 300,
+                    is_enabled: source.is_enabled ?? true,
+                    query_level: source.query_level ?? 'STUDY',
+                    query_filters: source.query_filters ? json5.stringify(source.query_filters, null, 2) : null,
                     move_destination_ae_title: source.move_destination_ae_title ?? null,
                  };
-            } else { // Create mode
-                 resetValues = initialFormDefaults;
+            } else {
+                 // Ensure default is compatible with form (string|null) before Zod transform
+                 resetValues = {
+                     ...initialFormDefaults,
+                     query_filters: null // Start with null string for create
+                 };
             }
             form.reset(resetValues);
             console.log("Resetting DIMSE Q/R form with:", resetValues);
         }
     }, [isOpen, source, form]);
 
-    // --- Mutations ---
     const createMutation = useMutation({
         mutationFn: createDimseQrSource,
         onSuccess: (data) => {
@@ -122,7 +113,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                  const field = errDetail.loc?.[1] || 'input';
                  specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
             } else if (error?.detail){
-                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+                 specificError = typeof error.detail === 'string' ? error.detail : json5.stringify(error.detail);
             } else {
                  specificError = error.message || specificError;
             }
@@ -137,7 +128,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
         onSuccess: (data) => {
             toast.success(`DIMSE Q/R Source "${data.name}" updated successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dimseQrSources'] });
-            queryClient.invalidateQueries({ queryKey: ['dimseQrSource', data.id] }); // Optional invalidate single item
+            queryClient.invalidateQueries({ queryKey: ['dimseQrSource', data.id] });
             onClose();
         },
         onError: (error: any, variables) => {
@@ -147,7 +138,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                  const field = errDetail.loc?.[1] || 'input';
                  specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
             } else if (error?.detail){
-                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+                 specificError = typeof error.detail === 'string' ? error.detail : json5.stringify(error.detail);
             } else {
                  specificError = error.message || specificError;
             }
@@ -156,50 +147,24 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
         },
     });
 
-    // --- Form Submission ---
+
     const onSubmit = (values: DimseQrSourceFormData) => {
-        let parsedQueryFilters: Record<string, any> | null = null;
-
-        // Safely parse JSON string from textarea
-        const safeJsonParse = (jsonString: string | null | undefined, fieldName: 'query_filters'): Record<string, any> | null => {
-            if (jsonString && typeof jsonString === 'string' && jsonString.trim()) {
-                try {
-                    const parsed = JSON.parse(jsonString);
-                    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-                         return parsed;
-                    } else {
-                         form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} must be a valid JSON object.` });
-                         throw new Error("Invalid JSON type");
-                    }
-                } catch (e) {
-                    form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} is not valid JSON.` });
-                    throw e;
-                }
-            }
-            return null; // Return null if input is empty/null/whitespace
-        };
-
-        try {
-            parsedQueryFilters = safeJsonParse(values.query_filters, 'query_filters');
-        } catch (e) {
-            console.error("JSON Parsing error in form", e);
-            return; // Stop submission if JSON is invalid
-        }
-
-        // Prepare payload, ensuring nulls for empty optional strings
+        // 'values' now contains the data *after* Zod transformation (filters is dict|null)
         const apiPayload = {
             ...values,
             description: values.description?.trim() || null,
-            query_filters: parsedQueryFilters,
             move_destination_ae_title: values.move_destination_ae_title?.trim() || null,
+            // query_filters is already a dict | null thanks to Zod transform
         };
-        console.log("Submitting DIMSE Q/R Values:", apiPayload);
+        console.log("Submitting DIMSE Q/R Values (API Payload):", apiPayload);
 
         if (isEditMode && source) {
-            const updatePayload: DimseQueryRetrieveSourceUpdatePayload = apiPayload; // Direct assignment works if types match
+            // Ensure payload matches the expected Update schema
+            const updatePayload: DimseQueryRetrieveSourceUpdatePayload = apiPayload;
             updateMutation.mutate({ id: source.id, data: updatePayload });
         } else {
-             const createPayload: DimseQueryRetrieveSourceCreatePayload = apiPayload; // Direct assignment
+            // Ensure payload matches the expected Create schema
+             const createPayload: DimseQueryRetrieveSourceCreatePayload = apiPayload;
             createMutation.mutate(createPayload);
         }
     };
@@ -208,7 +173,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[600px]"> {/* Wider modal */}
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit DIMSE Q/R Source' : 'Add DIMSE Q/R Source'}</DialogTitle>
                     <DialogDescription>
@@ -219,7 +184,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
 
-                        {/* Name */}
+
                         <FormField
                             control={form.control}
                             name="name"
@@ -234,7 +199,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Remote AE Title */}
+
                          <FormField
                             control={form.control}
                             name="remote_ae_title"
@@ -249,7 +214,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Remote Host & Port (Grid Layout) */}
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
@@ -279,7 +244,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             />
                         </div>
 
-                        {/* Local AE Title */}
+
                          <FormField
                             control={form.control}
                             name="local_ae_title"
@@ -295,7 +260,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Description */}
+
                         <FormField
                             control={form.control}
                             name="description"
@@ -315,7 +280,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Polling Interval */}
+
                         <FormField
                             control={form.control}
                             name="polling_interval_seconds"
@@ -330,7 +295,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Query Level Select */}
+
                         <FormField
                             control={form.control}
                             name="query_level"
@@ -354,7 +319,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                              )}
                         />
 
-                        {/* Query Filters */}
+
                          <FormField
                             control={form.control}
                             name="query_filters"
@@ -365,14 +330,21 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                         Enter C-FIND query keys/values as JSON object (e.g., {`{"StudyDate": "-7d", "ModalitiesInStudy": "CT"}`}). Optional.
                                     </FormDescription>
                                     <FormControl>
-                                        <Textarea placeholder={`{\n  "StudyDate": "-30d",\n  "PatientName": "DOE^JOHN*"\n}`} {...field} value={field.value ?? ''} rows={4} />
+                                        <Textarea
+                                            placeholder={`{\n  // Example:\n  "StudyDate": "-30d",\n  "PatientName": "DOE^JOHN*"\n}`}
+                                            // Use field.value which is string | null
+                                            {...field}
+                                            value={field.value ?? ''} // Ensure value is string for textarea
+                                            rows={4}
+                                            className="font-mono text-xs"
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
-                        {/* Move Destination AE Title */}
+
                          <FormField
                             control={form.control}
                             name="move_destination_ae_title"
@@ -388,7 +360,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* Is Enabled */}
+
                         <FormField
                             control={form.control}
                             name="is_enabled"
