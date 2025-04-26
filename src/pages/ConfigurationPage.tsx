@@ -10,24 +10,18 @@ interface ConfigTab {
     path: string;  // Full path for navigation
 }
 
-// --- UPDATED TABS LIST ---
 const configTabs: ConfigTab[] = [
     { value: 'dicomweb-sources', label: 'DICOMweb Sources', path: '/admin/config/dicomweb-sources' },
     { value: 'dimse-listeners', label: 'DIMSE Listeners', path: '/admin/config/dimse-listeners' },
     { value: 'dimse-qr-sources', label: 'DIMSE Q/R Sources', path: '/admin/config/dimse-qr-sources' },
-    // --- ADDED: Tab for Storage Backends ---
     { value: 'storage-backends', label: 'Storage Backends', path: '/admin/config/storage-backends' },
-    // --- END ADDED ---
-    // Add future configuration sections here
-    // { value: 'general', label: 'General Settings', path: '/admin/config/general' },
+    { value: 'crosswalk', label: 'Crosswalk', path: '/admin/config/crosswalk' }, 
 ];
-// --- END UPDATED TABS LIST ---
 
 const ConfigurationPage: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Determine the active tab based on the current URL path
     const activeTab = configTabs.find(tab => location.pathname.startsWith(tab.path))?.value
                       || configTabs[0].value; // Default to the first tab if no match
 
@@ -43,14 +37,13 @@ const ConfigurationPage: React.FC = () => {
             <div>
                 <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Configuration</h1>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Manage system configuration settings for inputs, outputs, and behaviour.
+                    Manage system configuration settings for inputs, outputs, rules and crosswalks.
                 </p>
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                 {/* --- Adjusted grid columns for potential future tabs --- */}
-                 {/* Updated grid-cols-4 to accommodate the new tab */}
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-4 gap-2">
+                 {/* Updated grid-cols-5 to accommodate the new tab */}
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-2">
                     {configTabs.map((tab) => (
                         <TabsTrigger key={tab.value} value={tab.value} className="w-full">
                             {tab.label}

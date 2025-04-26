@@ -19,14 +19,14 @@ import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
-// Import new configuration pages
 import ConfigurationPage from './pages/ConfigurationPage';
 import DicomWebSourcesConfigPage from './pages/DicomWebSourcesConfigPage';
 import DimseListenersConfigPage from './pages/DimseListenersConfigPage';
 import DimseQrSourcesConfigPage from './pages/DimseQrSourcesConfigPage';
-// --- ADDED: Import new Storage Backend config page ---
 import StorageBackendsConfigPage from './pages/StorageBackendsConfigPage';
-// --- END ADDED ---
+import CrosswalkLayout from './pages/CrosswalkLayout';
+import CrosswalkDataSourcesPage from './pages/CrosswalkDataSourcesPage';
+import CrosswalkMappingsPage from './pages/CrosswalkMappingsPage'; 
 
 /**
  * AppContent component sets up the main routing logic and connects
@@ -67,10 +67,13 @@ function AppContent() {
                             <Route path="dicomweb-sources" element={<DicomWebSourcesConfigPage />} />
                             <Route path="dimse-listeners" element={<DimseListenersConfigPage />} />
                             <Route path="dimse-qr-sources" element={<DimseQrSourcesConfigPage />} />
-                            {/* --- ADDED: Route for Storage Backends --- */}
                             <Route path="storage-backends" element={<StorageBackendsConfigPage />} />
-                            {/* --- END ADDED --- */}
-                            {/* Add other config pages here later */}
+
+			    <Route path="crosswalk" element={<CrosswalkLayout />}>
+                                <Route index element={<Navigate to="data-sources" replace />} />
+                                <Route path="data-sources" element={<CrosswalkDataSourcesPage />} />
+                                <Route path="mappings" element={<CrosswalkMappingsPage />} />
+			    </Route>
                         </Route>
                         {/* Add other top-level admin routes here */}
                     </Route>

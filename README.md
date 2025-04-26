@@ -1,77 +1,109 @@
 # Axiom Flow - Frontend
 
-Web-based user interface for configuring and monitoring the Axiom Flow DICOM processing and routing system backend.
+React-based user interface for configuring and monitoring the Axiom Flow DICOM processing backend.
 
 ## Features
 
-*   **Dashboard:** View the real-time status of core backend components, DICOMweb pollers, DIMSE listeners, and DIMSE Q/R sources, including basic metrics.
+*   **Dashboard:** View the real-time status of core backend components (Database, Broker, API, Workers), DIMSE Listeners, DICOMweb Pollers, DIMSE Q/R Pollers, and Crosswalk sync jobs. Includes key metrics like counts for received/processed items.
 *   **Configuration Management:**
-    *   Manage DICOMweb polling sources.
-    *   Manage DIMSE C-STORE listener configurations.
-    *   Manage DIMSE Q/R source configurations.
-    *   Manage Storage Backend destinations (Filesystem, C-STORE, GCS, Google Healthcare, STOW-RS).
-    *   Manage RuleSets and Rules (including tag/association matching criteria, tag modifications - set/delete/prepend/suffix/copy/move, and destination linking).
-*   **User Management (Admin):** View users and manage role assignments.
-*   **API Key Management:** Create and delete personal API keys for programmatic access.
-*   **Authentication:** Secure login using Google OAuth 2.0 via `@react-oauth/google`.
-*   **Authorization:** Role-based access control restricts access to admin sections.
-*   **Theming:** Light/Dark mode toggle with persistence.
-*   **Notifications:** User feedback via Sonner toast notifications.
+    *   **Rulesets & Rules:** Create, view, edit, delete, activate/deactivate rulesets and the rules within them. Define complex matching criteria (tags, association info) and tag modifications (set, delete, copy, move, crosswalk, etc.). Link rules to storage destinations.
+    *   **DICOMweb Sources:** Configure sources for QIDO-RS polling.
+    *   **DIMSE Listeners:** Configure C-STORE SCP listener instances.
+    *   **DIMSE Q/R Sources:** Configure remote peers for C-FIND polling and C-MOVE retrieval.
+    *   **Storage Backends:** Define output destinations (Filesystem, C-STORE, GCS, Google Healthcare, STOW-RS).
+    *   **Crosswalk:** Configure external database Data Sources (MySQL, Postgres, MSSQL) and Mappings for tag value lookups/replacements. Includes connection testing and manual sync triggering.
+*   **User & Access Management:**
+    *   **API Keys:** Create, view, and delete API keys for programmatic access.
+    *   **User Management (Admin):** View users, manage active status, assign/remove roles (Admin/User).
+*   **Authentication:** Secure login via Google OAuth 2.0.
+*   **Theme:** Light/Dark mode toggle.
+*   **Notifications:** Uses Sonner for toast notifications for actions like create, update, delete, errors.
 
 ## Technology Stack
 
-*   **Framework:** React 18+ (using Vite)
+*   **Framework:** React (using Vite)
 *   **Language:** TypeScript
-*   **UI Components:** Shadcn UI (@radix-ui/react + Tailwind CSS)
-*   **Routing:** React Router V6
-*   **State Management:** React Context (for Auth), TanStack Query (React Query) v5 (for server state caching/fetching)
+*   **UI Components:** Shadcn UI (built on Radix UI & Tailwind CSS)
+*   **State Management:** React Context (for Auth), TanStack Query (for server state caching/fetching)
 *   **Forms:** React Hook Form + Zod (for validation)
-*   **Tables:** TanStack Table (React Table) v8
-*   **Styling:** Tailwind CSS
-*   **Icons:** Heroicons, Lucide React
+*   **Tables:** TanStack Table
+*   **Routing:** React Router
 *   **Notifications:** Sonner
-*   **HTTP Client:** Custom wrapper around `fetch` (`apiClient`)
-*   **Build Tool:** Vite
+*   **Icons:** Lucide React, Heroicons
 
 ## Getting Started
 
 ### Prerequisites
 
 *   Node.js (v18 or later recommended)
-*   npm or yarn or pnpm
-*   A running instance of the [Axiom Flow Backend](https://github.com/[YourUsername]/axiom_backend) (or your backend repo link).
+*   npm or yarn
+*   A running instance of the Axiom Flow Backend API.
 
-### Installation
+### Installation & Running
 
 1.  **Clone the repository:**
     ```bash
-    # git clone ...
-    cd axiom_frontend
+    # git clone ... (if separate repo)
+    cd axiom-flow-ui
     ```
-2.  **Install dependencies:**
+
+2.  **Install Dependencies:**
     ```bash
     npm install
     # or
     yarn install
-    # or
-    pnpm install
     ```
 
-### Configuration
+3.  **Configure Environment:**
+    *   Copy the example environment file: `cp .env.example .env`
+    *   **Edit `.env`:**
+        *   `VITE_API_BASE_URL`: Set this to the URL where your Axiom Flow backend API is accessible (e.g., `http://localhost:8001/api/v1` if running backend locally via Docker Compose defaults).
+        *   `VITE_GOOGLE_CLIENT_ID`: **Required.** Paste the Google OAuth Client ID obtained from Google Cloud Console. This *must* match the ID used by the backend for token validation.
+    *   **DO NOT** commit your actual `.env` file.
 
-1.  **Create `.env` file:** Copy the example environment file:
+4.  **Run Development Server:**
     ```bash
-    cp .env.example .env
+    npm run dev
+    # or
+    yarn dev
     ```
-2.  **Edit `.env`:**
-    *   **`VITE_GOOGLE_CLIENT_ID`**: **Required.** Obtain this from your Google Cloud Console project credentials (OAuth 2.0 Client ID for Web application). Ensure the authorized JavaScript origins and redirect URIs are correctly configured in Google Cloud Console to include your frontend development URL (e.g., `http://localhost:3000`, `http://127.0.0.1:3000`).
-    *   **`VITE_API_BASE_URL`**: **Required.** Set this to the URL where your Axiom Flow backend API is running (e.g., `http://localhost:8001/api/v1` if running the backend locally with default docker-compose ports).
+    This will start the Vite development server, typically on `http://localhost:5173`.
 
-### Running the Development Server
+5.  **Build for Production:**
+    ```bash
+    npm run build
+    # or
+    yarn build
+    ```
+    This creates a production-ready build in the `dist` folder.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+## Usage
+
+1.  Open the application URL in your browser.
+2.  Click "Sign In" and use the Google Login button. Authenticate with a Google account recognized by the backend.
+3.  Navigate using the sidebar to view the Dashboard or manage configurations (Rulesets, Inputs, Outputs, Crosswalk, Users, API Keys).
+
+## Current Status
+
+*   Dashboard displays status for core components and detailed widgets for pollers and listeners.
+*   Full CRUD UI implemented for Rulesets, Rules (including Crosswalk action), DICOMweb Sources, DIMSE Listeners, DIMSE Q/R Sources, Storage Backends, Crosswalk Data Sources, Crosswalk Mappings, API Keys, and User Roles/Status (Admin only).
+*   Authentication flow via Google Login is functional.
+*   Theme toggle implemented.
+
+## Next Steps / Future Goals
+
+*   Implement UI for GCS Polling configuration.
+*   Add GCS Polling status widget to Dashboard.
+*   Implement UI elements related to IP address matching in Association Criteria.
+*   Refine Crosswalk Mapping UI (e.g., potentially add DB schema discovery helpers instead of pure JSON input).
+*   Enhance Dashboard visualizations (charts, graphs).
+*   Add more detailed error reporting and user feedback.
+*   Develop frontend test suite (Vitest/RTL).
+
+## Contributing
+
+*(Placeholder: Contribution guidelines will be added here.)*
+
+## License
+
+*(Placeholder: MIT or Apache 2.0 recommended.)*

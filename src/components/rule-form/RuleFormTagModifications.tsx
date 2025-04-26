@@ -3,8 +3,9 @@ import React, { useCallback } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { z } from 'zod';
 
+// Import specific Zod schemas for type inference within the component
 import {
-    TagModificationFormData,
+    TagModificationFormData, // Base type for the array
     ModifyActionSchema,
     TagSetModificationSchema,
     TagPrependModificationSchema,
@@ -12,7 +13,9 @@ import {
     TagRegexReplaceModificationSchema,
     TagCopyModificationSchema,
     TagMoveModificationSchema,
-} from '@/schemas';
+    TagCrosswalkModificationSchema // Import the Zod schema for crosswalk
+} from '@/schemas/ruleSchema'; // Assuming schemas index exports the Zod schema
+
 import { DicomTagInfo } from '@/dicom/dictionary';
 
 import DicomTagCombobox from '../DicomTagCombobox';
@@ -23,7 +26,8 @@ import { Input } from '@/components/ui/input';
 
 interface RuleFormTagModificationsProps {
     tagModifications: TagModificationFormData[];
-    updateTagModification: (index: number, field: keyof TagModificationFormData | 'tagInfo' | 'sourceTagInfo' | 'destTagInfo', value: any) => void;
+    // Ensure the type allows specific fields like 'crosswalk_map_id'
+    updateTagModification: (index: number, field: keyof TagModificationFormData | 'tagInfo' | 'sourceTagInfo' | 'destTagInfo' | 'crosswalk_map_id', value: any) => void;
     addTagModification: () => void;
     removeTagModification: (index: number) => void;
     isLoading: boolean;
@@ -54,6 +58,9 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
         const replacementError = validationErrors[`tag_modifications[${index}].replacement`];
         const destTagError = validationErrors[`tag_modifications[${index}].destination_tag`];
         const destVrError = validationErrors[`tag_modifications[${index}].destination_vr`];
+        // --- Added Error Key for Crosswalk ---
+        const crosswalkMapIdError = validationErrors[`tag_modifications[${index}].crosswalk_map_id`];
+        // --- End Added ---
 
         switch (mod.action) {
             case ModifyActionSchema.enum.set:
@@ -154,11 +161,37 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                         </div>
                      </>
                  );
+            // --- ADDED Case for Crosswalk ---
+            case ModifyActionSchema.enum.crosswalk:
+                 const crosswalkMod = mod as z.infer<typeof TagCrosswalkModificationSchema>;
+                 return (
+                    <div className="sm:col-span-2"> {/* Span across the two columns */}
+                         <Label htmlFor={`tm-crosswalk-map-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Crosswalk Map ID*</Label>
+                         <Input
+                            id={`tm-crosswalk-map-${index}`}
+                            type="number"
+                            min="1"
+                            step="1"
+                            placeholder="Enter Mapping ID"
+                            // Ensure value is string for input, handle potential undefined/null
+                            value={crosswalkMod.crosswalk_map_id?.toString() ?? ''}
+                             // Update state with the *number* value
+                            onChange={(e) => updateTagModification(index, 'crosswalk_map_id', e.target.value ? parseInt(e.target.value, 10) : undefined)}
+                            required
+                            disabled={isLoading}
+                            aria-invalid={!!crosswalkMapIdError}
+                            aria-describedby={`tm-crosswalk-map-${index}-error`}
+                            className={`${baseInputStyles} ${crosswalkMapIdError ? errorInputStyles : normalInputStyles} dark:bg-gray-900/50 dark:disabled:bg-gray-800`}
+                        />
+                         {crosswalkMapIdError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-crosswalk-map-${index}-error`}>{crosswalkMapIdError}</p>}
+                     </div>
+                 );
+            // --- END ADDED ---
             case ModifyActionSchema.enum.delete:
             default:
                 return (
                     <div className="sm:col-span-2 text-sm text-gray-500 dark:text-gray-400 italic self-center pt-2">
-                        (No value/VR needed)
+                        (No other fields needed)
                     </div>
                 );
         }
@@ -170,12 +203,14 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
             <div className="space-y-3 pr-2">
                 {tagModifications.map((mod, index) => {
                      const actionError = validationErrors[`tag_modifications[${index}].action`];
+                     // Use 'as any' for dynamic access or check action type first
                      const targetTagError = validationErrors[`tag_modifications[${index}].tag`];
                      const sourceTagError = validationErrors[`tag_modifications[${index}].source_tag`];
 
                      return (
                         <div key={index} className="relative flex items-start space-x-2 p-2 border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700/50">
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                {/* Action Select */}
                                 <div>
                                     <Select
                                         onValueChange={(value) => updateTagModification(index, 'action', value as ModifyAction)}
@@ -194,36 +229,41 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                                     {actionError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-action-${index}-error`}>{actionError}</p>}
                                 </div>
 
+                                {/* Target/Source Tag Combobox */}
                                 { (mod.action === ModifyActionSchema.enum.copy || mod.action === ModifyActionSchema.enum.move) ? (
                                      <div>
                                          <Label htmlFor={`tm-source-tag-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Source Tag*</Label>
                                          <DicomTagCombobox
-                                            value={(mod as z.infer<typeof TagCopyModificationSchema | typeof TagMoveModificationSchema>).source_tag ?? ''}
+                                            value={(mod as any).source_tag ?? ''} // Use dynamic access or type guard
                                             onChange={(tagInfo: DicomTagInfo | null) => updateTagModification(index, 'sourceTagInfo', tagInfo)}
                                             disabled={isLoading} required aria-invalid={!!sourceTagError} aria-describedby={`tm-source-tag-${index}-error`}
                                             inputClassName={`${baseInputStyles} ${sourceTagError ? errorInputStyles : normalInputStyles}`}
                                         />
                                          {sourceTagError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-source-tag-${index}-error`}>{sourceTagError}</p>}
                                      </div>
-                                 ) : (
+                                 ) : mod.action !== ModifyActionSchema.enum.crosswalk ? ( // Don't show target tag for crosswalk
                                      <div>
                                          <Label htmlFor={`tm-tag-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Target Tag*</Label>
                                          <DicomTagCombobox
-                                            value={(mod as any).tag ?? ''}
+                                            value={(mod as any).tag ?? ''} // Use dynamic access or type guard
                                             onChange={(tagInfo: DicomTagInfo | null) => updateTagModification(index, 'tagInfo', tagInfo)}
                                             disabled={isLoading} required aria-invalid={!!targetTagError} aria-describedby={`tm-tag-${index}-error`}
                                             inputClassName={`${baseInputStyles} ${targetTagError ? errorInputStyles : normalInputStyles}`}
                                         />
                                          {targetTagError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-tag-${index}-error`}>{targetTagError}</p>}
                                      </div>
+                                 ) : (
+                                     // Placeholder or empty div for crosswalk action in this column
+                                     <div>{/* Intentionally empty for crosswalk */}</div>
                                  )}
 
-
+                                {/* Render Action-Specific Inputs */}
                                 <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {renderModificationInputs(mod, index)}
                                 </div>
                             </div>
 
+                            {/* Delete Button */}
                             <button
                                 type="button"
                                 onClick={() => removeTagModification(index)}
@@ -236,9 +276,11 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                      );
                 })}
             </div>
+            {/* Add Button */}
             <Button type="button" variant="outline" size="sm" onClick={addTagModification} disabled={isLoading} className="mt-2">
                 <PlusIcon className="h-4 w-4 mr-1"/> Add Modification
             </Button>
+             {validationErrors['tag_modifications'] && typeof validationErrors['tag_modifications'] === 'string' && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{validationErrors['tag_modifications']}</p>}
         </fieldset>
     );
 };

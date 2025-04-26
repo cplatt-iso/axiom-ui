@@ -11,10 +11,13 @@ import {
     DicomWebSourceConfigRead, DicomWebSourceConfigCreatePayload, DicomWebSourceConfigUpdatePayload, // DICOMweb Config
     DimseListenerConfigRead, DimseListenerConfigCreatePayload, DimseListenerConfigUpdatePayload, // DIMSE Listener Config
     DimseQueryRetrieveSourceRead, DimseQueryRetrieveSourceCreatePayload, DimseQueryRetrieveSourceUpdatePayload, // DIMSE Q/R Config
-    // --- ADDED: Import Storage Backend types ---
     StorageBackendConfigRead, StorageBackendConfigCreatePayload, StorageBackendConfigUpdatePayload,
-    // --- END ADDED ---
-
+    CrosswalkDataSourceRead,
+    CrosswalkDataSourceCreatePayload,
+    CrosswalkDataSourceUpdatePayload,
+    CrosswalkMapRead,
+    CrosswalkMapCreatePayload,
+    CrosswalkMapUpdatePayload,
 } from '../schemas'; // Assuming schemas are exported from index
 
 // --- Keep Auth Context Reference ---
@@ -189,12 +192,51 @@ export const createDimseQrSource = (data: DimseQueryRetrieveSourceCreatePayload)
 export const updateDimseQrSource = (id: number, data: DimseQueryRetrieveSourceUpdatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteDimseQrSource = (id: number): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'DELETE' }); // Returns deleted object
 
-// --- ADDED: Storage Backends ---
 export const getStorageBackendConfigs = (skip: number = 0, limit: number = 100): Promise<StorageBackendConfigRead[]> => apiClient<StorageBackendConfigRead[]>(`/config/storage-backends?skip=${skip}&limit=${limit}`);
 export const createStorageBackendConfig = (data: StorageBackendConfigCreatePayload): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>('/config/storage-backends', { method: 'POST', body: JSON.stringify(data) });
 export const updateStorageBackendConfig = (id: number, data: StorageBackendConfigUpdatePayload): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteStorageBackendConfig = (id: number): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'DELETE' }); // Returns deleted object
-// --- END ADDED ---
 
-// --- Input Sources ---
 export const getKnownInputSources = (): Promise<string[]> => apiClient<string[]>('/system/input-sources');
+
+
+export const getCrosswalkDataSources = (skip = 0, limit = 100): Promise<CrosswalkDataSourceRead[]> =>
+    apiClient(`/config/crosswalk/data-sources?skip=${skip}&limit=${limit}`);
+
+export const getCrosswalkDataSourceById = (sourceId: number): Promise<CrosswalkDataSourceRead> =>
+    apiClient(`/config/crosswalk/data-sources/${sourceId}`);
+
+export const createCrosswalkDataSource = (payload: CrosswalkDataSourceCreatePayload): Promise<CrosswalkDataSourceRead> =>
+    apiClient('/config/crosswalk/data-sources', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateCrosswalkDataSource = (sourceId: number, payload: CrosswalkDataSourceUpdatePayload): Promise<CrosswalkDataSourceRead> =>
+    apiClient(`/config/crosswalk/data-sources/${sourceId}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteCrosswalkDataSource = (sourceId: number): Promise<CrosswalkDataSourceRead> =>
+    apiClient(`/config/crosswalk/data-sources/${sourceId}`, { method: 'DELETE' });
+
+export const testCrosswalkDataSourceConnection = (sourceId: number): Promise<{ success: boolean; message: string; status_code: number }> =>
+    apiClient(`/config/crosswalk/data-sources/${sourceId}/test`, { method: 'POST' });
+
+export const triggerCrosswalkDataSourceSync = (sourceId: number): Promise<{ message: string; task_id: string }> =>
+    apiClient(`/config/crosswalk/data-sources/${sourceId}/sync`, { method: 'POST' });
+
+export const getCrosswalkMaps = (dataSourceId?: number, skip = 0, limit = 100): Promise<CrosswalkMapRead[]> => {
+    const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+    if (dataSourceId !== undefined) {
+        params.append('data_source_id', String(dataSourceId));
+    }
+    return apiClient(`/config/crosswalk/mappings?${params.toString()}`);
+}
+
+export const getCrosswalkMapById = (mapId: number): Promise<CrosswalkMapRead> =>
+    apiClient(`/config/crosswalk/mappings/${mapId}`);
+
+export const createCrosswalkMap = (payload: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> =>
+    apiClient('/config/crosswalk/mappings', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateCrosswalkMap = (mapId: number, payload: CrosswalkMapUpdatePayload): Promise<CrosswalkMapRead> =>
+    apiClient(`/config/crosswalk/mappings/${mapId}`, { method: 'PUT', body: JSON.stringify(payload) });
+
+export const deleteCrosswalkMap = (mapId: number): Promise<CrosswalkMapRead> =>
+    apiClient(`/config/crosswalk/mappings/${mapId}`, { method: 'DELETE' });
