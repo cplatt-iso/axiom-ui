@@ -1,16 +1,16 @@
 // src/components/rule-form/RuleFormDestinations.tsx
 import React from 'react';
 
-import { StorageBackendConfigRead } from '@/schemas'; // Import type for destinations
+import { StorageBackendConfigRead } from '@/schemas';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface RuleFormDestinationsProps {
     selectedDestinationIds: Set<number>;
-    availableDestinations: StorageBackendConfigRead[];
+    availableDestinations: StorageBackendConfigRead[]; // This prop might be undefined/null initially
     onSelectionChange: (backendId: number, checked: boolean) => void;
-    isLoading: boolean; // Use combined loading state from parent
-    validationErrors: Record<string, string>;
+    isLoading: boolean;
+    validationErrors: Record<string, string>; // This prop might be undefined/null initially
 }
 
 const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({
@@ -20,8 +20,12 @@ const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({
     isLoading,
     validationErrors,
 }) => {
-    const enabledDestinations = availableDestinations.filter(d => d.is_enabled);
-    const disabledDestinations = availableDestinations.filter(d => !d.is_enabled);
+    // Ensure availableDestinations is an array before filtering/mapping
+    const destinationsToDisplay = Array.isArray(availableDestinations) ? availableDestinations : [];
+
+    const enabledDestinations = destinationsToDisplay.filter(d => d.is_enabled);
+    const disabledDestinations = destinationsToDisplay.filter(d => !d.is_enabled);
+    const destinationIdError = validationErrors?.['destination_ids']; // Use optional chaining
 
     return (
         <fieldset className="border-t border-gray-200 dark:border-gray-700 pt-4">
@@ -33,7 +37,7 @@ const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({
             </p>
             {isLoading ? (
                 <div className="text-sm text-gray-500 dark:text-gray-400">Loading destinations...</div>
-            ) : availableDestinations.length === 0 ? (
+            ) : destinationsToDisplay.length === 0 ? ( // Use safe array
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                     No storage backends configured. Please configure one under Configuration → Storage Backends.
                 </div>
@@ -58,7 +62,7 @@ const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({
                                     />
                                     <Label
                                         htmlFor={`dest-${dest.id}`}
-                                        id={`dest-label-${dest.id}`} // Add ID for association
+                                        id={`dest-label-${dest.id}`}
                                         className="text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer"
                                     >
                                         {dest.name} <span className="text-xs text-gray-500 dark:text-gray-400">({dest.backend_type})</span>
@@ -74,7 +78,8 @@ const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({
                     )}
                 </>
             )}
-            {validationErrors['destination_ids'] && (
+            {/* Use optional chaining for validation error display */}
+            {validationErrors?.['destination_ids'] && (
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="destination_ids-error">
                     {validationErrors['destination_ids']}
                 </p>

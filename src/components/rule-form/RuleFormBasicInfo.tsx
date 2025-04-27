@@ -17,9 +17,9 @@ interface RuleFormBasicInfoProps {
     onIsActiveChange: (value: boolean) => void;
     isLoading: boolean;
     validationErrors: Record<string, string>;
-    baseInputStyles: string; // Pass base styles
-    errorInputStyles: string; // Pass error styles
-    normalInputStyles: string; // Pass normal styles
+    baseInputStyles: string;
+    errorInputStyles: string;
+    normalInputStyles: string;
 }
 
 const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
@@ -33,7 +33,7 @@ const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
     onIsActiveChange,
     isLoading,
     validationErrors,
-    baseInputStyles, // Receive styles as props
+    baseInputStyles,
     errorInputStyles,
     normalInputStyles,
 }) => {
@@ -49,11 +49,12 @@ const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
                         onChange={(e) => onNameChange(e.target.value)}
                         required
                         disabled={isLoading}
-                        aria-invalid={!!validationErrors['name']}
+                        aria-invalid={!!validationErrors?.['name']}
                         aria-describedby="ruleName-error"
-                        className={`mt-1 ${validationErrors['name'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
-                    />
-                    {validationErrors['name'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="ruleName-error">{validationErrors['name']}</p>}
+                        // --- MOVED Comment ---
+                        className={`mt-1 ${validationErrors?.['name'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
+                    /> {/* Optional chaining applied */}
+                    {validationErrors?.['name'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="ruleName-error">{validationErrors['name']}</p>}
                 </div>
                 {/* Priority Field */}
                 <div>
@@ -64,11 +65,12 @@ const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
                         value={priority}
                         onChange={(e) => onPriorityChange(parseInt(e.target.value, 10) || 0)}
                         disabled={isLoading}
-                        aria-invalid={!!validationErrors['priority']}
+                        aria-invalid={!!validationErrors?.['priority']}
                         aria-describedby="rulePriority-error"
-                        className={`mt-1 ${validationErrors['priority'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
-                    />
-                    {validationErrors['priority'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="rulePriority-error">{validationErrors['priority']}</p>}
+                        // --- MOVED Comment ---
+                        className={`mt-1 ${validationErrors?.['priority'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
+                    /> {/* Optional chaining applied */}
+                     {validationErrors?.['priority'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="rulePriority-error">{validationErrors['priority']}</p>}
                 </div>
             </div>
             {/* Description Field */}
@@ -80,11 +82,12 @@ const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
                     onChange={(e) => onDescriptionChange(e.target.value)}
                     rows={2}
                     disabled={isLoading}
-                    aria-invalid={!!validationErrors['description']}
+                    aria-invalid={!!validationErrors?.['description']}
                     aria-describedby="ruleDescription-error"
-                    className={`mt-1 ${validationErrors['description'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
-                />
-                {validationErrors['description'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="ruleDescription-error">{validationErrors['description']}</p>}
+                    // --- MOVED Comment ---
+                    className={`mt-1 ${validationErrors?.['description'] ? errorInputStyles : normalInputStyles} dark:bg-gray-700 `}
+                /> {/* Optional chaining applied */}
+                 {validationErrors?.['description'] && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="ruleDescription-error">{validationErrors['description']}</p>}
             </div>
             {/* Active Status Switch */}
             <div className="flex items-center pt-2">
@@ -97,13 +100,13 @@ const RuleFormBasicInfo: React.FC<RuleFormBasicInfoProps> = ({
                     <span className={`${isActive ? 'translate-x-6' : 'translate-x-1'} inline-block h-4 w-4 transform rounded-full bg-white transition-transform`} />
                 </Switch>
                 <Label
-                    htmlFor={undefined} // Switch doesn't need direct label link via htmlFor
+                    htmlFor={undefined}
                     onClick={() => !isLoading && onIsActiveChange(!isActive)}
                     className={`ml-3 text-sm font-medium ${isLoading ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300 cursor-pointer'}`}
                 >
                     Active
                 </Label>
-                 {validationErrors['is_active'] && <p className="ml-4 text-xs text-red-600 dark:text-red-400">{validationErrors['is_active']}</p>}
+                 {validationErrors?.['is_active'] && <p className="ml-4 text-xs text-red-600 dark:text-red-400">{validationErrors['is_active']}</p>} {/* Optional chaining applied */}
             </div>
         </>
     );

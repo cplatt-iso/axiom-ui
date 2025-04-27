@@ -3,8 +3,9 @@ import React, { Fragment } from 'react';
 import { Listbox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { Label } from '@/components/ui/label';
-import { Server, Search, Code, HelpCircle } from 'lucide-react'; // Icons are already imported
-import { SourceInfo } from './RuleFormModal';
+import { Server, Search, Code, HelpCircle } from 'lucide-react';
+// Import SourceInfo from parent modal where it's defined
+import { SourceInfo } from '../RuleFormModal';
 
 interface RuleFormSourcesProps {
     selectedSources: string[];
@@ -42,21 +43,21 @@ const RuleFormSources: React.FC<RuleFormSourcesProps> = ({
         onSelectionChange(selectedNames);
     };
 
-    const selectedSourceObjects = availableSources.filter(source =>
-        selectedSources.includes(source.name)
-    );
+    const selectedSourceObjects = Array.isArray(availableSources)
+        ? availableSources.filter(source => selectedSources.includes(source.name))
+        : [];
+
+    const availableSourcesList = Array.isArray(availableSources) ? availableSources : [];
 
     return (
         <fieldset className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <legend className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">
                 Applicable Input Sources
             </legend>
-            {/* --- UPDATED Description Section --- */}
             <div className="mb-3">
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                     Select sources this rule applies to. If none selected, applies to ALL sources.
                 </p>
-                {/* Icon Key */}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-medium">Key:</span>
                     <span className="inline-flex items-center gap-1">
@@ -70,11 +71,10 @@ const RuleFormSources: React.FC<RuleFormSourcesProps> = ({
                     </span>
                 </div>
             </div>
-            {/* --- END UPDATED Description Section --- */}
 
             {isLoading ? (
                 <div className="text-sm text-gray-500 dark:text-gray-400">Loading sources...</div>
-            ) : availableSources.length === 0 ? (
+            ) : availableSourcesList.length === 0 ? (
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                     No specific input sources found or configured. Rule will apply globally if no sources are selected.
                 </div>
@@ -106,7 +106,7 @@ const RuleFormSources: React.FC<RuleFormSourcesProps> = ({
                             leaveTo="opacity-0"
                         >
                             <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm z-30">
-                                {availableSources.map((source, sourceIdx) => {
+                                {availableSourcesList.map((source, sourceIdx) => {
                                     const Icon = getSourceTypeIcon(source.type);
                                     return (
                                         <Listbox.Option
@@ -141,7 +141,7 @@ const RuleFormSources: React.FC<RuleFormSourcesProps> = ({
                     </div>
                 </Listbox>
             )}
-            {validationErrors['applicable_sources'] && (
+            {validationErrors?.['applicable_sources'] && (
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="applicable_sources-error">
                     {validationErrors['applicable_sources']}
                 </p>

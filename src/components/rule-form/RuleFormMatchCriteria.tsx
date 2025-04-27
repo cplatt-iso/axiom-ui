@@ -42,38 +42,39 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
     errorInputStyles,
     normalInputStyles,
 }) => {
+    // Ensure matchCriteria is an array before mapping
+    const criteriaToRender = Array.isArray(matchCriteria) ? matchCriteria : [];
+
     return (
         <fieldset className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <legend className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">Match Criteria (ALL must match)<span className="text-red-500">*</span></legend>
             <div className="space-y-3 pr-2">
-                {matchCriteria.map((criterion, index) => {
-                    const tagError = validationErrors[`match_criteria[${index}].tag`];
-                    const opError = validationErrors[`match_criteria[${index}].op`];
-                    const valueError = validationErrors[`match_criteria[${index}].value`];
+                {/* Map over the safe array */}
+                {criteriaToRender.map((criterion, index) => {
+                    const tagError = validationErrors?.[`match_criteria[${index}].tag`];
+                    const opError = validationErrors?.[`match_criteria[${index}].op`];
+                    const valueError = validationErrors?.[`match_criteria[${index}].value`];
                     const showValueInput = isValueRequired(criterion.op);
 
                     return (
                         <div key={index} className="relative flex items-start space-x-2 p-2 border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700/50">
-                            {/* Use consistent grid structure */}
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
 
-                                {/* Column 1: Tag */}
                                 <div className="flex flex-col space-y-1">
                                     <Label htmlFor={`mc-tag-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Tag*</Label>
                                     <DicomTagCombobox
-                                        inputId={`mc-tag-${index}`} // Pass ID for label association
+                                        inputId={`mc-tag-${index}`}
                                         value={criterion.tag ?? ''}
                                         onChange={(tagInfo: DicomTagInfo | null) => updateMatchCriterion(index, 'tagInfo', tagInfo)}
                                         disabled={isLoading}
                                         required
                                         aria-invalid={!!tagError}
-                                        aria-describedby={`mc-tag-${index}-error`}
+                                        aria-describedby={tagError ? `mc-tag-${index}-error` : undefined}
                                         inputClassName={`${baseInputStyles} ${tagError ? errorInputStyles : normalInputStyles}`}
                                     />
                                     {tagError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-tag-${index}-error`}>{tagError}</p>}
                                 </div>
 
-                                {/* Column 2: Operator */}
                                 <div className="flex flex-col space-y-1">
                                     <Label htmlFor={`mc-op-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Operator*</Label>
                                     <Select
@@ -83,7 +84,6 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                         required
                                         aria-invalid={!!opError}
                                     >
-                                        {/* Associate trigger with label */}
                                         <SelectTrigger id={`mc-op-${index}`} className={`${baseInputStyles} ${opError ? errorInputStyles : normalInputStyles} dark:bg-gray-900/50 dark:disabled:bg-gray-800`}>
                                             <SelectValue placeholder="Select Operator" />
                                         </SelectTrigger>
@@ -96,26 +96,25 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                     {opError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-op-${index}-error`}>{opError}</p>}
                                 </div>
 
-                                {/* Column 3: Value */}
                                 <div className="flex flex-col space-y-1">
-                                    {/* Conditionally render Label or a spacer */}
                                     {showValueInput ? (
                                          <Label htmlFor={`mc-value-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Value*</Label>
                                     ) : (
-                                         <Label className="text-xs font-medium text-transparent select-none"> </Label> // Spacer Label
+                                         <Label className="text-xs font-medium text-transparent select-none"> </Label>
                                     )}
 
                                     {showValueInput ? (
                                         <>
                                             <Input
-                                                id={`mc-value-${index}`} // Associate with label
+                                                id={`mc-value-${index}`}
                                                 type={isValueList(criterion.op) ? 'text' : 'text'}
                                                 placeholder={isValueList(criterion.op) ? "List, comma-separated" : "Value"}
                                                 value={criterion.value ?? ''}
                                                 onChange={(e) => updateMatchCriterion(index, 'value', e.target.value)}
                                                 disabled={isLoading}
+                                                required={opError ? false : true} // Make required conditional on op validity if needed
                                                 aria-invalid={!!valueError}
-                                                aria-describedby={`mc-value-${index}-error`}
+                                                aria-describedby={valueError ? `mc-value-${index}-error` : undefined}
                                                 className={`${baseInputStyles} ${valueError ? errorInputStyles : normalInputStyles} dark:bg-gray-900/50 dark:disabled:bg-gray-800`}
                                             />
                                             {valueError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-value-${index}-error`}>{valueError}</p>}
@@ -127,7 +126,6 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                     )}
                                 </div>
                             </div>
-                            {/* Delete Button (aligns with inputs due to flex items-start on parent) */}
                             <button
                                 type="button"
                                 onClick={() => removeMatchCriterion(index)}
@@ -145,7 +143,7 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
             <Button type="button" variant="outline" size="sm" onClick={addMatchCriterion} disabled={isLoading} className="mt-2">
                 <PlusIcon className="h-4 w-4 mr-1"/> Add Criterion
             </Button>
-            {validationErrors['match_criteria'] && typeof validationErrors['match_criteria'] === 'string' && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{validationErrors['match_criteria']}</p>}
+            {validationErrors?.['match_criteria'] && typeof validationErrors['match_criteria'] === 'string' && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{validationErrors['match_criteria']}</p>}
         </fieldset>
     );
 };

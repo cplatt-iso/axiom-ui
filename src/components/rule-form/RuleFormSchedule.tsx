@@ -1,21 +1,20 @@
 // src/components/rule-form/RuleFormSchedule.tsx
 import React from 'react';
-import { ScheduleRead } from '@/schemas'; // Import the ScheduleRead schema
+import { ScheduleRead } from '@/schemas';
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useFormField } from '@/components/ui/form'; // Import useFormField if needed for accessibility linking
 
 interface RuleFormScheduleProps {
-    selectedScheduleId: number | null | undefined; // ID of the currently selected schedule, or null/undefined
-    availableSchedules: ScheduleRead[]; // List of fetched, *enabled* schedules
-    onScheduleChange: (scheduleId: number | null) => void; // Callback returns number or null
-    isLoading: boolean; // Combined loading state (form submission + schedule fetching)
-    schedulesLoading: boolean; // Specific loading state for schedules
-    schedulesError: Error | null; // Specific error state for schedules
+    selectedScheduleId: number | null | undefined;
+    availableSchedules: ScheduleRead[];
+    onScheduleChange: (scheduleId: number | null) => void;
+    isLoading: boolean;
+    schedulesLoading: boolean;
+    schedulesError: Error | null;
     validationErrors: Record<string, string>;
-    baseInputStyles: string; // Pass base styles for SelectTrigger
-    errorInputStyles: string; // Pass error styles
-    normalInputStyles: string; // Pass normal styles
+    baseInputStyles: string;
+    errorInputStyles: string;
+    normalInputStyles: string;
 }
 
 const RuleFormSchedule: React.FC<RuleFormScheduleProps> = ({
@@ -30,10 +29,9 @@ const RuleFormSchedule: React.FC<RuleFormScheduleProps> = ({
     errorInputStyles,
     normalInputStyles,
 }) => {
-    const scheduleIdError = validationErrors['schedule_id'];
+    const scheduleIdError = validationErrors && validationErrors['schedule_id'];
     const hasError = !!scheduleIdError;
 
-    // Handle change: Convert string value from Select back to number or null
     const handleValueChange = (value: string) => {
         if (value === "none") {
             onScheduleChange(null);
@@ -43,10 +41,11 @@ const RuleFormSchedule: React.FC<RuleFormScheduleProps> = ({
         }
     };
 
-    // Determine the string value for the Select component
     const selectValue = selectedScheduleId === null || selectedScheduleId === undefined
         ? "none"
         : selectedScheduleId.toString();
+
+    const schedulesToDisplay = Array.isArray(availableSchedules) ? availableSchedules : [];
 
     return (
         <fieldset className="border-t border-gray-200 dark:border-gray-700 pt-4">
@@ -57,18 +56,18 @@ const RuleFormSchedule: React.FC<RuleFormScheduleProps> = ({
                 Select a schedule to control when this rule is active. If "None" is selected, the rule is active whenever its main 'Active' toggle is on.
             </p>
             <div>
-                <Label htmlFor="ruleSchedule" className="sr-only">Schedule</Label> {/* Hidden label for accessibility */}
+                <Label htmlFor="ruleSchedule" className="sr-only">Schedule</Label>
                 <Select
                     onValueChange={handleValueChange}
                     value={selectValue}
-                    disabled={isLoading || schedulesLoading} // Disable if form submitting or schedules loading
-                    required={false} // Not strictly required, null is valid
+                    disabled={isLoading || schedulesLoading}
+                    required={false}
                     aria-invalid={hasError}
                 >
                     <SelectTrigger
                         id="ruleSchedule"
                         className={`${baseInputStyles} ${hasError ? errorInputStyles : normalInputStyles} dark:bg-gray-700`}
-                        aria-describedby="schedule-error" // Link error message
+                        aria-describedby={hasError ? "schedule-error" : undefined}
                     >
                         <SelectValue placeholder={
                             schedulesLoading ? "Loading schedules..." :
@@ -77,18 +76,15 @@ const RuleFormSchedule: React.FC<RuleFormScheduleProps> = ({
                         } />
                     </SelectTrigger>
                     <SelectContent>
-                        {/* Always include the "None" option */}
                         <SelectItem value="none">None (Always Active)</SelectItem>
-
-                        {/* Render fetched schedules */}
                         {schedulesError ? (
                             <div className="px-2 py-1 text-sm text-red-600 italic">Error loading</div>
                         ) : schedulesLoading ? (
                             <div className="px-2 py-1 text-sm text-gray-500 italic">Loading...</div>
-                        ) : availableSchedules.length === 0 ? (
+                        ) : schedulesToDisplay.length === 0 ? (
                             <div className="px-2 py-1 text-sm text-gray-500 italic">No schedules configured</div>
                         ) : (
-                            availableSchedules.map(schedule => (
+                            schedulesToDisplay.map(schedule => (
                                 <SelectItem key={schedule.id} value={schedule.id.toString()}>
                                     [{schedule.id}] - {schedule.name}
                                 </SelectItem>
