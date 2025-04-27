@@ -3,19 +3,17 @@ import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Define the structure for configuration tabs
 interface ConfigTab {
-    value: string; // Corresponds to the last part of the URL path
-    label: string; // Display text for the tab
-    path: string;  // Full path for navigation
+    value: string;
+    label: string;
+    path: string;
 }
 
 const configTabs: ConfigTab[] = [
-    { value: 'dicomweb-sources', label: 'DICOMweb Sources', path: '/admin/config/dicomweb-sources' },
-    { value: 'dimse-listeners', label: 'DIMSE Listeners', path: '/admin/config/dimse-listeners' },
-    { value: 'dimse-qr-sources', label: 'DIMSE Q/R Sources', path: '/admin/config/dimse-qr-sources' },
+    { value: 'scrapers', label: 'Scrapers', path: '/admin/config/scrapers' },
+    { value: 'listeners', label: 'Listeners', path: '/admin/config/listeners' },
     { value: 'storage-backends', label: 'Storage Backends', path: '/admin/config/storage-backends' },
-    { value: 'crosswalk', label: 'Crosswalk', path: '/admin/config/crosswalk' }, 
+    { value: 'crosswalk', label: 'Crosswalk', path: '/admin/config/crosswalk' },
 ];
 
 const ConfigurationPage: React.FC = () => {
@@ -23,7 +21,7 @@ const ConfigurationPage: React.FC = () => {
     const navigate = useNavigate();
 
     const activeTab = configTabs.find(tab => location.pathname.startsWith(tab.path))?.value
-                      || configTabs[0].value; // Default to the first tab if no match
+                      || configTabs[0].value;
 
     const handleTabChange = (value: string) => {
         const selectedTab = configTabs.find(tab => tab.value === value);
@@ -42,8 +40,7 @@ const ConfigurationPage: React.FC = () => {
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                 {/* Updated grid-cols-5 to accommodate the new tab */}
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-2">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2"> {/* Updated grid columns */}
                     {configTabs.map((tab) => (
                         <TabsTrigger key={tab.value} value={tab.value} className="w-full">
                             {tab.label}
@@ -52,7 +49,6 @@ const ConfigurationPage: React.FC = () => {
                 </TabsList>
             </Tabs>
 
-            {/* Render the nested route component */}
             <div className="mt-6">
                 <Outlet />
             </div>

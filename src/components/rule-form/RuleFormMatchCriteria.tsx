@@ -9,8 +9,6 @@ import {
     MatchOperationSchema,
 } from '@/schemas';
 import { DicomTagInfo } from '@/dicom/dictionary';
-
-// Import helpers from the utility file
 import { isValueRequired, isValueList, isIpOperator } from '@/utils/ruleHelpers';
 
 import DicomTagCombobox from '../DicomTagCombobox';
@@ -33,8 +31,6 @@ interface RuleFormMatchCriteriaProps {
 
 const MATCH_OPERATORS = MatchOperationSchema.options;
 
-// Remove local definitions of isValueRequired, isValueList, isIpOperator
-
 const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
     matchCriteria,
     updateMatchCriterion,
@@ -54,13 +50,18 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                     const tagError = validationErrors[`match_criteria[${index}].tag`];
                     const opError = validationErrors[`match_criteria[${index}].op`];
                     const valueError = validationErrors[`match_criteria[${index}].value`];
-                    // Use the imported helper
                     const showValueInput = isValueRequired(criterion.op);
+
                     return (
                         <div key={index} className="relative flex items-start space-x-2 p-2 border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700/50">
+                            {/* Use consistent grid structure */}
                             <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                <div>
+
+                                {/* Column 1: Tag */}
+                                <div className="flex flex-col space-y-1">
+                                    <Label htmlFor={`mc-tag-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Tag*</Label>
                                     <DicomTagCombobox
+                                        inputId={`mc-tag-${index}`} // Pass ID for label association
                                         value={criterion.tag ?? ''}
                                         onChange={(tagInfo: DicomTagInfo | null) => updateMatchCriterion(index, 'tagInfo', tagInfo)}
                                         disabled={isLoading}
@@ -71,7 +72,10 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                     />
                                     {tagError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-tag-${index}-error`}>{tagError}</p>}
                                 </div>
-                                <div>
+
+                                {/* Column 2: Operator */}
+                                <div className="flex flex-col space-y-1">
+                                    <Label htmlFor={`mc-op-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Operator*</Label>
                                     <Select
                                         onValueChange={(value) => updateMatchCriterion(index, 'op', value as MatchOperation)}
                                         value={criterion.op}
@@ -79,11 +83,11 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                         required
                                         aria-invalid={!!opError}
                                     >
-                                        <SelectTrigger className={`${baseInputStyles} ${opError ? errorInputStyles : normalInputStyles} dark:bg-gray-900/50 dark:disabled:bg-gray-800`}>
+                                        {/* Associate trigger with label */}
+                                        <SelectTrigger id={`mc-op-${index}`} className={`${baseInputStyles} ${opError ? errorInputStyles : normalInputStyles} dark:bg-gray-900/50 dark:disabled:bg-gray-800`}>
                                             <SelectValue placeholder="Select Operator" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {/* Use the imported helper */}
                                             {MATCH_OPERATORS.filter(op => !isIpOperator(op)).map(op => (
                                                 <SelectItem key={op} value={op}>{op}</SelectItem>
                                             ))}
@@ -91,11 +95,20 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                     </Select>
                                     {opError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-op-${index}-error`}>{opError}</p>}
                                 </div>
-                                <div>
+
+                                {/* Column 3: Value */}
+                                <div className="flex flex-col space-y-1">
+                                    {/* Conditionally render Label or a spacer */}
+                                    {showValueInput ? (
+                                         <Label htmlFor={`mc-value-${index}`} className="text-xs font-medium text-gray-600 dark:text-gray-400">Value*</Label>
+                                    ) : (
+                                         <Label className="text-xs font-medium text-transparent select-none"> </Label> // Spacer Label
+                                    )}
+
                                     {showValueInput ? (
                                         <>
                                             <Input
-                                                // Use the imported helper
+                                                id={`mc-value-${index}`} // Associate with label
                                                 type={isValueList(criterion.op) ? 'text' : 'text'}
                                                 placeholder={isValueList(criterion.op) ? "List, comma-separated" : "Value"}
                                                 value={criterion.value ?? ''}
@@ -108,17 +121,22 @@ const RuleFormMatchCriteria: React.FC<RuleFormMatchCriteriaProps> = ({
                                             {valueError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`mc-value-${index}-error`}>{valueError}</p>}
                                         </>
                                     ) : (
-                                        <div className="text-sm text-gray-500 dark:text-gray-400 italic self-center pt-2">(No value needed)</div>
+                                        <div className="text-sm text-gray-500 dark:text-gray-400 italic self-center pt-2">
+                                            (No value needed)
+                                        </div>
                                     )}
                                 </div>
                             </div>
+                            {/* Delete Button (aligns with inputs due to flex items-start on parent) */}
                             <button
                                 type="button"
                                 onClick={() => removeMatchCriterion(index)}
                                 disabled={isLoading}
                                 className="text-red-500 hover:text-red-700 p-1 mt-1 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed self-start"
+                                title="Remove Criterion"
                             >
                                 <TrashIcon className="h-5 w-5"/>
+                                <span className="sr-only">Remove</span>
                             </button>
                         </div>
                     );

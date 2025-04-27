@@ -4,11 +4,9 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import { setAuthContextRef } from './services/api';
 
-// Import Core Layout and Route Protection Components
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Import Page Components
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ApiKeysPage from './pages/ApiKeysPage';
@@ -20,18 +18,21 @@ import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 import ConfigurationPage from './pages/ConfigurationPage';
+import ScrapersLayout from './pages/ScrapersLayout';
+import ListenersLayout from './pages/ListenersLayout';
 import DicomWebSourcesConfigPage from './pages/DicomWebSourcesConfigPage';
 import DimseListenersConfigPage from './pages/DimseListenersConfigPage';
 import DimseQrSourcesConfigPage from './pages/DimseQrSourcesConfigPage';
 import StorageBackendsConfigPage from './pages/StorageBackendsConfigPage';
 import CrosswalkLayout from './pages/CrosswalkLayout';
 import CrosswalkDataSourcesPage from './pages/CrosswalkDataSourcesPage';
-import CrosswalkMappingsPage from './pages/CrosswalkMappingsPage'; 
+import CrosswalkMappingsPage from './pages/CrosswalkMappingsPage';
+// --- Import New Info Pages ---
+import StowRsInfoPage from './pages/StowRsInfoPage';
+import JsonApiInfoPage from './pages/JsonApiInfoPage';
+// --- End Import ---
 
-/**
- * AppContent component sets up the main routing logic and connects
- * the authentication context to the API service helper.
- */
+
 function AppContent() {
   const auth = useAuth();
 
@@ -45,7 +46,7 @@ function AppContent() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Protected Routes (Standard Users & Admins) */}
+            {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
                 <Route element={<Layout />}>
                     {/* Standard Routes */}
@@ -63,20 +64,37 @@ function AppContent() {
 
                         {/* Configuration Section */}
                         <Route path="/admin/config" element={<ConfigurationPage />}>
-                            <Route index element={<Navigate to="dicomweb-sources" replace />} />
-                            <Route path="dicomweb-sources" element={<DicomWebSourcesConfigPage />} />
-                            <Route path="dimse-listeners" element={<DimseListenersConfigPage />} />
-                            <Route path="dimse-qr-sources" element={<DimseQrSourcesConfigPage />} />
+                            <Route index element={<Navigate to="scrapers" replace />} />
+
+                            {/* Scrapers Section */}
+                            <Route path="scrapers" element={<ScrapersLayout />}>
+                                <Route index element={<Navigate to="dicomweb" replace />} />
+                                <Route path="dicomweb" element={<DicomWebSourcesConfigPage />} />
+                                <Route path="dimse-qr" element={<DimseQrSourcesConfigPage />} />
+                            </Route>
+
+                            {/* --- UPDATED Listeners Section --- */}
+                            <Route path="listeners" element={<ListenersLayout />}>
+                                <Route index element={<Navigate to="dimse" replace />} />
+                                <Route path="dimse" element={<DimseListenersConfigPage />} />
+                                {/* Add routes for the info pages */}
+                                <Route path="stow-rs" element={<StowRsInfoPage />} />
+                                <Route path="json-api" element={<JsonApiInfoPage />} />
+                            </Route>
+                            {/* --- END UPDATED --- */}
+
+                            {/* Storage Backends */}
                             <Route path="storage-backends" element={<StorageBackendsConfigPage />} />
 
-			    <Route path="crosswalk" element={<CrosswalkLayout />}>
+                            {/* Crosswalk Section */}
+                            <Route path="crosswalk" element={<CrosswalkLayout />}>
                                 <Route index element={<Navigate to="data-sources" replace />} />
                                 <Route path="data-sources" element={<CrosswalkDataSourcesPage />} />
                                 <Route path="mappings" element={<CrosswalkMappingsPage />} />
-			    </Route>
+                            </Route>
                         </Route>
-                        {/* Add other top-level admin routes here */}
-                    </Route>
+
+                    </Route> {/* End Admin Protected Route */}
 
                 </Route> {/* End Layout */}
             </Route> {/* End Outer ProtectedRoute */}
@@ -87,9 +105,6 @@ function AppContent() {
   );
 }
 
-/**
- * The main App component.
- */
 function App() {
      return <AppContent />;
 }
