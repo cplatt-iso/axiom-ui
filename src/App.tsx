@@ -27,11 +27,9 @@ import StorageBackendsConfigPage from './pages/StorageBackendsConfigPage';
 import CrosswalkLayout from './pages/CrosswalkLayout';
 import CrosswalkDataSourcesPage from './pages/CrosswalkDataSourcesPage';
 import CrosswalkMappingsPage from './pages/CrosswalkMappingsPage';
-// --- Import New Info Pages ---
 import StowRsInfoPage from './pages/StowRsInfoPage';
 import JsonApiInfoPage from './pages/JsonApiInfoPage';
-// --- End Import ---
-
+import SchedulesConfigPage from './pages/SchedulesConfigPage';
 
 function AppContent() {
   const auth = useAuth();
@@ -73,15 +71,17 @@ function AppContent() {
                                 <Route path="dimse-qr" element={<DimseQrSourcesConfigPage />} />
                             </Route>
 
-                            {/* --- UPDATED Listeners Section --- */}
+                            {/* Listeners Section */}
                             <Route path="listeners" element={<ListenersLayout />}>
                                 <Route index element={<Navigate to="dimse" replace />} />
                                 <Route path="dimse" element={<DimseListenersConfigPage />} />
-                                {/* Add routes for the info pages */}
                                 <Route path="stow-rs" element={<StowRsInfoPage />} />
                                 <Route path="json-api" element={<JsonApiInfoPage />} />
                             </Route>
-                            {/* --- END UPDATED --- */}
+
+                            {/* --- ADDED: Schedules Route --- */}
+                            <Route path="schedules" element={<SchedulesConfigPage />} />
+                            {/* --- END ADDED --- */}
 
                             {/* Storage Backends */}
                             <Route path="storage-backends" element={<StorageBackendsConfigPage />} />

@@ -1,242 +1,210 @@
 // src/services/api.ts
 import { AuthContextType } from '../context/AuthContext'; // Import context type
+// --- Import Schemas ---
 import {
-    User, UserWithRoles, Role, ApiKey, ApiKeyCreateResponse,
-    Ruleset, Rule, RuleCreate, RuleUpdate, RulesetCreate, RulesetUpdate,
-    JsonProcessRequest, JsonProcessResponse,
-    HealthCheckResponse, // For dashboard status
-    DicomWebPollersStatusResponse, // For DICOMweb poller status
-    DimseListenersStatusResponse, // For DIMSE listener status
-    DimseQrSourcesStatusResponse, // For DIMSE Q/R source status
-    DicomWebSourceConfigRead, DicomWebSourceConfigCreatePayload, DicomWebSourceConfigUpdatePayload, // DICOMweb Config
-    DimseListenerConfigRead, DimseListenerConfigCreatePayload, DimseListenerConfigUpdatePayload, // DIMSE Listener Config
-    DimseQueryRetrieveSourceRead, DimseQueryRetrieveSourceCreatePayload, DimseQueryRetrieveSourceUpdatePayload, // DIMSE Q/R Config
+    Ruleset, RulesetCreate, RulesetUpdate,
+    Rule, RuleCreate, RuleUpdate,
+    ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate,
+    UserWithRoles, Role, UserUpdate as UserRoleUpdatePayload, // Use specific type for user role update
+    SystemStatusReport,
+    DicomWebSourceStatus, DicomWebPollersStatusResponse,
+    DimseListenerStatus, DimseListenersStatusResponse,
+    DicomWebSourceConfigRead, DicomWebSourceConfigCreatePayload, DicomWebSourceConfigUpdatePayload,
+    DimseListenerConfigRead, DimseListenerConfigCreatePayload, DimseListenerConfigUpdatePayload,
     StorageBackendConfigRead, StorageBackendConfigCreatePayload, StorageBackendConfigUpdatePayload,
-    CrosswalkDataSourceRead,
-    CrosswalkDataSourceCreatePayload,
-    CrosswalkDataSourceUpdatePayload,
-    CrosswalkMapRead,
-    CrosswalkMapCreatePayload,
-    CrosswalkMapUpdatePayload,
-} from '../schemas'; // Assuming schemas are exported from index
+    Schedule, ScheduleCreate, ScheduleUpdate,
+    DimseQueryRetrieveSourceRead, DimseQueryRetrieveSourceCreatePayload, DimseQueryRetrieveSourceUpdatePayload,
+    DimseQrSourceStatus, DimseQrSourcesStatusResponse, // Import status schemas too
+    CrosswalkDataSourceRead, CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload,
+    CrosswalkMapRead, CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload
+} from '../schemas';
 
-// --- Keep Auth Context Reference ---
+// Store a reference to the AuthContext
 let authContextRef: AuthContextType | null = null;
 
 export function setAuthContextRef(context: AuthContextType) {
+    console.log("API Service: AuthContext reference set.");
     authContextRef = context;
 }
-// --- End Auth Context Reference ---
 
-// Base URL for the API from environment variables
-// Ensure this uses HTTPS in your production .env file if your site uses HTTPS
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+// Base URL for the API (adjust if your backend runs elsewhere)
+// Use environment variable or a default
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+console.log(`API Service: Using base URL: ${API_BASE_URL}`);
 
-// --- apiClient Function (Keep existing logic) ---
-interface ApiClientOptions extends RequestInit {
-    useAuth?: boolean; // Control whether to send auth token
-    isFormData?: boolean; // Indicate if body is FormData
+// Type for API options
+interface ApiOptions extends RequestInit {
+    params?: Record<string, string>; // For query parameters
+    useAuth?: boolean; // Flag to control adding Auth header (defaults to true)
 }
 
-export async function apiClient<T>(
+// Centralized API client function
+export const apiClient = async <T>(
     endpoint: string,
-    options: ApiClientOptions = {}
-): Promise<T> {
-    const { useAuth = true, isFormData = false, ...fetchOptions } = options;
-    const headers = new Headers(fetchOptions.headers || {});
-    let token: string | null = null;
+    options: ApiOptions = {}
+): Promise<T> => {
+    const { params, useAuth = true, ...fetchOptions } = options;
+    let url = `${API_BASE_URL}${endpoint}`;
 
+    // Append query parameters if provided
+    if (params) {
+        const query = new URLSearchParams(params).toString();
+        if (query) {
+            url += `?${query}`;
+        }
+    }
+
+    // Prepare headers
+    const headers = new Headers(fetchOptions.headers || {});
+    if (!headers.has('Content-Type') && !(fetchOptions.body instanceof FormData)) {
+        headers.set('Content-Type', 'application/json');
+    }
+    if (!headers.has('Accept')) {
+        headers.set('Accept', 'application/json');
+    }
+
+    // Add Authorization header if useAuth is true and token is available
     if (useAuth) {
-        token = authContextRef?.getToken(); // Use function from context
+        const token = authContextRef?.getToken();
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
+            // console.debug(`API Client: Sending request to ${endpoint} with Bearer token.`);
         } else {
-            console.warn(`apiClient: No auth token found for protected endpoint ${endpoint}. Request might fail.`);
-            // Optionally throw error or handle redirect here if token is strictly required
+            console.warn(`API Client: Auth requested for ${endpoint}, but no token found.`);
+            // Optionally throw an error or proceed without auth depending on requirements
+            // throw new Error("Authentication token is missing");
         }
+    } else {
+        // console.debug(`API Client: Sending request to ${endpoint} without auth header.`);
     }
 
-    // Only set Content-Type if body exists and it's not FormData
-    if (fetchOptions.body && !isFormData && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
-    } else if (isFormData) {
-        // For FormData, DO NOT set Content-Type header; browser handles it with boundary
-        // Ensure the body IS actually a FormData object if isFormData is true
-        if (!(fetchOptions.body instanceof FormData)) {
-             console.error("apiClient: isFormData is true, but body is not FormData.");
-             // Handle error appropriately, maybe throw
-        }
-    }
-
-
-    const config: RequestInit = {
-        ...fetchOptions,
-        headers,
-    };
-
-    // Construct the final URL - ensure no double slashes if endpoint starts with /
-    const url = `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    console.debug(`apiClient: Fetching ${config.method || 'GET'} ${url}`);
+    fetchOptions.headers = headers;
 
     try {
-        const response = await fetch(url, config);
-
-        // Handle successful responses with no content (e.g., 204 No Content)
-        if (response.status === 204) {
-            console.debug(`apiClient: Received 204 No Content for ${url}`);
-            // Return an empty object or null cast as T, depending on expected usage
-            // Be cautious with this, ensure calling code handles potential null/empty object
-            return null as T;
-        }
-
-        // Try to parse JSON, but handle potential non-JSON responses gracefully
-        let responseData: any;
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            responseData = await response.json();
-        } else {
-            // If not JSON, maybe just get text? Or handle based on status code?
-            // For now, let's assume non-ok non-json is an error text
-            responseData = await response.text(); // Get text for error reporting
-             if (response.ok) {
-                 console.warn(`apiClient: Received non-JSON response for ${url} with status ${response.status}. Returning raw text.`);
-                 // If it was status 200 OK but not JSON, maybe return text? Or null?
-                 // Returning the text might break type T expectations. Returning null might be safer.
-                 return responseData as T; // Or return null as T;
-             }
-        }
-
+        console.debug(`API Client: Fetching ${fetchOptions.method || 'GET'} ${url}`);
+        const response = await fetch(url, fetchOptions);
 
         if (!response.ok) {
-            console.error(`apiClient: Error ${response.status} fetching ${url}:`, responseData);
-            // Attempt to extract a meaningful error message from JSON or use text
-            const errorMessage = (typeof responseData === 'object' && responseData?.detail)
-                                 || (typeof responseData === 'object' && responseData?.message)
-                                 || (typeof responseData === 'string' ? responseData : `HTTP error ${response.status}`);
-            const error: any = new Error(errorMessage);
-            error.status = response.status;
-            error.detail = (typeof responseData === 'object' ? responseData?.detail : responseData); // Preserve detail
-            // If 401 Unauthorized, trigger logout via context
-            if (response.status === 401 && useAuth && authContextRef) {
-                console.warn(`apiClient: Received 401 Unauthorized for ${url}. Logging out.`);
-                authContextRef.logout(); // Trigger logout
+            let errorData;
+            const contentType = response.headers.get("content-type");
+            try {
+                if (contentType && contentType.includes("application/json")) {
+                    errorData = await response.json();
+                } else {
+                     errorData = { detail: await response.text() || `HTTP error ${response.status}` };
+                }
+            } catch (e) {
+                 errorData = { detail: `HTTP error ${response.status}: Failed to parse error response.` };
             }
+            console.error(`API Client Error: ${response.status} ${response.statusText} for ${url}`, errorData);
+            // Throw an error object that includes status and detail
+            const error: any = new Error(errorData?.detail || `HTTP error ${response.status}`);
+            error.status = response.status;
+            error.detail = errorData?.detail; // Attach detail if available
             throw error;
         }
 
-        console.debug(`apiClient: Successfully fetched ${url}`);
-        return responseData as T;
+        // Handle potential 204 No Content responses
+        if (response.status === 204) {
+            console.debug(`API Client: Received 204 No Content for ${url}`);
+            return {} as T; // Return an empty object or null/undefined as appropriate for type T
+        }
 
-    } catch (error: any) {
-        // Catch fetch errors (network issues) and re-thrown errors from !response.ok
-        console.error(`apiClient: Network or processing error fetching ${url}:`, error);
-        // Re-throw the error so calling components can handle it
+        // Assume JSON response for successful requests unless specifically handled otherwise
+        const data: T = await response.json();
+        console.debug(`API Client: Successfully received data for ${url}`);
+        return data;
+    } catch (error) {
+        console.error(`API Client Fetch Error for ${url}:`, error);
+        // Re-throw the error (could be the custom error thrown above or a network error)
         throw error;
     }
-}
-// --- End apiClient Function ---
+};
 
 
-// --- API Key Management ---
-export const getApiKeys = (): Promise<ApiKey[]> => apiClient<ApiKey[]>('/apikeys');
-export const createApiKey = (name: string): Promise<ApiKeyCreateResponse> => apiClient<ApiKeyCreateResponse>('/apikeys', { method: 'POST', body: JSON.stringify({ name }) });
-export const deleteApiKey = (keyId: number): Promise<null> => apiClient<null>(`/apikeys/${keyId}`, { method: 'DELETE' });
+// --- Specific API Function Exports ---
 
-// --- User Management ---
-export const getUsers = (): Promise<UserWithRoles[]> => apiClient<UserWithRoles[]>('/users');
-export const getRoles = (): Promise<Role[]> => apiClient<Role[]>('/roles');
-export const assignRoleToUser = (userId: number, roleId: number): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ role_id: roleId }) });
-export const removeRoleFromUser = (userId: number, roleId: number): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
-export const updateUser = (userId: number, data: Partial<{ is_active: boolean }>): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) });
-export const getCurrentUser = (): Promise<User> => apiClient<User>('/users/me');
-
-
-// --- Ruleset & Rule Management ---
+// Rulesets
 export const getRulesets = (): Promise<Ruleset[]> => apiClient<Ruleset[]>('/rules-engine/rulesets');
 export const getRulesetById = (id: number): Promise<Ruleset> => apiClient<Ruleset>(`/rules-engine/rulesets/${id}`);
 export const createRuleset = (data: RulesetCreate): Promise<Ruleset> => apiClient<Ruleset>('/rules-engine/rulesets', { method: 'POST', body: JSON.stringify(data) });
 export const updateRuleset = (id: number, data: RulesetUpdate): Promise<Ruleset> => apiClient<Ruleset>(`/rules-engine/rulesets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteRuleset = (id: number): Promise<null> => apiClient<null>(`/rules-engine/rulesets/${id}`, { method: 'DELETE' });
+export const deleteRuleset = (id: number): Promise<void> => apiClient<void>(`/rules-engine/rulesets/${id}`, { method: 'DELETE' }); // Use void for 204
 
+// Rules
 export const getRulesByRuleset = (rulesetId: number): Promise<Rule[]> => apiClient<Rule[]>(`/rules-engine/rules?ruleset_id=${rulesetId}`);
+export const getRuleById = (id: number): Promise<Rule> => apiClient<Rule>(`/rules-engine/rules/${id}`);
 export const createRule = (data: RuleCreate): Promise<Rule> => apiClient<Rule>('/rules-engine/rules', { method: 'POST', body: JSON.stringify(data) });
 export const updateRule = (id: number, data: RuleUpdate): Promise<Rule> => apiClient<Rule>(`/rules-engine/rules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteRule = (id: number): Promise<null> => apiClient<null>(`/rules-engine/rules/${id}`, { method: 'DELETE' });
+export const deleteRule = (id: number): Promise<void> => apiClient<void>(`/rules-engine/rules/${id}`, { method: 'DELETE' });
 
-// --- JSON Processing ---
-export const processJsonHeader = (data: JsonProcessRequest): Promise<JsonProcessResponse> => apiClient<JsonProcessResponse>('/rules-engine/process-json', { method: 'POST', body: JSON.stringify(data) });
+// API Keys
+export const getApiKeys = (): Promise<ApiKey[]> => apiClient<ApiKey[]>('/apikeys/');
+export const createApiKey = (data: ApiKeyCreate): Promise<ApiKeyCreateResponse> => apiClient<ApiKeyCreateResponse>('/apikeys/', { method: 'POST', body: JSON.stringify(data) });
+// export const updateApiKey = (id: number, data: ApiKeyUpdate): Promise<ApiKey> => apiClient<ApiKey>(`/apikeys/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteApiKey = (id: number): Promise<void> => apiClient<void>(`/apikeys/${id}`, { method: 'DELETE' });
 
-// --- System Status ---
-export const getDashboardStatus = (): Promise<HealthCheckResponse> => apiClient<HealthCheckResponse>('/dashboard/status');
+// Users & Roles
+export const getUsers = (): Promise<UserWithRoles[]> => apiClient<UserWithRoles[]>('/users/');
+export const getRoles = (): Promise<Role[]> => apiClient<Role[]>('/roles/');
+export const assignRoleToUser = (userId: number, roleId: number): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}/roles`, { method: 'POST', body: JSON.stringify({ role_id: roleId }) });
+export const removeRoleFromUser = (userId: number, roleId: number): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}/roles/${roleId}`, { method: 'DELETE' });
+export const updateUser = (userId: number, data: UserRoleUpdatePayload): Promise<UserWithRoles> => apiClient<UserWithRoles>(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) });
+
+// System & Dashboard Status
+export const getDashboardStatus = (): Promise<SystemStatusReport> => apiClient<SystemStatusReport>('/dashboard/status');
 export const getDicomWebPollersStatus = (): Promise<DicomWebPollersStatusResponse> => apiClient<DicomWebPollersStatusResponse>('/system/dicomweb-pollers/status');
 export const getDimseListenersStatus = (): Promise<DimseListenersStatusResponse> => apiClient<DimseListenersStatusResponse>('/system/dimse-listeners/status');
-export const getDimseQrSourcesStatus = (): Promise<DimseQrSourcesStatusResponse> => apiClient<DimseQrSourcesStatusResponse>('/system/dimse-qr-sources/status');
+export const getDimseQrSourcesStatus = (): Promise<DimseQrSourcesStatusResponse> => apiClient<DimseQrSourcesStatusResponse>('/system/dimse-qr-sources/status'); // Added
+export const getKnownInputSources = (): Promise<string[]> => apiClient<string[]>('/system/input-sources');
 
-// --- Configuration Management ---
-
-// DICOMweb Sources
+// Config: DICOMweb Sources
 export const getDicomWebSources = (skip: number = 0, limit: number = 100): Promise<DicomWebSourceConfigRead[]> => apiClient<DicomWebSourceConfigRead[]>(`/config/dicomweb-sources?skip=${skip}&limit=${limit}`);
 export const createDicomWebSource = (data: DicomWebSourceConfigCreatePayload): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>('/config/dicomweb-sources', { method: 'POST', body: JSON.stringify(data) });
 export const updateDicomWebSource = (id: number, data: DicomWebSourceConfigUpdatePayload): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>(`/config/dicomweb-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteDicomWebSource = (id: number): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>(`/config/dicomweb-sources/${id}`, { method: 'DELETE' }); // Returns deleted object
+export const deleteDicomWebSource = (id: number): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>(`/config/dicomweb-sources/${id}`, { method: 'DELETE' }); // Returns deleted obj
 
-// DIMSE Listeners
+// Config: DIMSE Listeners
 export const getDimseListenerConfigs = (skip: number = 0, limit: number = 100): Promise<DimseListenerConfigRead[]> => apiClient<DimseListenerConfigRead[]>(`/config/dimse-listeners?skip=${skip}&limit=${limit}`);
 export const createDimseListenerConfig = (data: DimseListenerConfigCreatePayload): Promise<DimseListenerConfigRead> => apiClient<DimseListenerConfigRead>('/config/dimse-listeners', { method: 'POST', body: JSON.stringify(data) });
 export const updateDimseListenerConfig = (id: number, data: DimseListenerConfigUpdatePayload): Promise<DimseListenerConfigRead> => apiClient<DimseListenerConfigRead>(`/config/dimse-listeners/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteDimseListenerConfig = (id: number): Promise<DimseListenerConfigRead> => apiClient<DimseListenerConfigRead>(`/config/dimse-listeners/${id}`, { method: 'DELETE' }); // Returns deleted object
+export const deleteDimseListenerConfig = (id: number): Promise<DimseListenerConfigRead> => apiClient<DimseListenerConfigRead>(`/config/dimse-listeners/${id}`, { method: 'DELETE' }); // Returns deleted obj
 
-// DIMSE Q/R Sources
-export const getDimseQrSources = (skip: number = 0, limit: number = 100): Promise<DimseQueryRetrieveSourceRead[]> => apiClient<DimseQueryRetrieveSourceRead[]>(`/config/dimse-qr-sources?skip=${skip}&limit=${limit}`);
-export const createDimseQrSource = (data: DimseQueryRetrieveSourceCreatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>('/config/dimse-qr-sources', { method: 'POST', body: JSON.stringify(data) });
-export const updateDimseQrSource = (id: number, data: DimseQueryRetrieveSourceUpdatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteDimseQrSource = (id: number): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'DELETE' }); // Returns deleted object
-
+// Config: Storage Backends
 export const getStorageBackendConfigs = (skip: number = 0, limit: number = 100): Promise<StorageBackendConfigRead[]> => apiClient<StorageBackendConfigRead[]>(`/config/storage-backends?skip=${skip}&limit=${limit}`);
 export const createStorageBackendConfig = (data: StorageBackendConfigCreatePayload): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>('/config/storage-backends', { method: 'POST', body: JSON.stringify(data) });
 export const updateStorageBackendConfig = (id: number, data: StorageBackendConfigUpdatePayload): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteStorageBackendConfig = (id: number): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'DELETE' }); // Returns deleted object
+export const deleteStorageBackendConfig = (id: number): Promise<StorageBackendConfigRead> => apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'DELETE' }); // Returns deleted obj
 
-export const getKnownInputSources = (): Promise<string[]> => apiClient<string[]>('/system/input-sources');
+// --- ADDED: Config: Schedules ---
+export const getSchedules = (skip: number = 0, limit: number = 100): Promise<Schedule[]> => apiClient<Schedule[]>(`/config/schedules?skip=${skip}&limit=${limit}`);
+export const createSchedule = (data: ScheduleCreate): Promise<Schedule> => apiClient<Schedule>('/config/schedules', { method: 'POST', body: JSON.stringify(data) });
+export const updateSchedule = (id: number, data: ScheduleUpdate): Promise<Schedule> => apiClient<Schedule>(`/config/schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteSchedule = (id: number): Promise<Schedule> => apiClient<Schedule>(`/config/schedules/${id}`, { method: 'DELETE' }); // Returns deleted obj
+// --- END ADDED ---
 
+// Config: DIMSE Q/R Sources
+export const getDimseQrSources = (skip: number = 0, limit: number = 100): Promise<DimseQueryRetrieveSourceRead[]> => apiClient<DimseQueryRetrieveSourceRead[]>(`/config/dimse-qr-sources?skip=${skip}&limit=${limit}`);
+export const createDimseQrSource = (data: DimseQueryRetrieveSourceCreatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>('/config/dimse-qr-sources', { method: 'POST', body: JSON.stringify(data) });
+export const updateDimseQrSource = (id: number, data: DimseQueryRetrieveSourceUpdatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteDimseQrSource = (id: number): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'DELETE' });
 
-export const getCrosswalkDataSources = (skip = 0, limit = 100): Promise<CrosswalkDataSourceRead[]> =>
-    apiClient(`/config/crosswalk/data-sources?skip=${skip}&limit=${limit}`);
+// Config: Crosswalk Data Sources
+export const getCrosswalkDataSources = (skip: number = 0, limit: number = 100): Promise<CrosswalkDataSourceRead[]> => apiClient<CrosswalkDataSourceRead[]>(`/config/crosswalk/data-sources?skip=${skip}&limit=${limit}`);
+export const createCrosswalkDataSource = (data: CrosswalkDataSourceCreatePayload): Promise<CrosswalkDataSourceRead> => apiClient<CrosswalkDataSourceRead>('/config/crosswalk/data-sources', { method: 'POST', body: JSON.stringify(data) });
+export const updateCrosswalkDataSource = (id: number, data: CrosswalkDataSourceUpdatePayload): Promise<CrosswalkDataSourceRead> => apiClient<CrosswalkDataSourceRead>(`/config/crosswalk/data-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteCrosswalkDataSource = (id: number): Promise<CrosswalkDataSourceRead> => apiClient<CrosswalkDataSourceRead>(`/config/crosswalk/data-sources/${id}`, { method: 'DELETE' });
+export const testCrosswalkDataSourceConnection = (id: number): Promise<{ success: boolean; message: string }> => apiClient<{ success: boolean; message: string }>(`/config/crosswalk/data-sources/${id}/test`, { method: 'POST' });
+export const triggerCrosswalkDataSourceSync = (id: number): Promise<{ task_id: string }> => apiClient<{ task_id: string }>(`/config/crosswalk/data-sources/${id}/sync`, { method: 'POST' });
 
-export const getCrosswalkDataSourceById = (sourceId: number): Promise<CrosswalkDataSourceRead> =>
-    apiClient(`/config/crosswalk/data-sources/${sourceId}`);
+// Config: Crosswalk Maps
+export const getCrosswalkMaps = (dataSourceId: number | undefined, skip: number = 0, limit: number = 100): Promise<CrosswalkMapRead[]> => {
+    let url = `/config/crosswalk/mappings?skip=${skip}&limit=${limit}`;
+    if (dataSourceId !== undefined) { url += `&data_source_id=${dataSourceId}`; }
+    return apiClient<CrosswalkMapRead[]>(url);
+};
+export const createCrosswalkMap = (data: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>('/config/crosswalk/mappings', { method: 'POST', body: JSON.stringify(data) });
+export const updateCrosswalkMap = (id: number, data: CrosswalkMapUpdatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteCrosswalkMap = (id: number): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'DELETE' });
 
-export const createCrosswalkDataSource = (payload: CrosswalkDataSourceCreatePayload): Promise<CrosswalkDataSourceRead> =>
-    apiClient('/config/crosswalk/data-sources', { method: 'POST', body: JSON.stringify(payload) });
-
-export const updateCrosswalkDataSource = (sourceId: number, payload: CrosswalkDataSourceUpdatePayload): Promise<CrosswalkDataSourceRead> =>
-    apiClient(`/config/crosswalk/data-sources/${sourceId}`, { method: 'PUT', body: JSON.stringify(payload) });
-
-export const deleteCrosswalkDataSource = (sourceId: number): Promise<CrosswalkDataSourceRead> =>
-    apiClient(`/config/crosswalk/data-sources/${sourceId}`, { method: 'DELETE' });
-
-export const testCrosswalkDataSourceConnection = (sourceId: number): Promise<{ success: boolean; message: string; status_code: number }> =>
-    apiClient(`/config/crosswalk/data-sources/${sourceId}/test`, { method: 'POST' });
-
-export const triggerCrosswalkDataSourceSync = (sourceId: number): Promise<{ message: string; task_id: string }> =>
-    apiClient(`/config/crosswalk/data-sources/${sourceId}/sync`, { method: 'POST' });
-
-export const getCrosswalkMaps = (dataSourceId?: number, skip = 0, limit = 100): Promise<CrosswalkMapRead[]> => {
-    const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
-    if (dataSourceId !== undefined) {
-        params.append('data_source_id', String(dataSourceId));
-    }
-    return apiClient(`/config/crosswalk/mappings?${params.toString()}`);
-}
-
-export const getCrosswalkMapById = (mapId: number): Promise<CrosswalkMapRead> =>
-    apiClient(`/config/crosswalk/mappings/${mapId}`);
-
-export const createCrosswalkMap = (payload: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> =>
-    apiClient('/config/crosswalk/mappings', { method: 'POST', body: JSON.stringify(payload) });
-
-export const updateCrosswalkMap = (mapId: number, payload: CrosswalkMapUpdatePayload): Promise<CrosswalkMapRead> =>
-    apiClient(`/config/crosswalk/mappings/${mapId}`, { method: 'PUT', body: JSON.stringify(payload) });
-
-export const deleteCrosswalkMap = (mapId: number): Promise<CrosswalkMapRead> =>
-    apiClient(`/config/crosswalk/mappings/${mapId}`, { method: 'DELETE' });
+export default apiClient; // Optional: Export default if needed elsewhere

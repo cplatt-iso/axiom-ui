@@ -9,17 +9,21 @@ interface ConfigTab {
     path: string;
 }
 
+// --- UPDATED configTabs ---
 const configTabs: ConfigTab[] = [
     { value: 'scrapers', label: 'Scrapers', path: '/admin/config/scrapers' },
     { value: 'listeners', label: 'Listeners', path: '/admin/config/listeners' },
+    { value: 'schedules', label: 'Schedules', path: '/admin/config/schedules' }, // Added Schedules
     { value: 'storage-backends', label: 'Storage Backends', path: '/admin/config/storage-backends' },
     { value: 'crosswalk', label: 'Crosswalk', path: '/admin/config/crosswalk' },
 ];
+// --- END UPDATED ---
 
 const ConfigurationPage: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
+    // Default to first tab if no match (remains the same)
     const activeTab = configTabs.find(tab => location.pathname.startsWith(tab.path))?.value
                       || configTabs[0].value;
 
@@ -40,7 +44,9 @@ const ConfigurationPage: React.FC = () => {
             </div>
 
             <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-2"> {/* Updated grid columns */}
+                 {/* --- UPDATED Grid Columns --- */}
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-2">
+                {/* --- END UPDATED --- */}
                     {configTabs.map((tab) => (
                         <TabsTrigger key={tab.value} value={tab.value} className="w-full">
                             {tab.label}
