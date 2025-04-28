@@ -1,6 +1,9 @@
 // src/components/DimseListenerStatusWidget.tsx
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+// --- ADDED: Import useAuth ---
+import { useAuth } from '@/context/AuthContext';
+// --- END ADDED ---
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -67,17 +70,30 @@ const formatRelativeTime = (dateString: string | undefined | null): string => {
 
 
 export const DimseListenerStatusWidget: React.FC = () => {
+    // --- ADDED: Get auth status ---
+    const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+    // --- END ADDED ---
+
     const { data: responseData, isLoading, isError, error, refetch, isFetching } = useQuery<DimseListenersStatusResponse, Error>({
         queryKey: ['dimseListenersStatus'],
         queryFn: getDimseListenersStatus,
         refetchInterval: 15000,
         staleTime: 10000,
+        // --- ADDED: Enable query only when authenticated ---
+        enabled: !isAuthLoading && isAuthenticated,
+        // --- END ADDED ---
     });
 
     const listeners = responseData?.listeners ?? [];
 
+    // --- Use auth loading state for initial display ---
+    const combinedIsLoading = isAuthLoading || (isAuthenticated && isLoading);
+    // --- END USE ---
+
     const renderContent = () => {
-        if (isLoading) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400"><Loader2 className="inline w-4 h-4 mr-2 animate-spin" />Loading listener statuses...</div>; }
+        // Use combined loading state
+        if (combinedIsLoading) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400"><Loader2 className="inline w-4 h-4 mr-2 animate-spin" />Loading listener statuses...</div>; }
+        if (!isAuthenticated) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">Please log in to view status.</div>; }
         if (isError) { return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading statuses: {error?.message || 'Unknown error'}</div>; }
         if (listeners.length === 0) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">No active listener status found in database. Ensure listeners are configured and running.</div>; }
 
@@ -148,7 +164,7 @@ export const DimseListenerStatusWidget: React.FC = () => {
                  <Button
                      variant="ghost" size="sm"
                      onClick={() => refetch()}
-                     disabled={isFetching || isLoading}
+                     disabled={isFetching || combinedIsLoading} // Use combined loading state
                      aria-label="Refresh listener status"
                      className="text-muted-foreground hover:text-foreground"
                  >

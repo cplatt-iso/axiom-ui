@@ -1,7 +1,7 @@
 // src/services/api.ts
-import { AuthContextType } from '../context/AuthContext';
+import { AuthContextType } from '../context/AuthContext'; // Keep original import
 
-
+// Keep original schema imports
 import {
     Ruleset, RulesetCreate, RulesetUpdate, Rule, RuleCreate, RuleUpdate,
     ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate, UserWithRoles, Role,
@@ -15,7 +15,17 @@ import {
     DimseQrSourceStatus, DimseQrSourcesStatusResponse, CrosswalkDataSourceRead,
     CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload, CrosswalkMapRead,
     CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload, RuleGenRequest, RuleGenResponse,
-} from '../schemas';
+    // Assuming User schema is imported via UserWithRoles or similar
+} from '../schemas'; // Keep referring to ../schemas index if that's where types are exported
+
+// --- ADDED: Direct import for Data Browser Schemas ---
+// Make sure the file '../schemas/data_browser.ts' exists and exports these types
+import {
+    DataBrowserQueryRequest,
+    DataBrowserQueryResponse
+} from '../schemas/data_browser';
+// --- END ADDED ---
+
 
 let authContextRef: AuthContextType | null = null;
 
@@ -24,7 +34,7 @@ export function setAuthContextRef(context: AuthContextType) {
     authContextRef = context;
 }
 
-// --- UPDATED: Corrected Base URL Determination ---
+// --- Keep original Base URL Determination ---
 const determineApiBaseUrl = (): string => {
     const envUrl = import.meta.env.VITE_API_BASE_URL;
     const apiPrefix = '/api/v1'; // Define standard prefix
@@ -69,15 +79,17 @@ const determineApiBaseUrl = (): string => {
 };
 
 const API_BASE_URL = determineApiBaseUrl();
-// --- END UPDATED ---
+// --- END Base URL Determination ---
 
 console.log(`API Service: Using base URL: ${API_BASE_URL}`);
 
+// --- Keep original ApiOptions interface ---
 interface ApiOptions extends RequestInit {
-    params?: Record<string, string>;
+    params?: Record<string, string>; // Keep original type for params
     useAuth?: boolean;
 }
 
+// --- Keep original apiClient function ---
 export const apiClient = async <T>(
     endpoint: string,
     options: ApiOptions = {}
@@ -92,6 +104,7 @@ export const apiClient = async <T>(
     url = url.replace(/([^:]\/)\/+/g, "$1");
 
     if (params) {
+        // Keep original params handling
         const query = new URLSearchParams(params).toString();
         if (query) {
             url += `?${query}`;
@@ -107,6 +120,7 @@ export const apiClient = async <T>(
     }
 
     if (useAuth) {
+        // Keep original token fetching logic
         const token = authContextRef?.getToken();
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
@@ -134,6 +148,7 @@ export const apiClient = async <T>(
                  errorData = { detail: `HTTP error ${response.status}: Failed to parse error response.` };
             }
             console.error(`API Client Error: ${response.status} ${response.statusText} for ${url}`, errorData);
+            // Keep original error creation
             const error: any = new Error(errorData?.detail || `HTTP error ${response.status}`);
             error.status = response.status;
             error.detail = errorData?.detail;
@@ -142,6 +157,7 @@ export const apiClient = async <T>(
 
         if (response.status === 204) {
             console.debug(`API Client: Received 204 No Content for ${url}`);
+            // Keep original 204 handling
             return {} as T;
         }
 
@@ -153,10 +169,10 @@ export const apiClient = async <T>(
         throw error;
     }
 };
+// --- End original apiClient function ---
 
 
-// --- Specific API Function Exports (remain unchanged) ---
-// ... (getRulesets, getRulesetById, etc.) ...
+// --- Keep ALL original Specific API Function Exports ---
 export const getRulesets = (): Promise<Ruleset[]> => apiClient<Ruleset[]>('/rules-engine/rulesets');
 export const getRulesetById = (id: number): Promise<Ruleset> => apiClient<Ruleset>(`/rules-engine/rulesets/${id}`);
 export const createRuleset = (data: RulesetCreate): Promise<Ruleset> => apiClient<Ruleset>('/rules-engine/rulesets', { method: 'POST', body: JSON.stringify(data) });
@@ -220,4 +236,19 @@ export const suggestRule = async (requestData: RuleGenRequest): Promise<RuleGenR
     });
 };
 
-export default apiClient;
+// --- ADDED: Data Browser Query Function ---
+export const submitDataBrowserQuery = (request: DataBrowserQueryRequest): Promise<DataBrowserQueryResponse> => {
+    // Uses the existing apiClient, inheriting its auth logic and base URL handling
+    return apiClient<DataBrowserQueryResponse>('/data-browser/query', {
+        method: 'POST',
+        body: JSON.stringify(request),
+        useAuth: true // Ensure authentication is used for this endpoint
+    });
+};
+// --- END ADDED ---
+
+// Keep original UserWithRoles type export
+export { type UserWithRoles };
+// --- END Original Exports ---
+
+export default apiClient; // Keep default export

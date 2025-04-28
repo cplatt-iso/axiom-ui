@@ -1,6 +1,9 @@
 // src/components/DicomWebPollerWidget.tsx
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+// --- ADDED: Import useAuth ---
+import { useAuth } from '@/context/AuthContext';
+// --- END ADDED ---
 import { getDicomWebPollersStatus } from '../services/api';
 import { DicomWebSourceStatus } from '../schemas';
 import { ClockIcon, CheckCircleIcon, XCircleIcon, PauseCircleIcon, QuestionMarkCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
@@ -90,18 +93,31 @@ const getStatusIndicator = (poller: DicomWebSourceStatus): {
 
 
 const DicomWebPollerWidget: React.FC = () => {
+    // --- ADDED: Get auth status ---
+    const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+    // --- END ADDED ---
+
     const { data: responseData, isLoading, isError, error, refetch, isFetching } = useQuery({
         queryKey: ['dicomWebPollerStatus'],
         queryFn: getDicomWebPollersStatus,
         refetchInterval: 30000,
         refetchIntervalInBackground: true,
         staleTime: 15000,
+        // --- ADDED: Enable query only when authenticated ---
+        enabled: !isAuthLoading && isAuthenticated,
+        // --- END ADDED ---
     });
 
     const pollers = responseData?.pollers ?? [];
 
+    // --- Use auth loading state for initial display ---
+    const combinedIsLoading = isAuthLoading || (isAuthenticated && isLoading);
+    // --- END USE ---
+
     const renderContent = () => {
-        if (isLoading) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400"><Loader2 className="inline w-4 h-4 mr-2 animate-spin" />Loading poller status...</div>; }
+        // Use combined loading state
+        if (combinedIsLoading) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400"><Loader2 className="inline w-4 h-4 mr-2 animate-spin" />Loading poller status...</div>; }
+        if (!isAuthenticated) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">Please log in to view status.</div>; }
         if (isError) { return <div className="p-4 text-sm text-red-600 dark:text-red-400">Error loading status: {(error as Error).message || 'Unknown error'}</div>; }
         if (pollers.length === 0) { return <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">No DICOMweb pollers configured.</div>; }
 
@@ -163,7 +179,7 @@ const DicomWebPollerWidget: React.FC = () => {
                      variant="ghost"
                      size="sm"
                      onClick={() => refetch()}
-                     disabled={isFetching || isLoading}
+                     disabled={isFetching || combinedIsLoading} // Use combined loading state
                      aria-label="Refresh poller status"
                      className="text-muted-foreground hover:text-foreground"
                  >

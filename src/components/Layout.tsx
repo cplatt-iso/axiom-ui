@@ -4,7 +4,11 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
-import { Bars3Icon, XMarkIcon, Cog6ToothIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon } from '@heroicons/react/24/outline';
+import {
+    Bars3Icon, XMarkIcon, Cog6ToothIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
+    TableCellsIcon, // For Data Browser
+    ArchiveBoxIcon // For Inventory Tool
+} from '@heroicons/react/24/outline';
 import { Role } from '../schemas'; // Import the Role type if needed for casting
 
 // Utility for conditional classes
@@ -20,7 +24,7 @@ interface NavItem {
 }
 
 const Layout: React.FC = () => {
-    const { user } = useAuth(); // Only need user from context for the working isAdmin check
+    const { user } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const location = useLocation();
 
@@ -28,6 +32,10 @@ const Layout: React.FC = () => {
     const navigation: NavItem[] = [
         { name: 'Dashboard', href: '/', icon: SquaresPlusIcon },
         { name: 'Rulesets', href: '/rulesets', icon: CircleStackIcon },
+        // --- ADDED New Links ---
+        { name: 'Data Browser', href: '/data-browser', icon: TableCellsIcon },
+        { name: 'Inventory Tool', href: '/inventory-tool', icon: ArchiveBoxIcon },
+        // --- END ADDED ---
     ];
     const adminNavigation: NavItem[] = [
          { name: 'User Management', href: '/admin/users', icon: UsersIcon },
@@ -39,7 +47,7 @@ const Layout: React.FC = () => {
     const isAdmin = user?.roles?.some((role: Role | string) => { // Use Role type from schemas or string
         if (typeof role === 'string') {
             return role === 'Admin';
-        } else if (typeof role === 'object' && role !== null && role.name) {
+        } else if (typeof role === 'object' && role !== null && 'name' in role) {
             // Assuming Role interface has a 'name' property based on schemas.ts
             return role.name === 'Admin';
         }
@@ -55,7 +63,12 @@ const Layout: React.FC = () => {
 
     // Helper function to render navigation links
     const renderNavLink = (item: NavItem, isMobile: boolean) => {
-        const current = item.href === '/' ? location.pathname === '/' : location.pathname.startsWith(item.href);
+        // Use startsWith for parent paths like /rulesets and /admin/config
+        const isParentActive = (item.href !== '/' && item.href !== '/dashboard') && location.pathname.startsWith(item.href);
+        // Exact match for dashboard/root
+        const isExactActive = (item.href === '/' && location.pathname === '/') || (item.href === '/dashboard' && location.pathname === '/dashboard');
+        const current = isExactActive || isParentActive;
+
         return (
             <Link
                 key={item.name}
@@ -102,7 +115,7 @@ const Layout: React.FC = () => {
                          </div>
                          {/* Branding */}
                          <div className="flex flex-shrink-0 items-center px-4">
-                             <img className="h-8 w-auto" src="/vite.svg" alt="Axiom Flow" />
+                             <img className="h-8 w-auto" src="/axiom-logo.svg" alt="Axiom Flow" />
                              <span className="ml-3 text-xl font-semibold text-gray-900 dark:text-white">Axiom Flow</span>
                          </div>
                          {/* Navigation */}
@@ -134,7 +147,7 @@ const Layout: React.FC = () => {
                 <div className="flex flex-grow flex-col overflow-y-auto border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 pt-5">
                     {/* Branding */}
                     <div className="flex flex-shrink-0 items-center px-4">
-                        <img className="h-8 w-auto" src="/vite.svg" alt="Axiom Flow" />
+                        <img className="h-8 w-auto" src="/axiom-logo.svg" alt="Axiom Flow" />
                         <span className="ml-3 text-xl font-semibold text-gray-900 dark:text-white">Axiom Flow</span>
                     </div>
                     {/* Navigation */}
@@ -181,9 +194,11 @@ const Layout: React.FC = () => {
                 {/* Page Content */}
                 <main className="flex-1">
                     <div className="py-6">
-                        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+                         {/* --- Adjusted max-width and padding --- */}
+                         <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8 lg:max-w-7xl xl:max-w-8xl">
                             <Outlet key={location.pathname} />
                         </div>
+                         {/* --- End Adjustment --- */}
                     </div>
                 </main>
             </div>

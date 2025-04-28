@@ -31,6 +31,12 @@ import StowRsInfoPage from './pages/StowRsInfoPage';
 import JsonApiInfoPage from './pages/JsonApiInfoPage';
 import SchedulesConfigPage from './pages/SchedulesConfigPage';
 
+// --- ADDED: Import New Pages ---
+import DataBrowserPage from './pages/DataBrowserPage';
+import InventoryToolPage from './pages/InventoryToolPage';
+// --- END ADDED ---
+
+
 function AppContent() {
   const auth = useAuth();
 
@@ -50,10 +56,15 @@ function AppContent() {
                     {/* Standard Routes */}
                     <Route index element={<DashboardPage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/api-keys" element={<ApiKeysPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/rulesets" element={<RulesetsPage />} />
                     <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
+                    {/* --- ADDED: New Top-Level Routes --- */}
+                    <Route path="/data-browser" element={<DataBrowserPage />} />
+                    <Route path="/inventory-tool" element={<InventoryToolPage />} />
+                    {/* --- END ADDED --- */}
+                    <Route path="/api-keys" element={<ApiKeysPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+
 
                     {/* Admin Routes Section */}
                     <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
@@ -79,9 +90,8 @@ function AppContent() {
                                 <Route path="json-api" element={<JsonApiInfoPage />} />
                             </Route>
 
-                            {/* --- ADDED: Schedules Route --- */}
+                            {/* Schedules Route */}
                             <Route path="schedules" element={<SchedulesConfigPage />} />
-                            {/* --- END ADDED --- */}
 
                             {/* Storage Backends */}
                             <Route path="storage-backends" element={<StorageBackendsConfigPage />} />
