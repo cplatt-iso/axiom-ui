@@ -1,6 +1,7 @@
 // src/services/api.ts
 import { AuthContextType } from '../context/AuthContext';
-// ... other schema imports ...
+
+
 import {
     Ruleset, RulesetCreate, RulesetUpdate, Rule, RuleCreate, RuleUpdate,
     ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate, UserWithRoles, Role,
@@ -13,7 +14,7 @@ import {
     DimseQueryRetrieveSourceRead, DimseQueryRetrieveSourceCreatePayload, DimseQueryRetrieveSourceUpdatePayload,
     DimseQrSourceStatus, DimseQrSourcesStatusResponse, CrosswalkDataSourceRead,
     CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload, CrosswalkMapRead,
-    CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload
+    CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload, RuleGenRequest, RuleGenResponse,
 } from '../schemas';
 
 let authContextRef: AuthContextType | null = null;
@@ -209,5 +210,14 @@ export const getCrosswalkMaps = (dataSourceId: number | undefined, skip: number 
 export const createCrosswalkMap = (data: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>('/config/crosswalk/mappings', { method: 'POST', body: JSON.stringify(data) });
 export const updateCrosswalkMap = (id: number, data: CrosswalkMapUpdatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteCrosswalkMap = (id: number): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'DELETE' });
+
+export const suggestRule = async (requestData: RuleGenRequest): Promise<RuleGenResponse> => {
+    console.log("API: Calling suggestRule with prompt:", requestData.prompt);
+    return apiClient<RuleGenResponse>('/ai-assist/suggest-rule', {
+        method: 'POST',
+        body: JSON.stringify(requestData),
+        useAuth: true, // Requires authentication
+    });
+};
 
 export default apiClient;

@@ -159,6 +159,7 @@ export const RuleFormDataSchema = z.object({
     tag_modifications: z.array(TagModificationFormDataSchema).default([]), // Use the union schema
     applicable_sources: z.array(z.string()).nullable().optional(),
     destination_ids: z.array(z.number().int().positive()).min(1, "At least one destination is required."), // Require at least one destination
+    schedule_id: z.number().int().positive().nullish(),
 });
 
 // Final TypeScript type for the form data
