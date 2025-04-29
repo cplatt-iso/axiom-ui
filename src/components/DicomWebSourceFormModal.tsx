@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import json5 from 'json5'; // Use json5 for easier JSON editing
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +14,8 @@ import {
     Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+// import { Checkbox } from '@/components/ui/checkbox'; // REMOVED - Replaced with Switch
+import { Switch } from '@/components/ui/switch';      // ADDED - Use Switch instead of Checkbox
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -41,9 +43,10 @@ interface DicomWebSourceFormModalProps {
     source: DicomWebSourceConfigRead | null;
 }
 
+// Add is_active to defaults
 const initialFormDefaults: DicomWebSourceFormData = {
     name: '', description: null, base_url: '', qido_prefix: 'qido-rs', wado_prefix: 'wado-rs',
-    polling_interval_seconds: 300, is_enabled: true, auth_type: 'none', auth_config: null, search_filters: null,
+    polling_interval_seconds: 300, is_enabled: true, is_active: true, auth_type: 'none', auth_config: null, search_filters: null,
 };
 
 const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpen, onClose, source }) => {
@@ -56,12 +59,14 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
     });
 
     const watchedAuthType = form.watch('auth_type');
+    const watchedIsEnabled = form.watch('is_enabled'); // Watch is_enabled
 
     useEffect(() => {
         if (isOpen) {
             let resetValues;
             if (source) {
                  resetValues = {
+                    // Prefer 'name' from schema if available, fallback to DB 'source_name'
                     name: source.name ?? source.source_name,
                     description: source.description ?? null,
                     base_url: source.base_url ?? '',
@@ -69,14 +74,20 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                     wado_prefix: source.wado_prefix ?? 'wado-rs',
                     polling_interval_seconds: source.polling_interval_seconds ?? 300,
                     is_enabled: source.is_enabled ?? true,
+                    is_active: source.is_active ?? true, // Set is_active on edit
                     auth_type: source.auth_type ?? 'none',
-                    auth_config: source.auth_config ? JSON.stringify(source.auth_config, null, 2) : null,
-                    search_filters: source.search_filters ? JSON.stringify(source.search_filters, null, 2) : null,
+                    // Use json5 for stringifying (more forgiving)
+                    auth_config: source.auth_config ? json5.stringify(source.auth_config, null, 2) : null,
+                    search_filters: source.search_filters ? json5.stringify(source.search_filters, null, 2) : null,
                  };
             } else {
-                 resetValues = initialFormDefaults;
+                 resetValues = {
+                    ...initialFormDefaults,
+                    is_active: true // Ensure active is true for create
+                 };
             }
             form.reset(resetValues);
+             console.log("Resetting DICOMweb form with:", resetValues);
         }
     }, [isOpen, source, form]);
 
@@ -88,8 +99,16 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
             onClose();
         },
         onError: (error: any) => {
-            let specificError = error?.detail || error.message || "Failed to create source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+            let specificError = "Failed to create source.";
+             if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
+                 const errDetail = error.detail[0];
+                 const field = errDetail.loc?.[1] || 'input';
+                 specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
+            } else if (error?.detail){
+                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail); // Use JSON.stringify as fallback
+            } else {
+                 specificError = error.message || specificError;
+            }
             toast.error(`Creation failed: ${specificError}`);
             console.error("Create error:", error?.detail || error);
         },
@@ -104,21 +123,27 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
             onClose();
         },
         onError: (error: any, variables) => {
-            let specificError = error?.detail || error.message || "Failed to update source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+            let specificError = "Failed to update source.";
+             if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
+                 const errDetail = error.detail[0];
+                 const field = errDetail.loc?.[1] || 'input';
+                 specificError = `Validation Error on field '${field}': ${errDetail.msg}`;
+            } else if (error?.detail){
+                 specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail); // Use JSON.stringify as fallback
+            } else {
+                 specificError = error.message || specificError;
+            }
             toast.error(`Update failed for ID ${variables.id}: ${specificError}`);
             console.error(`Update error for ID ${variables.id}:`, error?.detail || error);
         },
     });
 
     const onSubmit = (values: DicomWebSourceFormData) => {
-        let parsedAuthConfig: Record<string, any> | null = null;
-        let parsedSearchFilters: Record<string, any> | null = null;
-
-        const safeJsonParse = (jsonString: string | null | undefined, fieldName: 'auth_config' | 'search_filters'): Record<string, any> | null => {
+        // Use json5 for parsing user input allowing comments etc.
+        const safeJson5Parse = (jsonString: string | null | undefined, fieldName: 'auth_config' | 'search_filters'): Record<string, any> | null => {
              if (!jsonString || !jsonString.trim()) return null;
              try {
-                 const parsed = JSON.parse(jsonString);
+                 const parsed = json5.parse(jsonString);
                  if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
                      return parsed;
                  } else {
@@ -126,20 +151,24 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                      throw new Error("Invalid JSON type");
                  }
              } catch (e) {
-                 form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} is not valid JSON.` });
+                 form.setError(fieldName, { type: 'manual', message: `${fieldName.replace('_',' ')} is not valid JSON: ${e instanceof Error ? e.message : String(e)}` });
                  throw e;
              }
         };
 
+        let parsedAuthConfig: Record<string, any> | null = null;
+        let parsedSearchFilters: Record<string, any> | null = null;
+
         try {
-            parsedAuthConfig = safeJsonParse(values.auth_config, 'auth_config');
+            parsedAuthConfig = safeJson5Parse(values.auth_config, 'auth_config');
             if (values.auth_type === 'none') {
                 parsedAuthConfig = null;
             }
-            parsedSearchFilters = safeJsonParse(values.search_filters, 'search_filters');
+            parsedSearchFilters = safeJson5Parse(values.search_filters, 'search_filters');
         } catch (e) {
             console.error("JSON Parsing error in form", e);
-            return;
+            toast.error("Please fix the invalid JSON in the marked field(s)."); // Give user feedback
+            return; // Stop submission
         }
 
 
@@ -147,8 +176,10 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
              ...values,
              description: values.description?.trim() || null,
              auth_config: parsedAuthConfig,
-             search_filters: parsedSearchFilters
+             search_filters: parsedSearchFilters,
+             // is_active is already included from 'values'
         };
+        console.log("Submitting DICOMweb Values (API Payload):", apiPayload);
 
         if (isEditMode && source) {
              const updatePayload: DicomWebSourceConfigUpdatePayload = apiPayload;
@@ -162,34 +193,33 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
     const isLoading = createMutation.isPending || updateMutation.isPending;
 
     const renderAuthConfigFields = () => {
-        const placeholderBase = "{\n  ";
+        const placeholderBase = "// Enter JSON config, e.g.:\n{\n  ";
         const placeholderEnd = "\n}";
         let placeholder = "";
         let rows = 3;
 
         if (watchedAuthType === 'basic') {
             placeholder = placeholderBase + `"username": "your_username",\n  "password": "your_password"` + placeholderEnd;
-            rows = 4;
+            rows = 5;
         } else if (watchedAuthType === 'bearer') {
             placeholder = placeholderBase + `"token": "your_long_bearer_token"` + placeholderEnd;
-            rows = 3;
+            rows = 4;
         } else if (watchedAuthType === 'apikey') {
              placeholder = placeholderBase + `"header_name": "X-Api-Key",\n  "key": "your_secret_key_value"` + placeholderEnd;
-             rows = 4;
+             rows = 5;
         }
 
         if (watchedAuthType !== 'none') {
              return (
                  <>
                      <FormDescription>
-                         Enter credentials as a JSON object.
+                         Enter required credentials as a JSON object.
                      </FormDescription>
                      <FormControl>
                          <Textarea
                              placeholder={placeholder}
-
+                             // Use the value from the form state directly
                              {...form.register("auth_config")}
-
                              rows={rows}
                              className="font-mono text-xs"
                              disabled={isLoading}
@@ -212,8 +242,10 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                 </DialogHeader>
 
                 <Form {...form}>
+                     {/* No closing tag here on purpose - DO NOT COLLAPSE */}
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
 
+                        {/* --- Name --- */}
                         <FormField
                             control={form.control}
                             name="name"
@@ -223,11 +255,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input placeholder="e.g., Orthanc Main Poller" {...field} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- Description --- */}
                         <FormField
                             control={form.control}
                             name="description"
@@ -237,11 +270,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input placeholder="Optional description" {...field} value={field.value ?? ''} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- Base URL --- */}
                         <FormField
                             control={form.control}
                             name="base_url"
@@ -252,11 +286,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input placeholder="http://dicom-server.local:8042/dicom-web" {...field} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- QIDO Prefix --- */}
                         <FormField
                             control={form.control}
                             name="qido_prefix"
@@ -267,11 +302,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input {...field} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- WADO Prefix --- */}
                         <FormField
                             control={form.control}
                             name="wado_prefix"
@@ -282,11 +318,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input {...field} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- Interval --- */}
                         <FormField
                             control={form.control}
                             name="polling_interval_seconds"
@@ -296,11 +333,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     <FormControl>
                                         <Input type="number" min="1" step="1" {...field} />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- Auth Type --- */}
                         <FormField
                             control={form.control}
                             name="auth_type"
@@ -320,26 +358,28 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                              <SelectItem value="apikey">API Key Header</SelectItem>
                                          </SelectContent>
                                      </Select>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                              )}
                         />
 
+                        {/* --- Auth Config --- */}
                         <FormField
                             control={form.control}
                             name="auth_config"
+                            // Use watchedAuthType to re-render this when auth_type changes
+                            key={watchedAuthType}
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Authentication Config</FormLabel>
-
                                     {renderAuthConfigFields()}
-
-                                    <FormMessage />
+                                    {/* Render message directly below Textarea */}
+                                     <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
-
+                        {/* --- Search Filters --- */}
                         <FormField
                             control={form.control}
                             name="search_filters"
@@ -351,26 +391,27 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     </FormDescription>
                                     <FormControl>
                                         <Textarea
-                                            placeholder={`{\n  "ModalitiesInStudy": "CT",\n  "StudyDate": "-30d"\n}`}
+                                            placeholder={`// Example QIDO query params\n{\n  "ModalitiesInStudy": "CT",\n  "StudyDate": "-30d"\n}`}
                                             {...field}
-                                            value={field.value ?? ''}
-                                            rows={4}
+                                            value={field.value ?? ''} // Ensure value is string for textarea
+                                            rows={5}
                                             className="font-mono text-xs"
                                             disabled={isLoading}
                                          />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
 
+                        {/* --- is_enabled Switch --- */}
                         <FormField
                             control={form.control}
                             name="is_enabled"
                             render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                                      <FormControl>
-                                        <Checkbox
+                                        <Switch // Use Switch component
                                             checked={field.value}
                                             onCheckedChange={field.onChange}
                                             id="dicomweb-enabled"
@@ -378,16 +419,44 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
                                          <FormLabel htmlFor="dicomweb-enabled">
-                                            Enable Polling
+                                            Source Enabled
                                          </FormLabel>
                                          <FormDescription>
-                                             If checked, the system will actively poll this source.
+                                             Allow use in Data Browser and rules. Must be enabled for polling to be active.
                                          </FormDescription>
                                     </div>
-                                    <FormMessage />
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
                                 </FormItem>
                             )}
                         />
+
+                         {/* --- is_active Switch --- */}
+                        <FormField
+                            control={form.control}
+                            name="is_active"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                                    <FormControl>
+                                        <Switch // Use Switch component
+                                            checked={field.value}
+                                            onCheckedChange={field.onChange}
+                                            id="dicomweb-active" // Unique ID
+                                            disabled={!watchedIsEnabled} // Use watched value
+                                        />
+                                    </FormControl>
+                                    <div className="space-y-1 leading-none">
+                                        <FormLabel htmlFor="dicomweb-active">
+                                            Automatic Polling Active
+                                        </FormLabel>
+                                        <FormDescription>
+                                            If checked (and source is Enabled), the system will automatically poll this source on its schedule.
+                                        </FormDescription>
+                                    </div>
+                                    <FormMessage></FormMessage> {/* Keep closing tag */}
+                                </FormItem>
+                            )}
+                        />
+                        {/* --- End is_active Switch --- */}
 
                         <DialogFooter className="pt-4">
                             <DialogClose asChild>
@@ -398,9 +467,13 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                              </Button>
                         </DialogFooter>
                     </form>
+                     {/* Keep closing tag */}
                 </Form>
+                 {/* Keep closing tag */}
             </DialogContent>
+             {/* Keep closing tag */}
         </Dialog>
+         /* Keep closing tag */
     );
 };
 

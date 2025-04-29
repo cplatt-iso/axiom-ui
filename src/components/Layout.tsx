@@ -7,7 +7,11 @@ import UserMenu from './UserMenu';
 import {
     Bars3Icon, XMarkIcon, Cog6ToothIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
     TableCellsIcon, // For Data Browser
-    ArchiveBoxIcon // For Inventory Tool
+    ArchiveBoxIcon, // For Inventory Tool
+    // --- ADDED Icons for Reorganization ---
+    AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
+    WrenchScrewdriverIcon // For System Config
+    // --- END ADDED ---
 } from '@heroicons/react/24/outline';
 import { Role } from '../schemas'; // Import the Role type if needed for casting
 
@@ -32,15 +36,20 @@ const Layout: React.FC = () => {
     const navigation: NavItem[] = [
         { name: 'Dashboard', href: '/', icon: SquaresPlusIcon },
         { name: 'Rulesets', href: '/rulesets', icon: CircleStackIcon },
-        // --- ADDED New Links ---
         { name: 'Data Browser', href: '/data-browser', icon: TableCellsIcon },
         { name: 'Inventory Tool', href: '/inventory-tool', icon: ArchiveBoxIcon },
-        // --- END ADDED ---
     ];
+
+    // --- UPDATED Admin Navigation ---
     const adminNavigation: NavItem[] = [
          { name: 'User Management', href: '/admin/users', icon: UsersIcon },
-         { name: 'Configuration', href: '/admin/config', icon: Cog6ToothIcon },
+         // Renamed Configuration to Routing Config
+         { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
+         // Added System Configuration
+         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
     ];
+    // --- END UPDATED Admin Navigation ---
+
     // --- End Navigation Definitions ---
 
     // Determine if user is admin (Using the reverted logic that works with user.roles)
@@ -61,10 +70,14 @@ const Layout: React.FC = () => {
         console.log("Layout - isAdmin check result:", isAdmin);
     }, [user, isAdmin]); // Removed 'roles' from dependency array
 
-    // Helper function to render navigation links
+    // Helper function to render navigation links (updated paths needed for active state)
     const renderNavLink = (item: NavItem, isMobile: boolean) => {
-        // Use startsWith for parent paths like /rulesets and /admin/config
-        const isParentActive = (item.href !== '/' && item.href !== '/dashboard') && location.pathname.startsWith(item.href);
+        // Use startsWith for parent paths like /rulesets, /admin/*
+        // --- UPDATED: Adjusted paths for active state check ---
+        const isParentActive =
+            (item.href !== '/' && item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+        // --- END UPDATED ---
+
         // Exact match for dashboard/root
         const isExactActive = (item.href === '/' && location.pathname === '/') || (item.href === '/dashboard' && location.pathname === '/dashboard');
         const current = isExactActive || isParentActive;
@@ -195,7 +208,8 @@ const Layout: React.FC = () => {
                 <main className="flex-1">
                     <div className="py-6">
                          {/* --- Adjusted max-width and padding --- */}
-                         <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8 lg:max-w-7xl xl:max-w-8xl">
+			 {/* <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8 lg:max-w-7xl xl:max-w-8xl"> */}
+			 <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8">
                             <Outlet key={location.pathname} />
                         </div>
                          {/* --- End Adjustment --- */}

@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 
 // Define the links for sub-navigation within this layout
 const crosswalkSubNavLinks = [
-    { name: "Data Sources", href: "/admin/config/crosswalk/data-sources" },
-    { name: "Mappings", href: "/admin/config/crosswalk/mappings" },
+    { name: "Data Sources", href: "/admin/routing-config/crosswalk/data-sources" },
+    { name: "Mappings", href: "/admin/routing-config/crosswalk/mappings" },
     // Add more crosswalk sub-sections here if needed later
 ];
 

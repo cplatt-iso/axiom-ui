@@ -1,7 +1,6 @@
 // src/services/api.ts
 import { AuthContextType } from '../context/AuthContext'; // Keep original import
 
-// Keep original schema imports
 import {
     Ruleset, RulesetCreate, RulesetUpdate, Rule, RuleCreate, RuleUpdate,
     ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate, UserWithRoles, Role,
@@ -15,17 +14,15 @@ import {
     DimseQrSourceStatus, DimseQrSourcesStatusResponse, CrosswalkDataSourceRead,
     CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload, CrosswalkMapRead,
     CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload, RuleGenRequest, RuleGenResponse,
-    // Assuming User schema is imported via UserWithRoles or similar
-} from '../schemas'; // Keep referring to ../schemas index if that's where types are exported
+    SystemInfo,
+} from '../schemas'; 
 
-// --- ADDED: Direct import for Data Browser Schemas ---
-// Make sure the file '../schemas/data_browser.ts' exists and exports these types
+import { DiskUsageStats } from '@/schemas';
+
 import {
     DataBrowserQueryRequest,
     DataBrowserQueryResponse
 } from '../schemas/data_browser';
-// --- END ADDED ---
-
 
 let authContextRef: AuthContextType | null = null;
 
@@ -196,7 +193,6 @@ export const getDicomWebPollersStatus = (): Promise<DicomWebPollersStatusRespons
 export const getDimseListenersStatus = (): Promise<DimseListenersStatusResponse> => apiClient<DimseListenersStatusResponse>('/system/dimse-listeners/status');
 export const getDimseQrSourcesStatus = (): Promise<DimseQrSourcesStatusResponse> => apiClient<DimseQrSourcesStatusResponse>('/system/dimse-qr-sources/status');
 export const getKnownInputSources = (): Promise<string[]> => apiClient<string[]>('/system/input-sources');
-export const getDicomWebSources = (skip: number = 0, limit: number = 100): Promise<DicomWebSourceConfigRead[]> => apiClient<DicomWebSourceConfigRead[]>(`/config/dicomweb-sources?skip=${skip}&limit=${limit}`);
 export const createDicomWebSource = (data: DicomWebSourceConfigCreatePayload): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>('/config/dicomweb-sources', { method: 'POST', body: JSON.stringify(data) });
 export const updateDicomWebSource = (id: number, data: DicomWebSourceConfigUpdatePayload): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>(`/config/dicomweb-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteDicomWebSource = (id: number): Promise<DicomWebSourceConfigRead> => apiClient<DicomWebSourceConfigRead>(`/config/dicomweb-sources/${id}`, { method: 'DELETE' });
@@ -212,7 +208,6 @@ export const getSchedules = (skip: number = 0, limit: number = 100): Promise<Sch
 export const createSchedule = (data: ScheduleCreate): Promise<Schedule> => apiClient<Schedule>('/config/schedules', { method: 'POST', body: JSON.stringify(data) });
 export const updateSchedule = (id: number, data: ScheduleUpdate): Promise<Schedule> => apiClient<Schedule>(`/config/schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteSchedule = (id: number): Promise<Schedule> => apiClient<Schedule>(`/config/schedules/${id}`, { method: 'DELETE' });
-export const getDimseQrSources = (skip: number = 0, limit: number = 100): Promise<DimseQueryRetrieveSourceRead[]> => apiClient<DimseQueryRetrieveSourceRead[]>(`/config/dimse-qr-sources?skip=${skip}&limit=${limit}`);
 export const createDimseQrSource = (data: DimseQueryRetrieveSourceCreatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>('/config/dimse-qr-sources', { method: 'POST', body: JSON.stringify(data) });
 export const updateDimseQrSource = (id: number, data: DimseQueryRetrieveSourceUpdatePayload): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteDimseQrSource = (id: number): Promise<DimseQueryRetrieveSourceRead> => apiClient<DimseQueryRetrieveSourceRead>(`/config/dimse-qr-sources/${id}`, { method: 'DELETE' });
@@ -226,6 +221,8 @@ export const getCrosswalkMaps = (dataSourceId: number | undefined, skip: number 
 export const createCrosswalkMap = (data: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>('/config/crosswalk/mappings', { method: 'POST', body: JSON.stringify(data) });
 export const updateCrosswalkMap = (id: number, data: CrosswalkMapUpdatePayload): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteCrosswalkMap = (id: number): Promise<CrosswalkMapRead> => apiClient<CrosswalkMapRead>(`/config/crosswalk/mappings/${id}`, { method: 'DELETE' });
+
+export const getSystemInfo = async (): Promise<SystemInfo> => apiClient<SystemInfo>('/system/info');
 
 export const suggestRule = async (requestData: RuleGenRequest): Promise<RuleGenResponse> => {
     console.log("API: Calling suggestRule with prompt:", requestData.prompt);
@@ -245,10 +242,31 @@ export const submitDataBrowserQuery = (request: DataBrowserQueryRequest): Promis
         useAuth: true // Ensure authentication is used for this endpoint
     });
 };
-// --- END ADDED ---
 
-// Keep original UserWithRoles type export
-export { type UserWithRoles };
+export const getDiskUsage = async (path?: string): Promise<DiskUsageStats> => {
+    const endpoint = path ? `/system/disk-usage?path_to_check=${encodeURIComponent(path)}` : '/system/disk-usage';
+    return apiClient<DiskUsageStats>(endpoint); // Defaults to GET
+};
+
+export const getDicomWebSources = (skip: number = 0, limit: number = 100): Promise<DicomWebSourceConfigRead[]> => {
+    // --- Add these logs ---
+    console.log(`>>> [getDicomWebSources] ENTERED. Received - skip: ${skip} (type: ${typeof skip}), limit: ${limit} (type: ${typeof limit})`);
+    const url = `/config/dicomweb-sources?skip=${skip}&limit=${limit}`;
+    console.log(`>>> [getDicomWebSources] Constructed URL: ${url}`);
+    // --- End logs ---
+    return apiClient<DicomWebSourceConfigRead[]>(url); // Existing call
+};
+
+export const getDimseQrSources = (skip: number = 0, limit: number = 100): Promise<DimseQueryRetrieveSourceRead[]> => {
+    // --- Add these logs ---
+    console.log(`>>> [getDimseQrSources] ENTERED. Received - skip: ${skip} (type: ${typeof skip}), limit: ${limit} (type: ${typeof limit})`);
+    const url = `/config/dimse-qr-sources?skip=${skip}&limit=${limit}`;
+    console.log(`>>> [getDimseQrSources] Constructed URL: ${url}`);
+    // --- End logs ---
+    return apiClient<DimseQueryRetrieveSourceRead[]>(url); // Existing call
+};
+
+export type { UserWithRoles };
 // --- END Original Exports ---
 
 export default apiClient; // Keep default export

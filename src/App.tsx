@@ -17,7 +17,9 @@ import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
 
-import ConfigurationPage from './pages/ConfigurationPage';
+// --- UPDATED: Rename ConfigurationPage import ---
+import RoutingConfigurationPage from './pages/RoutingConfigurationPage'; // Renamed from ConfigurationPage
+// --- END UPDATED ---
 import ScrapersLayout from './pages/ScrapersLayout';
 import ListenersLayout from './pages/ListenersLayout';
 import DicomWebSourcesConfigPage from './pages/DicomWebSourcesConfigPage';
@@ -30,12 +32,17 @@ import CrosswalkMappingsPage from './pages/CrosswalkMappingsPage';
 import StowRsInfoPage from './pages/StowRsInfoPage';
 import JsonApiInfoPage from './pages/JsonApiInfoPage';
 import SchedulesConfigPage from './pages/SchedulesConfigPage';
-
-// --- ADDED: Import New Pages ---
 import DataBrowserPage from './pages/DataBrowserPage';
 import InventoryToolPage from './pages/InventoryToolPage';
-// --- END ADDED ---
 
+// --- ADDED: Import New System Config Page ---
+import SystemConfigurationPage from './pages/SystemConfigurationPage'; // Placeholder page
+import SysInfoDisplay from './components/system-config/SysInfoDisplay';
+import SysProcessingSettings from './components/system-config/SysProcessingSettings';
+import SysLimitsSettings from './components/system-config/SysLimitsSettings';
+import SysExternalServices from './components/system-config/SysExternalServices';
+import SysAdminActions from './components/system-config/SysAdminActions';
+// --- END ADDED ---
 
 function AppContent() {
   const auth = useAuth();
@@ -58,31 +65,28 @@ function AppContent() {
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/rulesets" element={<RulesetsPage />} />
                     <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
-                    {/* --- ADDED: New Top-Level Routes --- */}
                     <Route path="/data-browser" element={<DataBrowserPage />} />
                     <Route path="/inventory-tool" element={<InventoryToolPage />} />
-                    {/* --- END ADDED --- */}
                     <Route path="/api-keys" element={<ApiKeysPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
-
 
                     {/* Admin Routes Section */}
                     <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
                         {/* User Management */}
                         <Route path="/admin/users" element={<UserManagementPage />} />
 
-                        {/* Configuration Section */}
-                        <Route path="/admin/config" element={<ConfigurationPage />}>
+                        {/* --- UPDATED: Routing Configuration Section --- */}
+                        <Route path="/admin/routing-config" element={<RoutingConfigurationPage />}>
                             <Route index element={<Navigate to="scrapers" replace />} />
 
-                            {/* Scrapers Section */}
+                            {/* Scrapers Sub-Section */}
                             <Route path="scrapers" element={<ScrapersLayout />}>
                                 <Route index element={<Navigate to="dicomweb" replace />} />
                                 <Route path="dicomweb" element={<DicomWebSourcesConfigPage />} />
                                 <Route path="dimse-qr" element={<DimseQrSourcesConfigPage />} />
                             </Route>
 
-                            {/* Listeners Section */}
+                            {/* Listeners Sub-Section */}
                             <Route path="listeners" element={<ListenersLayout />}>
                                 <Route index element={<Navigate to="dimse" replace />} />
                                 <Route path="dimse" element={<DimseListenersConfigPage />} />
@@ -93,17 +97,27 @@ function AppContent() {
                             {/* Schedules Route */}
                             <Route path="schedules" element={<SchedulesConfigPage />} />
 
-                            {/* Storage Backends */}
+                            {/* Storage Backends Route */}
                             <Route path="storage-backends" element={<StorageBackendsConfigPage />} />
 
-                            {/* Crosswalk Section */}
+                            {/* Crosswalk Sub-Section */}
                             <Route path="crosswalk" element={<CrosswalkLayout />}>
                                 <Route index element={<Navigate to="data-sources" replace />} />
                                 <Route path="data-sources" element={<CrosswalkDataSourcesPage />} />
                                 <Route path="mappings" element={<CrosswalkMappingsPage />} />
                             </Route>
                         </Route>
+                        {/* --- END UPDATED --- */}
 
+                        {/* --- ADDED: System Configuration Section --- */}
+                        <Route path="/admin/system-config" element={<SystemConfigurationPage />}>
+                            <Route index element={<Navigate to="info" replace />} />
+                            <Route path="info" element={<SysInfoDisplay />} />
+                            <Route path="processing" element={<SysProcessingSettings />} />
+                            <Route path="limits" element={<SysLimitsSettings />} />
+                            <Route path="services" element={<SysExternalServices />} />
+                            <Route path="admin-actions" element={<SysAdminActions />} />
+			</Route>
                     </Route> {/* End Admin Protected Route */}
 
                 </Route> {/* End Layout */}

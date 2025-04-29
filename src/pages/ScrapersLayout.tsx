@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 
 // CORRECTED: Define the sub-navigation links for Scrapers
 const scraperSubNavLinks = [
-    { name: "DICOMweb", href: "/admin/config/scrapers/dicomweb" },
-    { name: "DIMSE Q/R", href: "/admin/config/scrapers/dimse-qr" },
+    { name: "DICOMweb", href: "/admin/routing-config/scrapers/dicomweb" },
+    { name: "DIMSE Q/R", href: "/admin/routing-config/scrapers/dimse-qr" },
     // Add more scraper types here later (e.g., GCS)
 ];
 

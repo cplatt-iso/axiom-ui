@@ -4,11 +4,9 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 
 const listenerSubNavLinks = [
-    { name: "DIMSE Listeners", href: "/admin/config/listeners/dimse" },
-    // --- ADDED Links for Info Pages ---
-    { name: "STOW-RS Endpoint", href: "/admin/config/listeners/stow-rs" },
-    { name: "JSON API Endpoint", href: "/admin/config/listeners/json-api" },
-    // --- END ADDED ---
+    { name: "DIMSE Listeners", href: "/admin/routing-config/listeners/dimse" },
+    { name: "STOW-RS Endpoint", href: "/admin/routing-config/listeners/stow-rs" },
+    { name: "JSON API Endpoint", href: "/admin/routing-config/listeners/json-api" },
 ];
 
 const ListenersLayout: React.FC = () => {

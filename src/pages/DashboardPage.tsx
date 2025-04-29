@@ -1,15 +1,10 @@
 // src/pages/DashboardPage.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// Import the function and type for dashboard status
 import { getDashboardStatus, SystemStatusReport, ComponentStatus } from '../services/api'; // Added ComponentStatus type
-// Import the generic StatusWidget
 import StatusWidget from '../components/StatusWidget';
-// Import Specific Widgets
-import DicomWebPollerWidget from '../components/DicomWebPollerWidget';
 import DimseListenerStatusWidget from '../components/DimseListenerStatusWidget';
-// --- ADDED: Import the new DIMSE Q/R widget ---
-import DimseQrSourceStatusWidget from '../components/DimseQrSourceStatusWidget';
-// --- END ADDED ---
+import ScraperStatusWidget from '@/components/ScraperStatusWidget';
+import DiskUsageWidget from '../components/DiskUsageWidget';
 
 const DashboardPage: React.FC = () => {
     // State for the generic status report from /dashboard/status
@@ -88,9 +83,8 @@ const DashboardPage: React.FC = () => {
                          <StatusWidget title="Database" statusData={getComponentStatus('database')} isLoading={isLoadingStatus} />
                          <StatusWidget title="Message Broker" statusData={getComponentStatus('message_broker')} isLoading={isLoadingStatus} />
                          <StatusWidget title="API Service" statusData={getComponentStatus('api_service')} isLoading={isLoadingStatus} />
-                         {/* Note: We removed the generic 'dicom_listener' widget from here */}
-                         {/* It's now handled by the detailed DimseListenerStatusWidget below */}
                          <StatusWidget title="Processing Workers" statusData={getComponentStatus('celery_workers')} isLoading={isLoadingStatus} />
+			 <DiskUsageWidget />
                      </div>
                  </div>
             </div>
@@ -99,14 +93,8 @@ const DashboardPage: React.FC = () => {
             <div>
                  {/* No separate title needed if widgets have good titles */}
                 <div className="space-y-6">
-                    {/* Render the list-based DIMSE Listener Widget */}
                     <DimseListenerStatusWidget />
-                    {/* Render the DICOMweb Poller Widget */}
-                    <DicomWebPollerWidget />
-                    {/* --- ADDED: Render the DIMSE Q/R Source Widget --- */}
-                    <DimseQrSourceStatusWidget />
-                    {/* --- END ADDED --- */}
-                    {/* Add other detailed widgets here later */}
+		    <ScraperStatusWidget />
                 </div>
             </div>
         </div>
