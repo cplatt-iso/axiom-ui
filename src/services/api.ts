@@ -1,6 +1,7 @@
 // src/services/api.ts
 import { AuthContextType } from '../context/AuthContext'; // Keep original import
 
+// --- Keep ALL schema imports as they were ---
 import {
     Ruleset, RulesetCreate, RulesetUpdate, Rule, RuleCreate, RuleUpdate,
     ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate, UserWithRoles, Role,
@@ -15,62 +16,52 @@ import {
     CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload, CrosswalkMapRead,
     CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload, RuleGenRequest, RuleGenResponse,
     SystemInfo,
-} from '../schemas'; 
-
+} from '../schemas';
 import { DiskUsageStats } from '@/schemas';
-
 import {
     DataBrowserQueryRequest,
     DataBrowserQueryResponse
 } from '../schemas/data_browser';
+// --- End schema imports ---
+
 
 let authContextRef: AuthContextType | null = null;
 
 export function setAuthContextRef(context: AuthContextType) {
+    // Keep this initial log
     console.log("API Service: AuthContext reference set.");
     authContextRef = context;
 }
 
-// --- Keep original Base URL Determination ---
+// --- Keep Base URL Determination ---
 const determineApiBaseUrl = (): string => {
     const envUrl = import.meta.env.VITE_API_BASE_URL;
     const apiPrefix = '/api/v1'; // Define standard prefix
 
     if (envUrl) {
         let baseUrl = envUrl.trim();
-        // Ensure it ends without a trailing slash for consistency before adding prefix
         if (baseUrl.endsWith('/')) {
             baseUrl = baseUrl.slice(0, -1);
         }
-        // Force HTTPS unless explicitly http://
         if (baseUrl.startsWith('http://')) {
              console.warn("VITE_API_BASE_URL starts with http://. Using insecure connection.");
-             // return baseUrl + apiPrefix; // Use this if you MUST allow http
-              return baseUrl.replace(/^http:/, 'https:') + apiPrefix; // Force https
+              return baseUrl.replace(/^http:/, 'https:') + apiPrefix;
         }
         if (!baseUrl.startsWith('https://')) {
-            // Prepend https if no protocol specified
             if (!baseUrl.includes('://')) {
                  console.warn(`VITE_API_BASE_URL (${baseUrl}) lacks protocol, defaulting to HTTPS.`);
                  return `https://${baseUrl}${apiPrefix}`;
             }
-            // Handle other cases or just return as is? For safety, force https or log error
             console.error(`VITE_API_BASE_URL (${baseUrl}) has unexpected format. Forcing HTTPS.`);
-            return `https://${baseUrl.split('://')[1] || baseUrl}${apiPrefix}`; // Attempt to fix
+            return `https://${baseUrl.split('://')[1] || baseUrl}${apiPrefix}`;
         }
-        // Already starts with https://
         return baseUrl + apiPrefix;
     } else {
-        // Fallback: Use current window's origin + standard API prefix
-        // This works if API and UI are served from the same domain/port
-        // during development or production (behind a proxy).
         if (typeof window !== 'undefined') {
-            // window.location.origin includes the protocol (http/https) and domain/port
             return `${window.location.origin}${apiPrefix}`;
         } else {
-            // Fallback for non-browser environments (shouldn't happen in frontend)
             console.warn("Cannot determine window origin, defaulting to relative path for API.");
-            return apiPrefix; // Relative path
+            return apiPrefix;
         }
     }
 };
@@ -78,30 +69,28 @@ const determineApiBaseUrl = (): string => {
 const API_BASE_URL = determineApiBaseUrl();
 // --- END Base URL Determination ---
 
+// Keep this initial log
 console.log(`API Service: Using base URL: ${API_BASE_URL}`);
 
-// --- Keep original ApiOptions interface ---
 interface ApiOptions extends RequestInit {
-    params?: Record<string, string>; // Keep original type for params
+    params?: Record<string, string>;
     useAuth?: boolean;
 }
 
-// --- Keep original apiClient function ---
+// --- Keep apiClient function ---
+// (Removed internal debug logs if any were added, keep error logs)
 export const apiClient = async <T>(
     endpoint: string,
     options: ApiOptions = {}
 ): Promise<T> => {
     const { params, useAuth = true, ...fetchOptions } = options;
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    // Construct URL ensuring no double slashes between base and endpoint
     let url = API_BASE_URL.endsWith('/')
               ? `${API_BASE_URL.slice(0,-1)}${cleanEndpoint}`
               : `${API_BASE_URL}${cleanEndpoint}`;
-    // General double slash cleanup (might be redundant now)
     url = url.replace(/([^:]\/)\/+/g, "$1");
 
     if (params) {
-        // Keep original params handling
         const query = new URLSearchParams(params).toString();
         if (query) {
             url += `?${query}`;
@@ -117,11 +106,11 @@ export const apiClient = async <T>(
     }
 
     if (useAuth) {
-        // Keep original token fetching logic
         const token = authContextRef?.getToken();
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
         } else {
+            // Keep this warning
             console.warn(`API Client: Auth requested for ${endpoint}, but no token found.`);
         }
     }
@@ -129,7 +118,8 @@ export const apiClient = async <T>(
     fetchOptions.headers = headers;
 
     try {
-        console.debug(`API Client: Fetching ${fetchOptions.method || 'GET'} ${url}`);
+        // Optional: Keep a debug log here if generally useful, removed temporary ones
+        // console.debug(`API Client: Fetching ${fetchOptions.method || 'GET'} ${url}`);
         const response = await fetch(url, fetchOptions);
 
         if (!response.ok) {
@@ -144,8 +134,8 @@ export const apiClient = async <T>(
             } catch (e) {
                  errorData = { detail: `HTTP error ${response.status}: Failed to parse error response.` };
             }
+            // Keep this important error log
             console.error(`API Client Error: ${response.status} ${response.statusText} for ${url}`, errorData);
-            // Keep original error creation
             const error: any = new Error(errorData?.detail || `HTTP error ${response.status}`);
             error.status = response.status;
             error.detail = errorData?.detail;
@@ -153,23 +143,26 @@ export const apiClient = async <T>(
         }
 
         if (response.status === 204) {
-            console.debug(`API Client: Received 204 No Content for ${url}`);
-            // Keep original 204 handling
+            // Optional: Keep this debug log if useful
+            // console.debug(`API Client: Received 204 No Content for ${url}`);
             return {} as T;
         }
 
         const data: T = await response.json();
-        console.debug(`API Client: Successfully received data for ${url}`);
+        // Optional: Keep this debug log if useful
+        // console.debug(`API Client: Successfully received data for ${url}`);
         return data;
     } catch (error) {
+        // Keep this important error log
         console.error(`API Client Fetch Error for ${url}:`, error);
         throw error;
     }
 };
-// --- End original apiClient function ---
+// --- End apiClient function ---
 
 
 // --- Keep ALL original Specific API Function Exports ---
+// (These just call apiClient, no debug logs needed inside them unless specific issues arise)
 export const getRulesets = (): Promise<Ruleset[]> => apiClient<Ruleset[]>('/rules-engine/rulesets');
 export const getRulesetById = (id: number): Promise<Ruleset> => apiClient<Ruleset>(`/rules-engine/rulesets/${id}`);
 export const createRuleset = (data: RulesetCreate): Promise<Ruleset> => apiClient<Ruleset>('/rules-engine/rulesets', { method: 'POST', body: JSON.stringify(data) });
@@ -225,46 +218,39 @@ export const deleteCrosswalkMap = (id: number): Promise<CrosswalkMapRead> => api
 export const getSystemInfo = async (): Promise<SystemInfo> => apiClient<SystemInfo>('/system/info');
 
 export const suggestRule = async (requestData: RuleGenRequest): Promise<RuleGenResponse> => {
+    // Keep this useful log
     console.log("API: Calling suggestRule with prompt:", requestData.prompt);
     return apiClient<RuleGenResponse>('/ai-assist/suggest-rule', {
         method: 'POST',
         body: JSON.stringify(requestData),
-        useAuth: true, // Requires authentication
+        useAuth: true,
     });
 };
 
-// --- ADDED: Data Browser Query Function ---
 export const submitDataBrowserQuery = (request: DataBrowserQueryRequest): Promise<DataBrowserQueryResponse> => {
-    // Uses the existing apiClient, inheriting its auth logic and base URL handling
     return apiClient<DataBrowserQueryResponse>('/data-browser/query', {
         method: 'POST',
         body: JSON.stringify(request),
-        useAuth: true // Ensure authentication is used for this endpoint
+        useAuth: true
     });
 };
 
 export const getDiskUsage = async (path?: string): Promise<DiskUsageStats> => {
     const endpoint = path ? `/system/disk-usage?path_to_check=${encodeURIComponent(path)}` : '/system/disk-usage';
-    return apiClient<DiskUsageStats>(endpoint); // Defaults to GET
+    return apiClient<DiskUsageStats>(endpoint);
 };
 
+// --- REMOVED DEBUG LOGS from these functions ---
 export const getDicomWebSources = (skip: number = 0, limit: number = 100): Promise<DicomWebSourceConfigRead[]> => {
-    // --- Add these logs ---
-    console.log(`>>> [getDicomWebSources] ENTERED. Received - skip: ${skip} (type: ${typeof skip}), limit: ${limit} (type: ${typeof limit})`);
     const url = `/config/dicomweb-sources?skip=${skip}&limit=${limit}`;
-    console.log(`>>> [getDicomWebSources] Constructed URL: ${url}`);
-    // --- End logs ---
-    return apiClient<DicomWebSourceConfigRead[]>(url); // Existing call
+    return apiClient<DicomWebSourceConfigRead[]>(url);
 };
 
 export const getDimseQrSources = (skip: number = 0, limit: number = 100): Promise<DimseQueryRetrieveSourceRead[]> => {
-    // --- Add these logs ---
-    console.log(`>>> [getDimseQrSources] ENTERED. Received - skip: ${skip} (type: ${typeof skip}), limit: ${limit} (type: ${typeof limit})`);
     const url = `/config/dimse-qr-sources?skip=${skip}&limit=${limit}`;
-    console.log(`>>> [getDimseQrSources] Constructed URL: ${url}`);
-    // --- End logs ---
-    return apiClient<DimseQueryRetrieveSourceRead[]>(url); // Existing call
+    return apiClient<DimseQueryRetrieveSourceRead[]>(url);
 };
+// --- END REMOVED DEBUG LOGS ---
 
 export type { UserWithRoles };
 // --- END Original Exports ---
