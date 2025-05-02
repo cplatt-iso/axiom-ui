@@ -1,116 +1,167 @@
 // src/schemas/storageBackendSchema.ts
 import { z } from 'zod';
 import json5 from 'json5'; // Use json5 for more lenient parsing
-import { AllowedBackendType } from '@/schemas'; // Import shared Literal type
+// Assuming AllowedBackendType might be defined in your central schemas index
+// If not, define the enum/literal array directly here.
+// Example: export type AllowedBackendType = "filesystem" | "cstore" | "gcs" | "google_healthcare" | "stow_rs";
+// Make sure this import path is correct for your project structure
+import { AllowedBackendType } from '@/schemas/index';
 
-// Helper function to safely parse JSON strings (allowing comments, trailing commas etc.)
-const safeJsonParse = (jsonString: string | null | undefined): Record<string, any> | null => {
-    // Allow empty string input for the config textarea, treat as empty object {}
-    if (jsonString === null || jsonString === undefined || jsonString.trim() === '') {
-        return {}; // Return empty object for empty/null string
-    }
-    try {
-        const parsed = json5.parse(jsonString); // Use json5.parse
-        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-            return parsed; // Return the parsed object
-        }
-        // If parsing resulted in something other than an object (e.g., number, string, array)
-        throw new Error("Input must resolve to a valid JSON object.");
-    } catch (e) {
-        // Catch parsing errors or the error thrown above
-        throw new Error(`Invalid JSON object format: ${e instanceof Error ? e.message : String(e)}`);
-    }
-};
+// --- Define FULL flattened schemas for each API payload type ---
+// These represent the structure the API expects. Each includes the discriminator.
 
-// Define the Zod schema for the form data
-export const storageBackendFormSchema = z.object({
-    name: z.string().min(1, "Backend name is required"),
+const FilesystemPayloadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
     description: z.string().optional().nullable(),
-    // Ensure backend_type uses the imported Literal type for validation
-    backend_type: z.enum([
-        "filesystem",
-        "cstore",
-        "gcs",
-        "google_healthcare",
-        "stow_rs"
-    ]), // Use z.enum with values from AllowedBackendType
-    // Use transform to parse the JSON string input from the textarea
-    config: z.string() // Expect a string from the textarea initially
-        .transform((val, ctx) => {
-            try {
-                return safeJsonParse(val); // Attempt parsing
-            } catch (e) {
-                // If parsing fails, add an issue to the context
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: (e as Error).message, // Use the error message from safeJsonParse
-                });
-                // Zod requires returning z.NEVER on transform failure
-                return z.NEVER;
-            }
-        })
-        // Add refine after transform to ensure the *result* is an object (or null, adjusted safeJsonParse)
-        .refine(val => typeof val === 'object' && val !== null, {
-             message: "Config must be a valid JSON object.",
-         }),
+    backend_type: z.literal("filesystem"), // Discriminator
     is_enabled: z.boolean(),
-
-}).superRefine((data, ctx) => {
-    // Cross-field validation: Check config keys based on backend_type
-    // This runs *after* the initial field validations and transforms
-    const config = data.config; // config is now Record<string, any> | null
-    const b_type = data.backend_type;
-
-    if (config === null || typeof config !== 'object') {
-        // This case should theoretically be caught by the refine on config,
-        // but include a check just in case.
-        // Don't add another issue if refine already failed.
-         if (!ctx.common.issues.some(iss => iss.path.includes('config'))) {
-             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ["config"],
-                message: "Config is invalid or missing.",
-            });
-         }
-        return; // Stop validation if config isn't usable
-    }
-
-
-    if (b_type === "filesystem") {
-        if (typeof config.path !== 'string' || !config.path.trim()) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Filesystem config requires a non-empty 'path' string." });
-        }
-    } else if (b_type === "cstore") {
-        if (typeof config.ae_title !== 'string' || !config.ae_title.trim()) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "CStore config requires a non-empty 'ae_title' string." });
-        }
-        if (typeof config.host !== 'string' || !config.host.trim()) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "CStore config requires a non-empty 'host' string." });
-        }
-        if (typeof config.port !== 'number' || !Number.isInteger(config.port) || config.port < 1 || config.port > 65535) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "CStore config requires a valid 'port' number (1-65535)." });
-        }
-    } else if (b_type === "gcs") {
-         if (typeof config.bucket_name !== 'string' || !config.bucket_name.trim()) {
-             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "GCS config requires a non-empty 'bucket_name' string." });
-         }
-    } else if (b_type === "google_healthcare") {
-         if (typeof config.project_id !== 'string' || !config.project_id.trim()) { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Google Healthcare config requires 'project_id'." }); }
-         if (typeof config.location !== 'string' || !config.location.trim()) { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Google Healthcare config requires 'location'." }); }
-         if (typeof config.dataset_id !== 'string' || !config.dataset_id.trim()) { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Google Healthcare config requires 'dataset_id'." }); }
-         if (typeof config.dicom_store_id !== 'string' || !config.dicom_store_id.trim()) { ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "Google Healthcare config requires 'dicom_store_id'." }); }
-    } else if (b_type === "stow_rs") {
-         const hasStowUrl = typeof config.stow_url === 'string' && config.stow_url.trim();
-         const hasBaseUrl = typeof config.base_url === 'string' && config.base_url.trim();
-         if (!hasStowUrl && !hasBaseUrl) {
-              ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["config"], message: "STOW-RS config requires either 'stow_url' or 'base_url'." });
-         }
-         // Optional: Add validation for auth_type/auth_config consistency if needed
-         // const auth_type = config.auth_type;
-         // const auth_config = config.auth_config;
-         // if (auth_type === 'basic' && (!auth_config || !auth_config.username || !auth_config.password)) { ... }
-    }
+    // Filesystem specific
+    path: z.string().min(1, "Filesystem config requires a non-empty 'path' string."),
 });
 
-// Define the TypeScript type inferred from the Zod schema
+// CStore Schema WITHOUT Refinements for the union definition itself
+const CStorePayloadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string().optional().nullable(),
+    backend_type: z.literal("cstore"), // Discriminator
+    is_enabled: z.boolean(),
+    // CStore specific fields
+    remote_ae_title: z.string().min(1, "Req: 'remote_ae_title'.").max(16, "AE Title max 16 chars"),
+    remote_host: z.string().min(1, "Req: 'remote_host'."),
+    remote_port: z.number().int().min(1, "Port > 0").max(65535, "Port <= 65535"),
+    local_ae_title: z.string().max(16, "AE Title max 16 chars").optional().nullable(),
+    tls_enabled: z.boolean().optional().default(false),
+    tls_ca_cert_secret_name: z.string().min(1, "Cannot be empty if provided.").optional().nullable(),
+    tls_client_cert_secret_name: z.string().min(1, "Cannot be empty if provided.").optional().nullable(),
+    tls_client_key_secret_name: z.string().min(1, "Cannot be empty if provided.").optional().nullable(),
+});
+
+const GcsPayloadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string().optional().nullable(),
+    backend_type: z.literal("gcs"), // Discriminator
+    is_enabled: z.boolean(),
+    // GCS specific
+    bucket: z.string().min(1, "GCS config requires 'bucket'."),
+    prefix: z.string().optional().nullable(),
+});
+
+const GoogleHealthcarePayloadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string().optional().nullable(),
+    backend_type: z.literal("google_healthcare"), // Discriminator
+    is_enabled: z.boolean(),
+    // Google Healthcare specific
+    gcp_project_id: z.string().min(1, "Req: 'gcp_project_id'."),
+    gcp_location: z.string().min(1, "Req: 'gcp_location'."),
+    gcp_dataset_id: z.string().min(1, "Req: 'gcp_dataset_id'."),
+    gcp_dicom_store_id: z.string().min(1, "Req: 'gcp_dicom_store_id'."),
+});
+
+const StowRsPayloadSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    description: z.string().optional().nullable(),
+    backend_type: z.literal("stow_rs"), // Discriminator
+    is_enabled: z.boolean(),
+    // STOW-RS specific
+    base_url: z.string().min(1, "Req: 'base_url'.").url("Must be a valid URL."),
+});
+
+// --- API Payload Schema (Discriminated Union) ---
+// Uses the fully defined schemas directly.
+export const storageBackendApiPayloadSchema = z.discriminatedUnion("backend_type", [
+    FilesystemPayloadSchema,
+    CStorePayloadSchema, // Use the one WITHOUT .refine() here for the union
+    GcsPayloadSchema,
+    GoogleHealthcarePayloadSchema,
+    StowRsPayloadSchema,
+]);
+
+// TypeScript type for the flattened API payload
+export type StorageBackendApiPayload = z.infer<typeof storageBackendApiPayloadSchema>;
+
+
+// --- FORM Schema ---
+// Defines the structure for react-hook-form, using 'config_string' for the JSON textarea.
+
+// Schemas for validating the *content* of the config_string JSON based on type.
+// These CAN have refinements as they are used inside superRefine.
+const filesystemConfigContentSchema = FilesystemPayloadSchema.omit({ backend_type: true, name: true, description: true, is_enabled: true });
+
+// Define the CStore CONTENT schema WITH refinements
+const cstoreConfigContentSchema = z.object({
+    remote_ae_title: z.string().min(1, "Req: 'remote_ae_title'.").max(16),
+    remote_host: z.string().min(1, "Req: 'remote_host'."),
+    remote_port: z.number().int().min(1).max(65535),
+    local_ae_title: z.string().max(16).optional().nullable(),
+    tls_enabled: z.boolean().optional().default(false),
+    tls_ca_cert_secret_name: z.string().min(1, "Cannot be empty.").optional().nullable(),
+    tls_client_cert_secret_name: z.string().min(1, "Cannot be empty.").optional().nullable(),
+    tls_client_key_secret_name: z.string().min(1, "Cannot be empty.").optional().nullable(),
+}).refine(data => !(data.tls_enabled && (!data.tls_ca_cert_secret_name || data.tls_ca_cert_secret_name.trim() === '')), {
+    message: "`tls_ca_cert_secret_name` is required when TLS is enabled.", path: ["tls_ca_cert_secret_name"],
+}).refine(data => (!!data.tls_client_cert_secret_name) === (!!data.tls_client_key_secret_name), {
+    message: "Provide both client cert/key secret names for mTLS, or neither.", path: ["tls_client_cert_secret_name"],
+});
+
+const gcsConfigContentSchema = GcsPayloadSchema.omit({ backend_type: true, name: true, description: true, is_enabled: true });
+const googleHealthcareConfigContentSchema = GoogleHealthcarePayloadSchema.omit({ backend_type: true, name: true, description: true, is_enabled: true });
+const stowRsConfigContentSchema = StowRsPayloadSchema.omit({ backend_type: true, name: true, description: true, is_enabled: true });
+
+
+// The Zod schema for the form itself
+export const storageBackendFormSchema = z.object({
+    name: z.string().min(1), description: z.string().optional().nullable(),
+    backend_type: z.enum([ "filesystem", "cstore", "gcs", "google_healthcare", "stow_rs" ]),
+    is_enabled: z.boolean(), config_string: z.string()
+}).superRefine((data, ctx) => {
+    let parsedConfig: Record<string, any> = {};
+    try {
+        // --- INLINE the parsing logic ---
+        const jsonString = data.config_string;
+        if (jsonString === null || jsonString === undefined || jsonString.trim() === '') {
+            parsedConfig = {}; // Treat empty as empty object
+        } else {
+            const parsed = json5.parse(jsonString);
+            if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                parsedConfig = parsed;
+            } else {
+                throw new Error("Input must resolve to a valid JSON object.");
+            }
+        }
+        // --- END INLINE PARSING ---
+    } catch (e) {
+        // Add parsing error to the config_string field's issues
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["config_string"],
+            message: `Invalid JSON object format: ${e instanceof Error ? e.message : String(e)}`, // Ensure message is included
+        });
+        return z.NEVER; // Stop validation if JSON itself is invalid
+    }
+
+    // --- Validation logic using content schemas remains the same ---
+    let validationResult: z.SafeParseReturnType<any, any>;
+    if (data.backend_type === "filesystem") {
+        validationResult = filesystemConfigContentSchema.safeParse(parsedConfig);
+    } else if (data.backend_type === "cstore") {
+        validationResult = cstoreConfigContentSchema.safeParse(parsedConfig);
+    } else if (data.backend_type === "gcs") {
+        validationResult = gcsConfigContentSchema.safeParse(parsedConfig);
+    } else if (data.backend_type === "google_healthcare") {
+        validationResult = googleHealthcareConfigContentSchema.safeParse(parsedConfig);
+    } else if (data.backend_type === "stow_rs") {
+        validationResult = stowRsConfigContentSchema.safeParse(parsedConfig);
+    } else { return; } // Should not happen
+
+    // Add issues if content validation fails
+    if (!validationResult.success) {
+        validationResult.error.issues.forEach(issue => {
+            const fieldPath = issue.path.join('.');
+            const newMessage = `JSON content error for field '${fieldPath}': ${issue.message}`;
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: newMessage, path: ["config_string"] });
+        });
+    }
+});
+// TypeScript type inferred from the Zod FORM schema
 export type StorageBackendFormData = z.infer<typeof storageBackendFormSchema>;

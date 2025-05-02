@@ -1,41 +1,49 @@
-// src/components/StorageBackendFormModal.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import json5 from 'json5'; // Import json5
-
+import json5 from 'json5';
 import { Button } from '@/components/ui/button';
 import {
-    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogClose,
 } from '@/components/ui/dialog';
 import {
-    Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+    FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from "@/components/ui/select";
 import { AlertCircle, ClipboardCopyIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-// --- Import API/General TYPES from main schemas index ---
 import {
     StorageBackendConfigRead,
-    StorageBackendConfigCreatePayload,
-    StorageBackendConfigUpdatePayload,
-    AllowedBackendType
+    AllowedBackendType,
 } from '@/schemas';
-// --- END API/General TYPES ---
-
-// --- Import Zod Schema and FORM DATA type DIRECTLY from its file ---
 import {
-    storageBackendFormSchema, // The Zod Schema object
-    StorageBackendFormData,   // The TypeScript type derived from the Zod schema
-} from '@/schemas/storageBackendSchema'; // Import from SPECIFIC file
-// --- END Zod Schema Import ---
-
+    storageBackendFormSchema,
+    StorageBackendFormData,
+    StorageBackendApiPayload,
+} from '@/schemas/storageBackendSchema';
 import {
     createStorageBackendConfig,
     updateStorageBackendConfig,
@@ -47,39 +55,29 @@ interface StorageBackendFormModalProps {
     backend: StorageBackendConfigRead | null;
 }
 
-// Default values for the *form* state (config is a string)
-const initialFormDefaults: {
-    name: string;
-    description: string | null;
-    backend_type: AllowedBackendType;
-    config: string; // Expect string input for textarea
-    is_enabled: boolean;
-} = {
+const configJsonExamples: Record<AllowedBackendType, Record<string, any>> = {
+    filesystem: { path: "/dicom_data/processed/my_archive" },
+    cstore: { remote_ae_title: "REMOTE_AE", remote_host: "pacs.example.com", remote_port: 104, local_ae_title: "AXIOM_QSCU", tls_enabled: false, tls_ca_cert_secret_name: null, tls_client_cert_secret_name: null, tls_client_key_secret_name: null },
+    gcs: { bucket: "axiom-flow-test-0001", prefix: "optional/folder/" },
+    google_healthcare: { gcp_project_id: "axiom-flow", gcp_location: "us-central1", gcp_dataset_id: "axiom-dataset-test-0001", gcp_dicom_store_id: "axiom-dicom-store-0001" },
+    stow_rs: { base_url: "https://dicom.server.com/dicom-web" },
+};
+
+const configJsonTooltips: Record<AllowedBackendType, string> = {
+     filesystem: "JSON requires: 'path' (string).",
+     cstore: "JSON requires: 'remote_ae_title', 'remote_host', 'remote_port'. Optional: 'local_ae_title', 'tls_enabled' (bool), 'tls_ca_cert_secret_name', 'tls_client_cert_secret_name', 'tls_client_key_secret_name'.",
+     gcs: "JSON requires: 'bucket' (string). Optional: 'prefix' (string).",
+     google_healthcare: "JSON requires: 'gcp_project_id', 'gcp_location', 'gcp_dataset_id', 'gcp_dicom_store_id'.",
+     stow_rs: "JSON requires: 'base_url' (string).",
+};
+
+const initialFormDefaults: StorageBackendFormData = {
     name: '',
     description: null,
     backend_type: 'filesystem',
-    config: '{}', // Default to empty JSON string
+    config_string: json5.stringify(configJsonExamples['filesystem'], null, 2),
     is_enabled: true,
 };
-
-// Examples for config field (used for initial population and copy button)
-const configExamples: Record<AllowedBackendType, Record<string, any>> = {
-    filesystem: { path: "/dicom_data/processed/my_archive" },
-    cstore: { ae_title: "REMOTE_PACS_AE", host: "pacs.example.com", port: 104, calling_ae_title: "AXIOM_SCU" },
-    gcs: { bucket_name: "your-gcs-bucket-name", path_prefix: "optional/folder/structure" },
-    google_healthcare: { project_id: "your-gcp-project-id", location: "us-central1", dataset_id: "your-dataset", dicom_store_id: "your-dicom-store" },
-    stow_rs: { stow_url: "https://dicom.server.com/dicom-web/studies", auth_type: "none", auth_config: null },
-};
-
-// Tooltips remain the same
-const configTooltips: Record<AllowedBackendType, string> = {
-     filesystem: "Required: 'path' (string) - Absolute path *inside the container* where files will be stored (e.g., /dicom_data/processed/some_folder).",
-     cstore: "Required: 'ae_title' (string), 'host' (string), 'port' (number). Optional: 'calling_ae_title' (string, default: AXIOM_SCU), timeouts (number).",
-     gcs: "Required: 'bucket_name' (string). Optional: 'path_prefix' (string). Authentication uses ADC or GOOGLE_APPLICATION_CREDENTIALS env var.",
-     google_healthcare: "Required: 'project_id', 'location', 'dataset_id', 'dicom_store_id' (all strings). Authentication uses ADC or GOOGLE_APPLICATION_CREDENTIALS env var.",
-     stow_rs: "Required: 'stow_url' (string, full URL to /studies endpoint) OR 'base_url' (string, base DICOMweb URL). Optional: 'auth_type' ('none', 'basic', 'bearer', 'apikey'), 'auth_config' (object based on auth_type), 'timeout' (number).",
-};
-
 
 const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpen, onClose, backend }) => {
     const queryClient = useQueryClient();
@@ -87,59 +85,70 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
     const [copiedTimeout, setCopiedTimeout] = useState<NodeJS.Timeout | null>(null);
     const [showCopied, setShowCopied] = useState(false);
 
-    // Form uses the StorageBackendFormData type derived from Zod schema
     const form = useForm<StorageBackendFormData>({
         resolver: zodResolver(storageBackendFormSchema),
-        defaultValues: {
-            ...initialFormDefaults,
-            // Ensure default config is a string for the form field
-            config: json5.stringify(configExamples['filesystem'], null, 2),
-        },
-        mode: 'onBlur', // Validate on blur
+        defaultValues: initialFormDefaults,
+        mode: 'onBlur',
     });
 
     const watchedBackendType = form.watch('backend_type');
 
+    const defaultValues = useMemo(() => {
+        if (backend) {
+            const {
+                id, created_at, updated_at,
+                name, description, backend_type, is_enabled,
+                ...specificConfigFields
+            } = backend;
+
+            const configToStringify: Record<string, any> = {};
+            Object.entries(specificConfigFields).forEach(([key, value]) => {
+                const commonKeys = ['name', 'description', 'backend_type', 'is_enabled'];
+                if (value !== undefined && value !== null && !commonKeys.includes(key)) {
+                    configToStringify[key] = value;
+                }
+            });
+
+            return {
+                name: name,
+                description: description ?? null,
+                backend_type: backend_type as AllowedBackendType,
+                is_enabled: is_enabled ?? true,
+                config_string: json5.stringify(configToStringify, null, 2) || '{}',
+            };
+        } else {
+            return {
+                ...initialFormDefaults,
+                config_string: json5.stringify(configJsonExamples[initialFormDefaults.backend_type] || {}, null, 2)
+            };
+        }
+    }, [backend]);
+
     useEffect(() => {
         if (isOpen) {
-            let resetValues;
-            if (backend) {
-                 // Convert config dict back to string for textarea
-                 resetValues = {
-                    name: backend.name,
-                    description: backend.description ?? null,
-                    backend_type: backend.backend_type as AllowedBackendType, // Cast if needed
-                    config: backend.config ? json5.stringify(backend.config, null, 2) : '{}', // Stringify for form
-                    is_enabled: backend.is_enabled ?? true,
-                 };
-            } else {
-                 // Set default based on initial form defaults, config as string
-                 resetValues = {
-                     ...initialFormDefaults,
-                     config: json5.stringify(configExamples['filesystem'], null, 2)
-                 };
-            }
-            form.reset(resetValues);
-             // Clear errors manually on open/reset
-             form.clearErrors();
+            form.reset(defaultValues);
+            form.clearErrors();
         }
-    }, [isOpen, backend, form]);
+    }, [isOpen, form, defaultValues]);
 
-    // Update config example when type changes in create mode
     useEffect(() => {
         if (isOpen && !isEditMode) {
-            const example = configExamples[watchedBackendType] || {};
-            // Set the *string* value for the textarea
-            form.setValue('config', json5.stringify(example, null, 2), { shouldValidate: true });
+            const example = configJsonExamples[watchedBackendType] || {};
+            form.setValue('config_string', json5.stringify(example, null, 2), {
+                shouldValidate: true,
+                shouldDirty: true,
+            });
+	    form.trigger('config_string');
         }
     }, [watchedBackendType, isOpen, isEditMode, form]);
 
     const createMutation = useMutation({
-        mutationFn: createStorageBackendConfig,
+        mutationFn: (payload: StorageBackendApiPayload) => createStorageBackendConfig(payload),
         onSuccess: (data) => {
             toast.success(`Storage Backend "${data.name}" created successfully.`);
             queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
             onClose();
+            form.reset(initialFormDefaults);
         },
         onError: (error: any) => {
             let specificError = "Failed to create backend config.";
@@ -158,7 +167,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { id: number, data: StorageBackendConfigUpdatePayload }) =>
+        mutationFn: (payload: { id: number, data: Partial<StorageBackendApiPayload> }) =>
             updateStorageBackendConfig(payload.id, payload.data),
         onSuccess: (data) => {
             toast.success(`Storage Backend "${data.name}" updated successfully.`);
@@ -182,26 +191,49 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
         },
     });
 
-    // onSubmit now receives data AFTER Zod transform (config is dict | null)
     const onSubmit = (values: StorageBackendFormData) => {
-        const apiPayload = {
-            ...values,
+        console.log("Form submitted with values:", values);
+        let parsedConfig: Record<string, any> = {};
+        try {
+            const jsonString = values.config_string;
+            if (jsonString === null || jsonString === undefined || jsonString.trim() === '') {
+                parsedConfig = {};
+            } else {
+                const parsed = json5.parse(jsonString);
+                if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+                    parsedConfig = parsed;
+                } else {
+                    throw new Error("Parsed JSON config is not a valid object.");
+                }
+            }
+            console.log("Parsed config string:", parsedConfig);
+        } catch (e) {
+            const errorMsg = `Invalid JSON in configuration: ${e instanceof Error ? e.message : String(e)}`;
+            toast.error(errorMsg);
+            form.setError("config_string", { type: "manual", message: errorMsg });
+            console.error("Error parsing config_string in onSubmit:", e);
+            return;
+        }
+
+        const apiPayload: Partial<StorageBackendApiPayload> = {
+            name: values.name,
             description: values.description?.trim() || null,
-            // 'config' is already a dictionary or null from the Zod transform
+            backend_type: values.backend_type,
+            is_enabled: values.is_enabled,
+            ...parsedConfig
         };
-        console.log("Submitting Storage Backend Values (API Payload):", apiPayload);
+
+        console.log("Submitting Flattened API Payload:", apiPayload);
 
         if (isEditMode && backend) {
-            const updatePayload: StorageBackendConfigUpdatePayload = apiPayload;
-            updateMutation.mutate({ id: backend.id, data: updatePayload });
+            updateMutation.mutate({ id: backend.id, data: apiPayload as Partial<StorageBackendApiPayload> });
         } else {
-             const createPayload: StorageBackendConfigCreatePayload = apiPayload;
-            createMutation.mutate(createPayload);
+             createMutation.mutate(apiPayload as StorageBackendApiPayload);
         }
     };
 
     const handleCopyExample = () => {
-        const exampleJson = json5.stringify(configExamples[watchedBackendType] || {}, null, 2);
+        const exampleJson = json5.stringify(configJsonExamples[watchedBackendType] || {}, null, 2);
         navigator.clipboard.writeText(exampleJson).then(() => {
             setShowCopied(true);
             if (copiedTimeout) clearTimeout(copiedTimeout);
@@ -225,43 +257,41 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[650px]">
-                <DialogHeader>
-                    <DialogTitle>{isEditMode ? 'Edit Storage Backend' : 'Add Storage Backend'}</DialogTitle>
-                    <DialogDescription>
-                        {isEditMode ? `Modify the configuration for "${backend?.name}".` : 'Configure a new storage destination.'}
-                    </DialogDescription>
-                </DialogHeader>
+                 <DialogHeader>
+                     <DialogTitle>{isEditMode ? 'Edit Storage Backend' : 'Add Storage Backend'}</DialogTitle>
+                     <DialogDescription>
+                         {isEditMode ? `Modify the configuration for "${backend?.name}".` : 'Configure a new storage destination.'}
+                     </DialogDescription>
+                 </DialogHeader>
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
+                 <Form {...form}>
+                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
 
+                         <FormField
+                             control={form.control}
+                             name="name"
+                             render={({ field }) => (
+                                 <FormItem>
+                                     <FormLabel>Name*</FormLabel>
+                                     <FormControl>
+                                         <Input placeholder="e.g., Main Archive Filesystem" {...field} />
+                                     </FormControl>
+                                     <FormMessage />
+                                 </FormItem>
+                             )}
+                         />
 
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Name*</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="e.g., Main Archive Filesystem" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-
-                        <FormField
-                            control={form.control}
-                            name="backend_type"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Backend Type*</FormLabel>
+                         <FormField
+                             control={form.control}
+                             name="backend_type"
+                             render={({ field }) => (
+                                 <FormItem>
+                                     <FormLabel>Backend Type*</FormLabel>
                                      <Select
                                          onValueChange={field.onChange}
                                          value={field.value}
                                          disabled={isEditMode}
-                                    >
+                                     >
                                          <FormControl>
                                              <SelectTrigger>
                                                  <SelectValue placeholder="Select backend type" />
@@ -278,123 +308,118 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                                      <FormDescription>
                                          Select the type of storage destination. Cannot be changed after creation.
                                      </FormDescription>
-                                    <FormMessage />
-                                </FormItem>
+                                     <FormMessage />
+                                 </FormItem>
                              )}
-                        />
-
-
-                        <FormField
-                            control={form.control}
-                            name="description"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Description</FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            placeholder="Optional description of this backend"
-                                            {...field}
-                                            value={field.value ?? ''}
-                                            rows={2}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
+                         />
 
                          <FormField
-                            control={form.control}
-                            name="config"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Backend Configuration (JSON)*</FormLabel>
-                                    <FormDescription>
-                                        Enter backend-specific settings as a JSON object.
-                                        <span className="block mt-1 text-xs text-muted-foreground italic">
-                                            {configTooltips[watchedBackendType] || "Select a backend type to see required fields."}
-                                        </span>
-                                    </FormDescription>
-                                    <div className="relative">
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder={`{\n  // Example:\n  "key": "value"\n}`}
-                                                className="font-mono text-xs min-h-[100px] resize-y"
-                                                spellCheck="false"
-                                                {...field}
-                                                value={field.value ?? ''} // Use field value (string or null)
-                                                rows={5}
-                                            />
-                                        </FormControl>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="absolute top-1 right-1 h-6 px-2 text-xs"
-                                            onClick={handleCopyExample}
-                                            title={`Copy default JSON for ${watchedBackendType}`}
-                                        >
-                                            <ClipboardCopyIcon className="h-3 w-3 mr-1" />
-                                            {showCopied ? 'Copied!' : 'Copy Example'}
-                                        </Button>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-
-                        {watchedBackendType === 'filesystem' && (
-                            <Alert variant="default" className="bg-amber-50 border-amber-300 dark:bg-amber-900/30 dark:border-amber-700">
-                                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                <AlertTitle className="text-amber-700 dark:text-amber-300 text-sm">Container Path Required</AlertTitle>
-                                <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs">
-                                    The 'path' specified in the JSON config must be the **absolute path inside the container** where the storage volume is mounted (e.g., `/dicom_data/processed/...`). This is likely different from the path on your host machine. Ensure the volume mapping is correctly set up in your `docker-compose.yml` or container runtime.
-                                </AlertDescription>
-                            </Alert>
-                        )}
-
-
-
-                        <FormField
-                            control={form.control}
-                            name="is_enabled"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                             control={form.control}
+                             name="description"
+                             render={({ field }) => (
+                                 <FormItem>
+                                     <FormLabel>Description</FormLabel>
                                      <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                            id="is_enabled_storage"
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                         <FormLabel htmlFor="is_enabled_storage">
-                                            Enable Backend
-                                         </FormLabel>
-                                         <FormDescription>
-                                             If checked, this backend can be used in rule destinations.
-                                         </FormDescription>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                         <Textarea
+                                             placeholder="Optional description of this backend"
+                                             {...field}
+                                             value={field.value ?? ''}
+                                             rows={2}
+                                         />
+                                     </FormControl>
+                                     <FormMessage />
+                                 </FormItem>
+                             )}
+                         />
 
-                        <DialogFooter className="pt-4">
-                            <DialogClose asChild>
-                                 <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                            </DialogClose>
-                             <Button type="submit" disabled={isLoading}>
-                                 {isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Backend')}
-                             </Button>
-                        </DialogFooter>
-                    </form>
-                </Form>
-            </DialogContent>
-        </Dialog>
-    );
-};
+                          <FormField
+                             control={form.control}
+                             name="config_string"
+                             render={({ field }) => (
+                                 <FormItem>
+                                     <FormLabel>Backend Configuration (JSON)*</FormLabel>
+                                     <FormDescription>
+                                         Enter backend-specific settings as a JSON object.
+                                         <span className="block mt-1 text-xs text-muted-foreground italic">
+                                             {configJsonTooltips[watchedBackendType] || "Select a backend type..."}
+                                         </span>
+                                     </FormDescription>
+                                     <div className="relative">
+                                         <FormControl>
+                                             <Textarea
+                                                 placeholder={`{\n  // Example keys for ${watchedBackendType}...\n}`}
+                                                 className="font-mono text-xs min-h-[150px] resize-y"
+                                                 spellCheck="false"
+                                                 {...field}
+                                                 value={field.value ?? ''}
+                                                 rows={8}
+                                             />
+                                         </FormControl>
+                                         <Button
+                                             type="button"
+                                             variant="ghost"
+                                             size="sm"
+                                             className="absolute top-1 right-1 h-6 px-2 text-xs"
+                                             onClick={handleCopyExample}
+                                             title={`Copy default JSON for ${watchedBackendType}`}
+                                         >
+                                             <ClipboardCopyIcon className="h-3 w-3 mr-1" />
+                                             {showCopied ? 'Copied!' : 'Copy Example'}
+                                         </Button>
+                                     </div>
+                                     <FormMessage />
+                                 </FormItem>
+                             )}
+                         />
 
-export default StorageBackendFormModal;
+                         {watchedBackendType === 'filesystem' && (
+                             <Alert variant="default" className="bg-amber-50 border-amber-300 dark:bg-amber-900/30 dark:border-amber-700">
+                                 <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                 <AlertTitle className="text-amber-700 dark:text-amber-300 text-sm">Container Path Required</AlertTitle>
+                                 <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs">
+                                     The 'path' in the JSON must be the absolute path *inside the container* (e.g., `/dicom_data/processed/...`). Ensure volume mapping is correct.
+                                 </AlertDescription>
+                             </Alert>
+                         )}
+
+                         <FormField
+                             control={form.control}
+                             name="is_enabled"
+                             render={({ field }) => (
+                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+                                      <FormControl>
+                                         <Checkbox
+                                             checked={field.value}
+                                             onCheckedChange={field.onChange}
+                                             id={`is_enabled_${backend?.id || 'new'}`}
+                                         />
+                                     </FormControl>
+                                     <div className="space-y-1 leading-none">
+                                          <FormLabel htmlFor={`is_enabled_${backend?.id || 'new'}`}>
+                                             Enable Backend
+                                          </FormLabel>
+                                          <FormDescription>
+                                              If checked, this backend can be used in rule destinations.
+                                          </FormDescription>
+                                     </div>
+                                     <FormMessage />
+                                 </FormItem>
+                             )}
+                         />
+
+                         <DialogFooter className="pt-4">
+                             <DialogClose asChild>
+                                  <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                             </DialogClose>
+                              <Button type="submit" disabled={isLoading}>
+                                  {isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Backend')}
+                              </Button>
+                         </DialogFooter>
+                     </form>
+                 </Form>
+             </DialogContent>
+         </Dialog>
+     );
+ };
+
+ export default StorageBackendFormModal;

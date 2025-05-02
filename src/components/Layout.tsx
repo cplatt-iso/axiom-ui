@@ -8,6 +8,7 @@ import {
     Bars3Icon, XMarkIcon, Cog6ToothIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
     TableCellsIcon, // For Data Browser
     ArchiveBoxIcon, // For Inventory Tool
+    ExclamationTriangleIcon,
     // --- ADDED Icons for Reorganization ---
     AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
     WrenchScrewdriverIcon // For System Config
@@ -38,6 +39,7 @@ const Layout: React.FC = () => {
         { name: 'Rulesets', href: '/rulesets', icon: CircleStackIcon },
         { name: 'Data Browser', href: '/data-browser', icon: TableCellsIcon },
         { name: 'Inventory Tool', href: '/inventory-tool', icon: ArchiveBoxIcon },
+        { name: 'Exceptions', href: '/exceptions', icon: ExclamationTriangleIcon },
     ];
 
     // --- UPDATED Admin Navigation ---

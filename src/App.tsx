@@ -34,6 +34,7 @@ import JsonApiInfoPage from './pages/JsonApiInfoPage';
 import SchedulesConfigPage from './pages/SchedulesConfigPage';
 import DataBrowserPage from './pages/DataBrowserPage';
 import InventoryToolPage from './pages/InventoryToolPage';
+import ExceptionsPage from './pages/ExceptionsPage';
 
 // --- ADDED: Import New System Config Page ---
 import SystemConfigurationPage from './pages/SystemConfigurationPage'; // Placeholder page
@@ -67,6 +68,7 @@ function AppContent() {
                     <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
                     <Route path="/data-browser" element={<DataBrowserPage />} />
                     <Route path="/inventory-tool" element={<InventoryToolPage />} />
+                    <Route path="/exceptions" element={<ExceptionsPage />} />
                     <Route path="/api-keys" element={<ApiKeysPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
 
