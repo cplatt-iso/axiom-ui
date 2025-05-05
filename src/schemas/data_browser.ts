@@ -1,57 +1,74 @@
-// src/schemas/data_browser.ts
+// frontend/src/schemas/data_browser.ts
+import { z } from 'zod'; // Use Zod
 
-// Define allowed query parameters explicitly
-export type AllowedQueryParam =
-    | "PatientName"
-    | "PatientID"
-    | "AccessionNumber"
-    | "StudyDate"
-    | "StudyTime"
-    | "ModalitiesInStudy"
-    | "ReferringPhysicianName"
-    | "StudyDescription"
-    | "PatientBirthDate";
-    // Add other relevant C-FIND/QIDO keys as needed
+// Define QueryLevel enum using Zod if preferred, or keep TS enum
+export enum QueryLevel {
+    STUDY = "STUDY",
+    SERIES = "SERIES",
+    INSTANCE = "INSTANCE"
+}
+
+// --- CORRECTED Zod Enum ---
+// Ensure this matches the backend Literal exactly, including hyphens
+export const AllowedQuerySourceType = z.enum([
+    "dicomweb",
+    "dimse-qr", // Use hyphen
+    "google_healthcare"
+]);
+export type AllowedQuerySourceType = z.infer<typeof AllowedQuerySourceType>;
+// --- END CORRECTION ---
+
+// Define allowed query keys/tags if needed for validation or UI hints
+export const AllowedQueryParamKeys = z.enum([
+    "PatientName", "PatientID", "AccessionNumber", "StudyDate", "StudyTime",
+    "ModalitiesInStudy", "ReferringPhysicianName", "StudyDescription", "PatientBirthDate",
+    // Add specific tags if useful
+    "00100010", "00100020", "00080050", "00080020", "00080030",
+    "00080061", "00080090", "00081030", "00100030",
+]);
+export type AllowedQueryParamKeys = z.infer<typeof AllowedQueryParamKeys>;
+
 
 export interface DataBrowserQueryParam {
-    field: AllowedQueryParam;
-    value: string; // Keep as string, validation/formatting happens on backend/UI input
+    field: AllowedQueryParamKeys | string;
+    value: string;
 }
 
+// Request uses the Zod enum now for validation within the page component
 export interface DataBrowserQueryRequest {
     source_id: number;
+    source_type: AllowedQuerySourceType; // Use Zod enum type
     query_parameters: DataBrowserQueryParam[];
-    // Optional pagination if added later
-    // limit?: number;
-    // offset?: number;
+    query_level?: QueryLevel;
 }
 
-// --- Query Response Schema ---
-
+// Result items can also use the literal type for consistency
 export interface StudyResultItem {
     PatientName?: string | null;
     PatientID?: string | null;
     StudyInstanceUID: string;
-    StudyDate?: string | null; // YYYYMMDD
-    StudyTime?: string | null; // HHMMSS
+    StudyDate?: string | null;
+    StudyTime?: string | null;
     AccessionNumber?: string | null;
     ModalitiesInStudy?: string[] | null;
     ReferringPhysicianName?: string | null;
-    PatientBirthDate?: string | null; // YYYYMMDD
+    PatientBirthDate?: string | null;
     StudyDescription?: string | null;
     NumberOfStudyRelatedSeries?: number | null;
     NumberOfStudyRelatedInstances?: number | null;
-    // Source info added by the backend service
     source_id: number;
     source_name: string;
-    source_type: string; // 'dicomweb' or 'dimse-qr'
+    // Use the Zod enum type here too + Error types
+    source_type: AllowedQuerySourceType | 'Unknown' | 'Error';
+    [key: string]: any;
 }
 
+// Response uses the literal type
 export interface DataBrowserQueryResponse {
     query_status: "success" | "error" | "partial";
     message?: string | null;
     source_id: number;
     source_name: string;
-    source_type: string;
+    source_type: AllowedQuerySourceType | 'Unknown' | 'Error'; // Use Zod enum type
     results: StudyResultItem[];
 }

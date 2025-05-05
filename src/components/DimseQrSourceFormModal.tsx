@@ -1,12 +1,12 @@
 // src/components/DimseQrSourceFormModal.tsx
+
 import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form'; // Keep Controller
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import json5 from 'json5'; // Keep json5
+import json5 from 'json5';
 
-// UI Components
 import { Button } from '@/components/ui/button';
 import {
     Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
@@ -15,26 +15,24 @@ import {
     Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch'; // Keep Switch (used for is_enabled)
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// API/Schema Types
 import {
     DimseQueryRetrieveSourceRead,
     DimseQueryRetrieveSourceCreatePayload,
     DimseQueryRetrieveSourceUpdatePayload
-} from '@/schemas'; // Ensure this path is correct
+} from '@/schemas';
 import {
-    dimseQrSourceFormSchema, // Use the simplified schema
-    DimseQrSourceFormData,   // Type derived from simplified schema
-} from '@/schemas/dimseQrSourceSchema'; // Ensure this path is correct
+    dimseQrSourceFormSchema,
+    DimseQrSourceFormData,
+} from '@/schemas/dimseQrSourceSchema';
 
-// API Functions
 import {
     createDimseQrSource,
     updateDimseQrSource,
-} from '@/services/api'; // Ensure this path is correct
+} from '@/services/api';
 
 interface DimseQrSourceFormModalProps {
     isOpen: boolean;
@@ -42,7 +40,6 @@ interface DimseQrSourceFormModalProps {
     source: DimseQueryRetrieveSourceRead | null;
 }
 
-// Initial Defaults for CREATE mode - based on simplified schema
 const initialFormDefaults: DimseQrSourceFormData = {
     name: '',
     description: null,
@@ -54,8 +51,12 @@ const initialFormDefaults: DimseQrSourceFormData = {
     is_enabled: true,
     is_active: true,
     query_level: 'STUDY',
-    query_filters: '', // Start with empty string for textarea
+    query_filters: '',
     move_destination_ae_title: null,
+    tls_enabled: false,
+    tls_ca_cert_secret_name: null,
+    tls_client_cert_secret_name: null,
+    tls_client_key_secret_name: null,
 };
 
 
@@ -64,19 +65,17 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
     const isEditMode = !!source;
 
     const form = useForm<DimseQrSourceFormData>({
-        resolver: zodResolver(dimseQrSourceFormSchema), // Use simplified schema
+        resolver: zodResolver(dimseQrSourceFormSchema),
         defaultValues: initialFormDefaults
     });
 
-    // Effect to reset form when modal opens or source changes
+    const tlsEnabled = form.watch('tls_enabled');
+
     useEffect(() => {
         if (isOpen) {
             let resetValues: Partial<DimseQrSourceFormData>;
 
             if (isEditMode && source) {
-                // EDIT MODE: Build values from the source prop
-                // Optional: Keep log for debugging resets if needed
-                // console.log("useEffect [DimseQr]: EDIT mode, resetting from source:", source);
                 resetValues = {
                     name: source.name ?? '',
                     description: source.description ?? null,
@@ -90,23 +89,21 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                     query_level: source.query_level ?? 'STUDY',
                     query_filters: source.query_filters ? json5.stringify(source.query_filters, null, 2) : '',
                     move_destination_ae_title: source.move_destination_ae_title ?? null,
+                    tls_enabled: source.tls_enabled ?? false,
+                    tls_ca_cert_secret_name: source.tls_ca_cert_secret_name ?? null,
+                    tls_client_cert_secret_name: source.tls_client_cert_secret_name ?? null,
+                    tls_client_key_secret_name: source.tls_client_key_secret_name ?? null,
                 };
             } else {
-                // CREATE MODE: Use the predefined defaults
-                // Optional: Keep log for debugging resets if needed
-                // console.log("useEffect [DimseQr]: CREATE mode, resetting to initial defaults.");
                 resetValues = {
                     ...initialFormDefaults,
                     query_filters: ''
                 };
             }
-            // Optional: Keep log for debugging resets if needed
-            // console.log("useEffect [DimseQr]: Calling form.reset() with:", resetValues);
             form.reset(resetValues);
         }
     }, [isOpen, source, isEditMode, form]);
 
-    // --- Mutations (Keep as is) ---
     const createMutation = useMutation({
         mutationFn: createDimseQrSource,
         onSuccess: (data) => {
@@ -117,7 +114,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
         onError: (error: any) => {
             const errorMsg = error?.detail?.[0]?.msg || error?.detail || error.message || "Failed to create source.";
             toast.error(`Creation failed: ${errorMsg}`);
-            console.error("Create DIMSE Q/R Source error:", error); // Keep error log
+            console.error("Create DIMSE Q/R Source error:", error);
         },
     });
 
@@ -133,16 +130,11 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
         onError: (error: any, variables) => {
             const errorMsg = error?.detail?.[0]?.msg || error?.detail || error.message || "Failed to update source.";
             toast.error(`Update failed for ID ${variables.id}: ${errorMsg}`);
-            console.error(`Update DIMSE Q/R Source error for ID ${variables.id}:`, error); // Keep error log
+            console.error(`Update DIMSE Q/R Source error for ID ${variables.id}:`, error);
         },
     });
-    // --- End Mutations ---
 
-    // --- Form Submit Handler (with parsing fix) ---
     const onSubmit = (values: DimseQrSourceFormData) => {
-        // Removed debug logs for received values and payloads
-        // console.log(">>> DimseQrSourceFormModal - onSubmit received values:", JSON.stringify(values, null, 2));
-
         let parsedQueryFilters: Record<string, any> | null = null;
         if (typeof values.query_filters === 'string' && values.query_filters.trim()) {
              try {
@@ -151,7 +143,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                       throw new Error("Parsed value is not a valid object.");
                  }
              } catch(e) {
-                 console.error("Error parsing query_filters in onSubmit:", e); // Keep error log
+                 console.error("Error parsing query_filters in onSubmit:", e);
                  form.setError('query_filters', {type: 'manual', message: `Invalid JSON format: ${e instanceof Error ? e.message : String(e)}`});
                  toast.error("Please fix the invalid JSON in Query Filters.");
                  return;
@@ -160,7 +152,6 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
              parsedQueryFilters = null;
         }
 
-        // Construct the payload
         const apiPayload = {
             name: values.name,
             description: values.description?.trim() || null,
@@ -174,44 +165,33 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
             query_level: values.query_level,
             query_filters: parsedQueryFilters,
             move_destination_ae_title: values.move_destination_ae_title?.trim() || null,
+            tls_enabled: values.tls_enabled,
+            tls_ca_cert_secret_name: values.tls_enabled ? (values.tls_ca_cert_secret_name?.trim() || null) : null,
+            tls_client_cert_secret_name: values.tls_enabled ? (values.tls_client_cert_secret_name?.trim() || null) : null,
+            tls_client_key_secret_name: values.tls_enabled ? (values.tls_client_key_secret_name?.trim() || null) : null,
         };
 
-        // Removed debug logs for payloads
-        // console.log(">>> DimseQrSourceFormModal - Submitting API Payload:", JSON.stringify(apiPayload, null, 2));
-
         if (isEditMode && source) {
-            const updatePayload: DimseQueryRetrieveSourceUpdatePayload = apiPayload;
-            // console.log(">>> DimseQrSourceFormModal - Typed Update Payload:", JSON.stringify(updatePayload, null, 2));
-            updateMutation.mutate({ id: source.id, data: updatePayload });
+            updateMutation.mutate({ id: source.id, data: apiPayload as DimseQueryRetrieveSourceUpdatePayload });
         } else {
-            const createPayload: DimseQueryRetrieveSourceCreatePayload = apiPayload;
-            // console.log(">>> DimseQrSourceFormModal - Typed Create Payload:", JSON.stringify(createPayload, null, 2));
-            createMutation.mutate(createPayload);
+            createMutation.mutate(apiPayload as DimseQueryRetrieveSourceCreatePayload);
         }
     };
-    // --- End Submit Handler ---
 
     const isLoading = createMutation.isPending || updateMutation.isPending;
 
-    // --- Render ---
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            {/* Explicit closing tag */}
             <DialogContent className="sm:max-w-[600px]">
-                {/* Explicit closing tag */}
                 <DialogHeader>
-                    {/* Explicit closing tag */}
                     <DialogTitle>{isEditMode ? 'Edit DIMSE Q/R Source' : 'Add DIMSE Q/R Source'}</DialogTitle>
                     <DialogDescription>
                         {isEditMode ? `Modify the configuration for "${source?.name}".` : 'Configure a new remote DIMSE peer for Query/Retrieve.'}
                     </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    {/* Explicit closing tag */}
-                    {/* Explicit closing tag */}
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto px-1 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
 
-                        {/* --- Fields with explicit closing tags --- */}
                         <FormField
                             control={form.control}
                             name="name"
@@ -241,7 +221,6 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                         />
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {/* Explicit closing tag */}
                             <FormField
                                 control={form.control}
                                 name="remote_host"
@@ -262,7 +241,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                     <FormItem>
                                         <FormLabel>Remote Port*</FormLabel>
                                         <FormControl>
-                                             <Input type="number" min="1" max="65535" step="1" {...field}></Input>
+                                             <Input type="number" min="1" max="65535" step="1" {...field} value={field.value ?? ''} onChange={event => field.onChange(event.target.value === '' ? null : +event.target.value)}></Input>
                                         </FormControl>
                                         <FormMessage></FormMessage>
                                     </FormItem>
@@ -298,7 +277,6 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                             value={field.value ?? ''}
                                             rows={2}
                                         ></Textarea>
-                                        {/* Explicit closing tag */}
                                     </FormControl>
                                     <FormMessage></FormMessage>
                                 </FormItem>
@@ -312,7 +290,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                 <FormItem>
                                     <FormLabel>Polling Interval (seconds)*</FormLabel>
                                     <FormControl>
-                                        <Input type="number" min="1" step="1" {...field}></Input>
+                                        <Input type="number" min="1" step="1" {...field} value={field.value ?? ''} onChange={event => field.onChange(event.target.value === '' ? null : +event.target.value)}></Input>
                                     </FormControl>
                                     <FormMessage></FormMessage>
                                 </FormItem>
@@ -326,21 +304,16 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                 <FormItem>
                                     <FormLabel>Query Level</FormLabel>
                                      <Select onValueChange={field.onChange} value={field.value}>
-                                         {/* Explicit closing tag */}
                                          <FormControl>
                                              <SelectTrigger>
-                                                 {/* Explicit closing tag */}
                                                  <SelectValue placeholder="Select C-FIND query level" />
                                              </SelectTrigger>
-                                             {/* Explicit closing tag */}
                                          </FormControl>
                                          <SelectContent>
-                                             {/* Explicit closing tag */}
                                              <SelectItem value="STUDY">STUDY</SelectItem>
                                              <SelectItem value="SERIES">SERIES</SelectItem>
                                              <SelectItem value="PATIENT">PATIENT</SelectItem>
                                          </SelectContent>
-                                         {/* Explicit closing tag */}
                                      </Select>
                                     <FormMessage></FormMessage>
                                 </FormItem>
@@ -360,13 +333,10 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                                         <Textarea
                                             placeholder={`{\n  // Example:\n  "StudyDate": "-30d",\n  "PatientName": "DOE^JOHN*"\n}`}
                                             {...field}
-                                            value={(typeof field.value === 'object' && field.value !== null)
-                                                      ? json5.stringify(field.value, null, 2)
-                                                      : (field.value ?? '')}
+                                            value={field.value ?? ''}
                                             rows={4}
                                             className="font-mono text-xs"
                                         ></Textarea>
-                                        {/* Explicit closing tag */}
                                     </FormControl>
                                     <FormMessage></FormMessage>
                                 </FormItem>
@@ -388,93 +358,139 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
                             )}
                         />
 
-                        {/* --- is_enabled Controller --- */}
-                        <Controller
-                            name="is_enabled"
+                        <div className="space-y-4 rounded-md border p-4 shadow-sm">
+                            <FormField
+                                control={form.control}
+                                name="tls_enabled"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                                        <FormControl>
+                                            <Switch
+                                                id="tls_enabled_qr"
+                                                checked={!!field.value}
+                                                onCheckedChange={field.onChange}
+                                                ref={field.ref}
+                                            />
+                                        </FormControl>
+                                        <div className="space-y-1 leading-none">
+                                            <FormLabel htmlFor="tls_enabled_qr">Enable TLS</FormLabel>
+                                            <FormDescription>Use secure TLS for outgoing connections.</FormDescription>
+                                        </div>
+                                        <FormMessage></FormMessage>
+                                    </FormItem>
+                                )}
+                            />
+
+                            {tlsEnabled && (
+                                <div className="space-y-4 pl-8 pt-2 border-l ml-2">
+                                    <FormField
+                                        control={form.control}
+                                        name="tls_ca_cert_secret_name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>CA Certificate Secret Name*</FormLabel>
+                                                <FormDescription>GCP Secret resource name for CA to verify remote server.</FormDescription>
+                                                <FormControl>
+                                                    <Input placeholder="projects/.../secrets/remote-ca/versions/latest" {...field} value={field.value ?? ''}></Input>
+                                                </FormControl>
+                                                <FormMessage></FormMessage>
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="tls_client_cert_secret_name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client Certificate Secret Name</FormLabel>
+                                                <FormDescription>Optional (for mTLS): GCP Secret resource name for *our* client certificate.</FormDescription>
+                                                <FormControl>
+                                                    <Input placeholder="projects/.../secrets/axiom-client-cert/versions/latest" {...field} value={field.value ?? ''}></Input>
+                                                </FormControl>
+                                                <FormMessage></FormMessage>
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={form.control}
+                                        name="tls_client_key_secret_name"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Client Private Key Secret Name</FormLabel>
+                                                <FormDescription>Optional (for mTLS): GCP Secret resource name for *our* client private key.</FormDescription>
+                                                <FormControl>
+                                                    <Input placeholder="projects/.../secrets/axiom-client-key/versions/latest" {...field} value={field.value ?? ''}></Input>
+                                                </FormControl>
+                                                <FormMessage></FormMessage>
+                                            </FormItem>
+                                        )}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                         <FormField
                             control={form.control}
-                            render={({ field: { onChange, value, ref }, fieldState: { error } }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                                    {/* Explicit closing tag */}
+                            name="is_enabled"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                                     <FormControl>
-                                        {/* Explicit closing tag */}
                                         <Switch
-                                            checked={!!value}
-                                            onCheckedChange={onChange}
-                                            ref={ref}
-                                            id="is_enabled_qr"
+                                            id="is_enabled_qr_main"
+                                            checked={!!field.value}
+                                            onCheckedChange={field.onChange}
+                                            ref={field.ref}
                                         />
-                                        {/* Explicit closing tag - Switch is self-closing */}
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
-                                        {/* Explicit closing tag */}
-                                         <FormLabel htmlFor="is_enabled_qr">Source Enabled</FormLabel>
+                                         <FormLabel htmlFor="is_enabled_qr_main">Source Enabled</FormLabel>
                                          <FormDescription>Allow use in Data Browser and rules.</FormDescription>
                                     </div>
-                                    {error && <FormMessage>{error.message}</FormMessage>}
-                                    {/* Explicit closing tag */}
+                                    <FormMessage></FormMessage>
                                 </FormItem>
                             )}
                         />
-                        {/* --- End is_enabled Controller --- */}
 
-                        {/* --- is_active Controller (still using checkbox as it worked) --- */}
-                        <Controller
-                            name="is_active"
+                        <FormField
                             control={form.control}
-                            render={({ field: { onChange, onBlur, value, name, ref }, fieldState: { error } }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
-                                    {/* Explicit closing tag */}
+                            name="is_active"
+                            render={({ field }) => (
+                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
                                     <FormControl>
-                                        {/* Explicit closing tag */}
-                                        <input
-                                            type="checkbox"
-                                            onChange={onChange}
-                                            onBlur={onBlur}
-                                            checked={!!value}
-                                            name={name}
-                                            ref={ref}
-                                            id="is_active_qr_checkbox"
+                                        <Switch
+                                            id="is_active_qr_polling"
+                                            checked={!!field.value}
+                                            onCheckedChange={field.onChange}
+                                            ref={field.ref}
                                             disabled={!form.watch('is_enabled')}
-                                            className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:focus:ring-offset-gray-800"
                                         />
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
-                                        {/* Explicit closing tag */}
-                                        <FormLabel htmlFor="is_active_qr_checkbox">
-                                            Automatic Polling Active (HTML CB)
+                                        <FormLabel htmlFor="is_active_qr_polling">
+                                            Automatic Polling Active
                                         </FormLabel>
                                         <FormDescription>
-                                            If checked (and Enabled), poll automatically.
+                                            If checked (and Source Enabled), poll automatically on schedule.
                                         </FormDescription>
                                     </div>
-                                    {error && <FormMessage>{error.message}</FormMessage>}
-                                    {/* Explicit closing tag */}
+                                    <FormMessage></FormMessage>
                                 </FormItem>
                             )}
                         />
-                        {/* --- End is_active Controller --- */}
+
 
                         <DialogFooter className="pt-4">
-                            {/* Explicit closing tag */}
                             <DialogClose asChild={true}>
-                                {/* Explicit closing tag */}
                                  <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                                 {/* Explicit closing tag */}
                             </DialogClose>
                              <Button type="submit" disabled={isLoading}>
                                  {isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Q/R Source')}
                              </Button>
-                             {/* Explicit closing tag */}
                         </DialogFooter>
-                        {/* Explicit closing tag */}
                     </form>
-                    {/* Explicit closing tag */}
                 </Form>
-                 {/* Explicit closing tag */}
             </DialogContent>
-             {/* Explicit closing tag */}
         </Dialog>
-         /* Explicit closing tag */
     );
 };
 

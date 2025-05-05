@@ -43,6 +43,7 @@ import SysProcessingSettings from './components/system-config/SysProcessingSetti
 import SysLimitsSettings from './components/system-config/SysLimitsSettings';
 import SysExternalServices from './components/system-config/SysExternalServices';
 import SysAdminActions from './components/system-config/SysAdminActions';
+import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesConfigPage';
 // --- END ADDED ---
 
 function AppContent() {
@@ -86,6 +87,7 @@ function AppContent() {
                                 <Route index element={<Navigate to="dicomweb" replace />} />
                                 <Route path="dicomweb" element={<DicomWebSourcesConfigPage />} />
                                 <Route path="dimse-qr" element={<DimseQrSourcesConfigPage />} />
+				<Route path="google-healthcare" element={<GoogleHealthcareSourcesConfigPage />} />
                             </Route>
 
                             {/* Listeners Sub-Section */}

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const scraperSubNavLinks = [
     { name: "DICOMweb", href: "/admin/routing-config/scrapers/dicomweb" },
     { name: "DIMSE Q/R", href: "/admin/routing-config/scrapers/dimse-qr" },
+    { name: "Google Healthcare", href: "/admin/routing-config/scrapers/google-healthcare" },
     // Add more scraper types here later (e.g., GCS)
 ];
 
