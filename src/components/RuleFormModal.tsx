@@ -53,6 +53,7 @@ import RuleFormAssociationCriteria from './rule-form/RuleFormAssociationCriteria
 import RuleFormTagModifications from './rule-form/RuleFormTagModifications';
 import RuleFormDestinations from './rule-form/RuleFormDestinations';
 import RuleFormSchedule from './rule-form/RuleFormSchedule';
+import RuleFormAiStandardization from './rule-form/RuleFormAiStandardization';
 
 import { isValueRequired, isValueList, isIpOperator } from '@/utils/ruleHelpers';
 
@@ -131,6 +132,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const [selectedDestinationIds, setSelectedDestinationIds] = useState<Set<number>>(new Set());
     const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [aiStandardizationTags, setAiStandardizationTags] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
@@ -190,6 +192,8 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setDescription(existingRule.description ?? '');
                     setPriority(existingRule.priority ?? 100);
                     setIsActive(existingRule.is_active ?? true);
+		    setAiStandardizationTags(existingRule.ai_standardization_tags || []);
+
                     setSelectedScheduleId(existingRule.schedule_id ?? null);
 
                     if (combinedSources.length > 0) {
@@ -233,6 +237,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setMatchCriteria([]); setAssociationCriteria([]); setTagModifications([]);
                     setSelectedSources([]);
                     setSelectedDestinationIds(new Set());
+		    setAiStandardizationTags([]);
                     setSelectedScheduleId(null);
                     processedRuleIdRef.current = 'create';
                 }
@@ -284,6 +289,11 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const handleDescriptionChange = useCallback((value: string) => { setDescription(value) }, []);
     const handlePriorityChange = useCallback((value: number) => { setPriority(value) }, []);
     const handleIsActiveChange = useCallback((value: boolean) => { setIsActive(value) }, []);
+
+    const handleAiStandardizationTagsChange = useCallback((tags: string[]) => {
+        setAiStandardizationTags(tags);
+        setValidationErrors(prev => ({ ...prev, ai_standardization_tags: undefined }));
+    }, []);
 
     const handleSourceSelectionChange = useCallback((selectedItems: SourceInfo[]) => {
         setSelectedSources(selectedItems);
@@ -570,6 +580,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             tag_modifications: tagModifications,
             applicable_sources: selectedSourceNames.length > 0 ? selectedSourceNames : null,
             destination_ids: Array.from(selectedDestinationIds),
+	    ai_standardization_tags: aiStandardizationTags.length > 0 ? aiStandardizationTags : null,
             schedule_id: selectedScheduleId,
         };
 
@@ -613,6 +624,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             tag_modifications: validatedData.tag_modifications,
             applicable_sources: validatedData.applicable_sources,
             destination_ids: validatedData.destination_ids,
+	    ai_standardization_tags: validatedData.ai_standardization_tags,
             schedule_id: validatedData.schedule_id,
         };
 
@@ -704,6 +716,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
                                         availableCrosswalkMaps={availableCrosswalkMaps} crosswalkMapsLoading={crosswalkMapsLoading} crosswalkMapsError={crosswalkMapsError}
                                         containerRef={panelRef}
+                                    />
+				     <RuleFormAiStandardization
+                                        tags={aiStandardizationTags}
+                                        onTagsChange={handleAiStandardizationTagsChange}
+                                        isLoading={overallIsLoading}
+                                        validationErrors={validationErrors}
                                     />
                                      <RuleFormDestinations
                                         selectedDestinationIds={selectedDestinationIds} availableDestinations={availableDestinations}

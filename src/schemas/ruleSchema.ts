@@ -1,6 +1,7 @@
 // src/schemas/ruleSchema.ts
 import { z } from 'zod';
-import json5 from 'json5'; // Use json5 for lenient parsing
+// No need for json5 here unless you're parsing JSON strings from user input directly,
+// which doesn't seem to be the case for ai_standardization_tags.
 
 // --- Enums (Mirroring Backend) ---
 export const MatchOperationSchema = z.enum([
@@ -10,7 +11,7 @@ export const MatchOperationSchema = z.enum([
 ]);
 export type MatchOperation = z.infer<typeof MatchOperationSchema>;
 
-export const ModifyActionSchema = z.enum([ // <-- Add CROSSWALK here
+export const ModifyActionSchema = z.enum([
     "set", 
     "delete", 
     "prepend", 
@@ -27,56 +28,84 @@ export const associationParameterSchema = z.enum([
 ]);
 export type AssociationParameter = z.infer<typeof associationParameterSchema>;
 
+// --- Helper for DICOM Tag Validation (Keyword or GGGG,EEEE) ---
+const dicomTagStringSchema = z.string()
+    .min(1, "Tag cannot be empty.")
+    .refine(tag => {
+        const upperTag = tag.trim().toUpperCase();
+        // Check for GGGG,EEEE format (allowing optional spaces around comma)
+        if (/^([0-9A-F]{4})\s*,\s*([0-9A-F]{4})$/.test(upperTag)) {
+            return true;
+        }
+        // Check for DICOM Keyword format (alphanumeric, starting with a letter)
+        // Pydicom keywords are typically CamelCase, but allow more general alphanumeric
+        // for flexibility, as backend validator is the ultimate source of truth.
+        if (/^[A-Z][A-Z0-9]*$/.test(upperTag)) { // More restrictive: starts with letter, then alphanumeric
+            // A simpler /^[A-Z0-9]+$/ might also work if backend is forgiving.
+            // We won't validate against a full DICOM dictionary here, too complex for frontend.
+            return true;
+        }
+        return false;
+    }, {
+        message: "Tag must be a valid DICOM keyword (e.g., PatientName) or in GGGG,EEEE format (e.g., 0010,0020)."
+    })
+    .transform(tag => { // Normalize to uppercase and consistent GGGG,EEEE format
+        const upperTag = tag.trim().toUpperCase();
+        const geMatch = upperTag.match(/^([0-9A-F]{4})\s*,\s*([0-9A-F]{4})$/);
+        if (geMatch) {
+            return `${geMatch[1]},${geMatch[2]}`; // Normalize GGGG,EEEE
+        }
+        return upperTag; // Return keyword as is (uppercase)
+    });
+
 // --- Individual Criterion/Modification Schemas for the Form ---
 
-// Base required for discriminated union
 const tagModificationBaseSchema = z.object({
     action: ModifyActionSchema,
 });
 
-// Specific Modification Schemas (define fields relevant to the form input)
 export const TagSetModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.set),
-    tag: z.string().min(1, "Target Tag is required."),
-    value: z.any().refine(val => val !== undefined && val !== null && val !== '', { message: "Value is required for 'set'." }), // Allow any type for input, specific coercion maybe later
+    tag: dicomTagStringSchema, // Use the new helper
+    value: z.any().refine(val => val !== undefined && val !== null && val !== '', { message: "Value is required for 'set'." }),
     vr: z.string().length(2, "VR must be 2 letters.").regex(/^[A-Z]{2}$/, "VR must be 2 uppercase letters.").nullable().optional(),
 });
 
 export const TagDeleteModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.delete),
-    tag: z.string().min(1, "Target Tag is required."),
+    tag: dicomTagStringSchema, // Use the new helper
 });
 
 export const TagPrependModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.prepend),
-    tag: z.string().min(1, "Target Tag is required."),
+    tag: dicomTagStringSchema, // Use the new helper
     value: z.string().min(1, "Value to prepend is required."),
 });
 
 export const TagSuffixModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.suffix),
-    tag: z.string().min(1, "Target Tag is required."),
+    tag: dicomTagStringSchema, // Use the new helper
     value: z.string().min(1, "Value to suffix is required."),
 });
 
 export const TagRegexReplaceModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.regex_replace),
-    tag: z.string().min(1, "Target Tag is required."),
+    tag: dicomTagStringSchema, // Use the new helper
     pattern: z.string().min(1, "Regex pattern is required."),
-    replacement: z.string().refine(val => val !== null && val !== undefined, { message: "Replacement string is required (can be empty string)." }), // Allow empty string
+    replacement: z.string().refine(val => val !== null && val !== undefined, { message: "Replacement string is required (can be empty string)." }),
 });
 
 export const TagCopyModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.copy),
-    source_tag: z.string().min(1, "Source Tag is required."),
-    destination_tag: z.string().min(1, "Destination Tag is required."),
+    source_tag: dicomTagStringSchema, // Use the new helper
+    destination_tag: dicomTagStringSchema, // Use the new helper
     destination_vr: z.string().length(2, "VR must be 2 letters.").regex(/^[A-Z]{2}$/, "VR must be 2 uppercase letters.").nullable().optional(),
 });
 
 export const TagMoveModificationSchema = tagModificationBaseSchema.extend({
     action: z.literal(ModifyActionSchema.enum.move),
-    source_tag: z.string().min(1, "Source Tag is required."),
-    destination_tag: z.string().min(1, "Destination Tag is required."),
+    source_tag: dicomTagStringSchema, // Use the new helper
+    destination_tag: dicomTagStringSchema, // Use the new helper
     destination_vr: z.string().length(2, "VR must be 2 letters.").regex(/^[A-Z]{2}$/, "VR must be 2 uppercase letters.").nullable().optional(),
 });
 
@@ -85,7 +114,6 @@ export const TagCrosswalkModificationSchema = tagModificationBaseSchema.extend({
     crosswalk_map_id: z.number({ required_error: "Crosswalk Map ID is required.", invalid_type_error: "Crosswalk Map ID must be a number."}).int().positive("Crosswalk Map ID must be a positive number."),
 });
 
-// --- Union of all possible modification structures ---
 export const TagModificationFormDataSchema = z.discriminatedUnion("action", [
     TagSetModificationSchema,
     TagDeleteModificationSchema,
@@ -98,30 +126,20 @@ export const TagModificationFormDataSchema = z.discriminatedUnion("action", [
 ]);
 export type TagModificationFormData = z.infer<typeof TagModificationFormDataSchema>;
 
-
-// --- Match Criteria Schemas (remain the same for now) ---
 export const matchCriterionSchema = z.object({
-    // Using refine for tag as it might need more complex logic than regex alone if keywords allowed
-    tag: z.string().min(1, "Tag is required."),
-        // .refine(tag => /* Add tag format/keyword validation logic here if needed */, "Invalid DICOM Tag format or keyword"),
+    tag: dicomTagStringSchema, // Use the new helper
     op: MatchOperationSchema,
-    value: z.any().optional(), // Allow any type, refine based on op
+    value: z.any().optional(), 
 }).refine(data => {
-    // Use the imported helper for value requirement check
     const isValueNeeded = !['exists', 'not_exists'].includes(data.op);
     return isValueNeeded ? (data.value !== undefined && data.value !== null && data.value !== '') : true;
 }, {
     message: "Value is required for this operator.",
-    path: ["value"], // Assign error to the value field
-    // Only run this refinement if the operator requires a value
-    // This logic might need adjustment depending on how RHF handles initial undefined values
-    // It might be better to handle this conditional validation in the component or main form schema
+    path: ["value"], 
 }).refine(data => {
-    // Use the imported helper for list check
     const needsList = ['in', 'not_in'].includes(data.op);
     if (!needsList) return true;
-    if (typeof data.value !== 'string') return false; // Input should be string
-    // Basic check: Allow comma-separated, non-empty values
+    if (typeof data.value !== 'string') return false; 
     return data.value.split(',').every(s => s.trim().length > 0);
 }, {
     message: "Value must be a comma-separated list for 'in'/'not_in' operators.",
@@ -129,22 +147,19 @@ export const matchCriterionSchema = z.object({
 });
 export type MatchCriterionFormData = z.infer<typeof matchCriterionSchema>;
 
-
 export const associationMatchCriterionSchema = z.object({
     parameter: associationParameterSchema,
-    op: MatchOperationSchema, // Use the same enum for now
-    value: z.any().refine(val => val !== undefined && val !== null && val !== '', { message: "Value is required for association criteria." }), // Required
+    op: MatchOperationSchema, 
+    value: z.any().refine(val => val !== undefined && val !== null && val !== '', { message: "Value is required for association criteria." }),
 }).refine(data => {
-    // Use the imported helper for list check
     const needsList = ['in', 'not_in'].includes(data.op);
     if (!needsList) return true;
-    if (typeof data.value !== 'string') return false; // Input should be string
+    if (typeof data.value !== 'string') return false; 
     return data.value.split(',').every(s => s.trim().length > 0);
 }, {
     message: "Value must be a comma-separated list for 'in'/'not_in' operators.",
     path: ["value"],
 });
-// Add refine for IP operators if needed
 export type AssociationMatchCriterionFormData = z.infer<typeof associationMatchCriterionSchema>;
 
 
@@ -154,11 +169,33 @@ export const RuleFormDataSchema = z.object({
     description: z.string().nullable().optional(),
     priority: z.number().int().default(0),
     is_active: z.boolean().default(true),
-    match_criteria: z.array(matchCriterionSchema).min(1, "At least one match criterion is required."), // Require at least one criterion
+    match_criteria: z.array(matchCriterionSchema).min(1, "At least one match criterion is required."),
     association_criteria: z.array(associationMatchCriterionSchema).nullable().optional(),
-    tag_modifications: z.array(TagModificationFormDataSchema).default([]), // Use the union schema
-    applicable_sources: z.array(z.string()).nullable().optional(),
-    destination_ids: z.array(z.number().int().positive()).min(1, "At least one destination is required."), // Require at least one destination
+    tag_modifications: z.array(TagModificationFormDataSchema).default([]), 
+    
+    // --- ADDED: AI Standardization Tags ---
+    ai_standardization_tags: z.array(dicomTagStringSchema) // Use the helper for each item
+        .nullable()
+        .optional()
+        .transform(tags => { // Ensure uniqueness
+            if (!tags) return tags; // Keep null or undefined as is
+            const uniqueTags = [...new Set(tags)];
+            // Optionally, log if duplicates were removed, though Zod transforms are silent
+            // if (uniqueTags.length !== tags.length) {
+            //     console.warn("Duplicate tags removed from ai_standardization_tags");
+            // }
+            return uniqueTags;
+        }),
+    // --- END ADDED ---
+
+    applicable_sources: z.array(z.string().min(1, "Source cannot be empty")) // Ensure non-empty strings in array
+        .nullable()
+        .optional()
+        .transform(sources => { // Ensure uniqueness for sources too
+            if (!sources) return sources;
+            return [...new Set(sources.map(s => s.trim()).filter(s => s.length > 0))];
+        }),
+    destination_ids: z.array(z.number().int().positive()).min(1, "At least one destination is required."),
     schedule_id: z.number().int().positive().nullish(),
 });
 

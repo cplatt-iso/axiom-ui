@@ -20,11 +20,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpDown, Database, Search, Server, ArrowLeft, ArrowRight, Cloud } from 'lucide-react';
-import { StudyResultItem } from '@/schemas/data_browser'; // Keep this type for the props definition
+import { StudyResultItem } from '@/schemas/data_browser';
 import { format, parse, isValid } from 'date-fns';
 
 interface DataBrowserResultsTableProps {
-    results: StudyResultItem[]; // Prop expects mapped type, but data might be raw
+    results: StudyResultItem[];
     isLoading: boolean;
 }
 
@@ -44,7 +44,11 @@ const formatDicomDateTime = (dateStr?: string | null, timeStr?: string | null): 
 };
 
 const SortableHeader = ({ column, title }: { column: any, title: string }) => (
-  <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4 h-8" >
+  <Button
+    variant="ghost"
+    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+    className="-ml-4 h-8"
+  >
     {title}
     <ArrowUpDown className="ml-2 h-4 w-4" />
   </Button>
@@ -56,7 +60,8 @@ const SourceBadge = ({ type, name }: { type: string, name: string }) => {
     if (type === 'dicomweb') { Icon = Search; variant = 'secondary'; }
     else if (type === 'dimse-qr') { Icon = Server; variant = 'outline'; }
     else if (type === 'google_healthcare') { Icon = Cloud; variant = 'default'; }
-    return <Badge variant={variant} className="w-fit"><Icon className="mr-1 h-3 w-3" />{name}</Badge>;
+    const displayName = name.length > 25 ? `${name.substring(0, 22)}...` : name;
+    return <Badge variant={variant} className="w-fit" title={name}><Icon className="mr-1 h-3 w-3" />{displayName}</Badge>;
 };
 
 
@@ -64,33 +69,30 @@ const DataBrowserResultsTable: React.FC<DataBrowserResultsTableProps> = ({ resul
     const [sorting, setSorting] = useState<SortingState>([]);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 15 });
 
-    // --- UPDATED Columns to use Tag Numbers ---
-    const columns: ColumnDef<StudyResultItem>[] = useMemo(() => [ // Keep StudyResultItem type for prop definition, but access raw tags
+    const columns: ColumnDef<StudyResultItem>[] = useMemo(() => [
         {
-            accessorKey: "source_name", // This comes pre-mapped correctly
+            accessorKey: "source_name",
             id: "source_name",
             header: "Source",
             cell: ({ row }) => <SourceBadge type={row.original.source_type} name={row.original.source_name} />,
-            size: 120,
+            size: 150,
         },
-        // Use accessorFn to get data using Tag Number strings
         { id: "PatientName", accessorFn: row => row["00100010"] ?? 'N/A', header: ({ column }) => <SortableHeader column={column} title="Patient Name" />, size: 180 },
         { id: "PatientID", accessorFn: row => row["00100020"] ?? 'N/A', header: "Patient ID", size: 130 },
         { id: "PatientBirthDate", accessorFn: row => formatDicomDateTime(row["00100030"], null), header: "Birth Date", size: 110 },
-        { id: "StudyDateTime", accessorFn: row => formatDicomDateTime(row["00080020"], row["00080030"]), header: ({ column }) => <SortableHeader column={column} title="Study Date/Time" />, size: 150 },
-        { id: "AccessionNumber", accessorFn: row => row["00080050"] ?? 'N/A', header: "Accession #", size: 120 },
-        { id: "ModalitiesInStudy", accessorFn: row => row["00080061"]?.join(', ') ?? 'N/A', header: "Mods", size: 60 }, // Assuming 00080061 returns an array
-        { id: "StudyDescription", accessorFn: row => row["00081030"] ?? 'N/A', header: "Description", size: 200 },
+        { id: "StudyDateTime", accessorFn: row => formatDicomDateTime(row["00080020"], row["00080030"]), header: ({ column }) => <SortableHeader column={column} title="Study Date/Time" />, size: 140 },
+        { id: "AccessionNumber", accessorFn: row => row["00080050"] ?? 'N/A', header: "Accession #", size: 130 },
+        { id: "InstitutionName", accessorFn: row => row["00080080"] ?? 'N/A', header: "Institution", size: 180 }, // <-- ADDED COLUMN
+        { id: "ModalitiesInStudy", accessorFn: row => row["00080061"]?.join(', ') ?? 'N/A', header: "Mods", size: 70 },
+        { id: "StudyDescription", accessorFn: row => row["00081030"] ?? 'N/A', header: "Description", size: 200 }, // Reduced size slightly
         { id: "ReferringPhysicianName", accessorFn: row => row["00080090"] ?? 'N/A', header: "Referring Dr.", size: 160 },
         { id: "NumberOfStudyRelatedSeries", accessorFn: row => row["00201206"] ?? '?', header: () => <div className="text-right">Series</div>, cell: ({ getValue }) => <div className="text-right">{getValue<number | string>()}</div>, size: 60 },
         { id: "NumberOfStudyRelatedInstances", accessorFn: row => row["00201208"] ?? '?', header: () => <div className="text-right">Inst.</div>, cell: ({ getValue }) => <div className="text-right">{getValue<number | string>()}</div>, size: 60 },
-        { id: "StudyInstanceUID", accessorFn: row => row["0020000D"] ?? 'N/A', header: "Study UID", cell: ({ getValue }) => <div className="font-mono text-xs truncate max-w-[100px]" title={getValue<string>()}>{getValue<string>()}</div>, size: 120 },
 
     ], []);
-    // --- END UPDATED ---
 
     const table = useReactTable({
-        data: results ?? [], // Data directly from props (has tag number keys)
+        data: results ?? [],
         columns,
         getCoreRowModel: getCoreRowModel(),
         onSortingChange: setSorting,
@@ -106,12 +108,12 @@ const DataBrowserResultsTable: React.FC<DataBrowserResultsTableProps> = ({ resul
     return (
         <div className="space-y-2">
             <div className="rounded-md border bg-white dark:bg-gray-800 shadow-sm">
-                <Table>
+                <Table style={{ tableLayout: 'fixed', width: '100%' }}>
                     <TableHeader>
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
                                 {headerGroup.headers.map((header) => (
-                                    <TableHead key={header.id} style={{ width: header.getSize() !== 150 ? `${header.getSize()}px` : undefined }}>
+                                    <TableHead key={header.id} style={{ width: `${header.getSize()}px` }}>
                                         {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                                     </TableHead>
                                 ))}
@@ -125,7 +127,7 @@ const DataBrowserResultsTable: React.FC<DataBrowserResultsTableProps> = ({ resul
                             table.getRowModel().rows.map((row) => (
                                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                                     {row.getVisibleCells().map((cell) => (
-                                        <TableCell key={cell.id} className="py-2 truncate" style={{ maxWidth: cell.column.getSize() !== 150 ? `${cell.column.getSize()}px` : undefined }}>
+                                        <TableCell key={cell.id} className="py-2 truncate" style={{ maxWidth: `${cell.column.getSize()}px` }}>
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </TableCell>
                                     ))}
