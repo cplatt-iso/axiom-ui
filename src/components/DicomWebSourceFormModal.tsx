@@ -1,5 +1,6 @@
 // src/components/DicomWebSourceFormModal.tsx
 import React, { useEffect } from 'react';
+import { z } from "zod";
 import { useForm, Controller } from 'react-hook-form'; // Use Controller
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -24,11 +25,10 @@ import {
     DicomWebSourceConfigRead,
     DicomWebSourceConfigCreatePayload,
     DicomWebSourceConfigUpdatePayload,
-    AuthType,
 } from '@/schemas'; // Ensure this path is correct
 import {
     dicomWebSourceFormSchema, // Use the corrected schema
-    DicomWebSourceFormData,   // Type derived from corrected schema
+    DicomWebSourceFormData,   // Type derived from corrected schema    
 } from '@/schemas/dicomWebSourceSchema'; // Ensure this path is correct
 
 // API Functions
@@ -55,14 +55,14 @@ const initialFormDefaults: DicomWebSourceFormData = {
     search_filters: '', // Start with empty string for textarea
 };
 
-
 const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpen, onClose, source }) => {
     const queryClient = useQueryClient();
     const isEditMode = !!source;
 
-    const form = useForm<DicomWebSourceFormData>({
-        resolver: zodResolver(dicomWebSourceFormSchema), // Use corrected schema
+    const form = useForm<z.infer<typeof dicomWebSourceFormSchema>>({
+        resolver: zodResolver(dicomWebSourceFormSchema),
         defaultValues: initialFormDefaults,
+        mode: 'onBlur',
     });
 
     const watchedAuthType = form.watch('auth_type');
@@ -87,7 +87,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
                     wado_prefix: source.wado_prefix ?? 'wado-rs',
                     polling_interval_seconds: source.polling_interval_seconds ?? 300,
                     is_enabled: source.is_enabled ?? true,
-                    is_active: source.is_active ?? true, // Reset is_active from source
+                    // is_active: source.is_active ?? true, // Reset is_active from source
                     auth_type: source.auth_type ?? 'none',
                     // Stringify objects for textareas
                     auth_config: source.auth_config ? json5.stringify(source.auth_config, null, 2) : '',
@@ -143,7 +143,7 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
     // --- End Mutations ---
 
     // --- Form Submit Handler (with parsing fix) ---
-    const onSubmit = (values: DicomWebSourceFormData) => {
+    const onSubmit: Parameters<typeof form.handleSubmit>[0] = (values) => {
         // Optional: Keep log for debugging if needed
         // console.log(">>> DicomWebSourceFormModal - onSubmit received values:", JSON.stringify(values, null, 2));
 

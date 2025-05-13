@@ -1,6 +1,6 @@
 // src/pages/RulesetDetailPage.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react'; // Added useRef
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/solid';
 // Import updateRule API function for status toggle
 import { getRulesetById, getRulesByRuleset, deleteRule, updateRule, Ruleset, Rule } from '../services/api'; // Import types
@@ -10,8 +10,7 @@ import RuleFormModal from '../components/RuleFormModal';
 
 const RulesetDetailPage: React.FC = () => {
     const { rulesetId } = useParams<{ rulesetId: string }>();
-    const navigate = useNavigate();
-    const { user } = useAuth();
+    useAuth();
 
     const [ruleset, setRuleset] = useState<Ruleset | null>(null);
     const [rules, setRules] = useState<Rule[]>([]);

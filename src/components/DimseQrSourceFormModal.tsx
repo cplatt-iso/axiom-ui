@@ -1,7 +1,7 @@
 // src/components/DimseQrSourceFormModal.tsx
 
 import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -64,7 +64,7 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
     const queryClient = useQueryClient();
     const isEditMode = !!source;
 
-    const form = useForm<DimseQrSourceFormData>({
+    const form = useForm({
         resolver: zodResolver(dimseQrSourceFormSchema),
         defaultValues: initialFormDefaults
     });
@@ -76,23 +76,25 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
             let resetValues: Partial<DimseQrSourceFormData>;
 
             if (isEditMode && source) {
+                const typedSource = source as DimseQueryRetrieveSourceRead;
                 resetValues = {
-                    name: source.name ?? '',
-                    description: source.description ?? null,
-                    remote_ae_title: source.remote_ae_title ?? '',
-                    remote_host: source.remote_host ?? '',
-                    remote_port: source.remote_port ?? 104,
-                    local_ae_title: source.local_ae_title ?? 'AXIOM_QR_SCU',
-                    polling_interval_seconds: source.polling_interval_seconds ?? 300,
-                    is_enabled: source.is_enabled ?? true,
-                    is_active: source.is_active ?? true,
-                    query_level: source.query_level ?? 'STUDY',
-                    query_filters: source.query_filters ? json5.stringify(source.query_filters, null, 2) : '',
-                    move_destination_ae_title: source.move_destination_ae_title ?? null,
-                    tls_enabled: source.tls_enabled ?? false,
-                    tls_ca_cert_secret_name: source.tls_ca_cert_secret_name ?? null,
-                    tls_client_cert_secret_name: source.tls_client_cert_secret_name ?? null,
-                    tls_client_key_secret_name: source.tls_client_key_secret_name ?? null,
+                    name: typedSource.name ?? '',
+                    description: typedSource.description ?? null,
+                    remote_ae_title: typedSource.remote_ae_title ?? '',
+                    remote_host: typedSource.remote_host ?? '',
+                    remote_port: typedSource.remote_port ?? 104,
+                    local_ae_title: typedSource.local_ae_title ?? 'AXIOM_QR_SCU',
+                    polling_interval_seconds: typedSource.polling_interval_seconds ?? 300,
+                    is_enabled: typedSource.is_enabled ?? true,
+                    is_active: typedSource.is_active ?? true, // Now valid
+                    // Use type assertion assuming backend validation holds
+                    query_level: (typedSource.query_level as DimseQrSourceFormData['query_level']) ?? 'STUDY',
+                    query_filters: typedSource.query_filters ? json5.stringify(typedSource.query_filters, null, 2) : '',
+                    move_destination_ae_title: typedSource.move_destination_ae_title ?? null,
+                    tls_enabled: typedSource.tls_enabled ?? false, // Now valid
+                    tls_ca_cert_secret_name: typedSource.tls_ca_cert_secret_name ?? null, // Now valid
+                    tls_client_cert_secret_name: typedSource.tls_client_cert_secret_name ?? null, // Now valid
+                    tls_client_key_secret_name: typedSource.tls_client_key_secret_name ?? null, // Now valid
                 };
             } else {
                 resetValues = {

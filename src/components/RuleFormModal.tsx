@@ -1,4 +1,4 @@
-// src/components/RuleFormModal.tsx
+// frontend/src/components/RuleFormModal.tsx
 import React, { useState, useEffect, Fragment, FormEvent, useCallback, useRef } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Dialog, Transition } from '@headlessui/react';
@@ -21,26 +21,34 @@ import {
 
 import {
     Rule,
-    StorageBackendConfigRead,
+    StorageBackendConfigRead, // Used for availableDestinations
     CrosswalkMapRead,
-    ScheduleRead,
-    RuleCreatePayload,
-    RuleUpdatePayload,
+    Schedule, // Used for availableSchedules
     MatchOperation,
     ModifyAction,
-    AssociationParameter
-} from '@/schemas';
+} from '@/schemas'; // Reading types
 
 import {
-    RuleFormDataSchema,
-    RuleFormData,
+    RuleCreate, // Correct type for create payload
+    RuleUpdate, // Correct type for update payload
+ //   RuleFormData, // Can be used for form state type if helpful
     MatchCriterionFormData,
     AssociationMatchCriterionFormData,
     TagModificationFormData,
     ModifyActionSchema,
     MatchOperationSchema,
-    associationParameterSchema
-} from '@/schemas/ruleSchema';
+    associationParameterSchema,
+    TagSetModificationSchema, // Import specific schemas if needed for type guards inside component
+    TagDeleteModificationSchema,
+    TagPrependModificationSchema,
+    TagSuffixModificationSchema,
+    TagRegexReplaceModificationSchema,
+    TagCopyModificationSchema,
+    TagMoveModificationSchema,
+    TagCrosswalkModificationSchema,
+    RuleCreateSchema, // Zod schema for validation on create
+    RuleUpdateSchema, // Zod schema for validation on update
+} from '@/schemas/ruleSchema'; // Form/Payload types/schemas
 
 import { DicomTagInfo, getTagInfo } from '../dicom/dictionary';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -55,15 +63,15 @@ import RuleFormDestinations from './rule-form/RuleFormDestinations';
 import RuleFormSchedule from './rule-form/RuleFormSchedule';
 import RuleFormAiStandardization from './rule-form/RuleFormAiStandardization';
 
-import { isValueRequired, isValueList, isIpOperator } from '@/utils/ruleHelpers';
+import { isValueRequired, isIpOperator } from '@/utils/ruleHelpers';
 
 export interface SourceInfo {
     name: string;
     type: 'listener' | 'scraper' | 'api';
 }
 
-const baseInputStyles = "block w-full rounded-md shadow-sm sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed py-2 pl-3 px-3";
-const errorInputStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
+//const baseInputStyles = "block w-full rounded-md shadow-sm sm:text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 border focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-gray-700 disabled:cursor-not-allowed py-2 pl-3 px-3";
+//const errorInputStyles = "border-red-500 focus:border-red-500 focus:ring-red-500";
 const normalInputStyles = "border-gray-300 dark:border-gray-600";
 
 function deepClone<T>(obj: T): T {
@@ -87,6 +95,21 @@ interface RuleFormModalProps {
     existingRule: Rule | null;
 }
 
+type AllTagModificationFieldKeys =
+    | keyof z.infer<typeof TagSetModificationSchema>
+    | keyof z.infer<typeof TagDeleteModificationSchema>
+    | keyof z.infer<typeof TagPrependModificationSchema>
+    | keyof z.infer<typeof TagSuffixModificationSchema>
+    | keyof z.infer<typeof TagRegexReplaceModificationSchema>
+    | keyof z.infer<typeof TagCopyModificationSchema>
+    | keyof z.infer<typeof TagMoveModificationSchema>
+    | keyof z.infer<typeof TagCrosswalkModificationSchema>;
+
+type SpecialTagModificationFields = 'tagInfo' | 'sourceTagInfo' | 'destTagInfo';
+
+export type UpdatableTagModificationField = AllTagModificationFieldKeys | SpecialTagModificationFields;
+
+
 const createDefaultModification = (action: ModifyAction): TagModificationFormData => {
     const base = { action };
     switch (action) {
@@ -105,7 +128,7 @@ const createDefaultModification = (action: ModifyAction): TagModificationFormDat
         case ModifyActionSchema.enum.move:
             return { ...base, source_tag: '', destination_tag: '', destination_vr: null, action: ModifyActionSchema.enum.move };
         case ModifyActionSchema.enum.crosswalk:
-            return { ...base, crosswalk_map_id: undefined, action: ModifyActionSchema.enum.crosswalk };
+            return { ...base, crosswalk_map_id: 0, action: ModifyActionSchema.enum.crosswalk };
         default:
             const exhaustiveCheck: never = action;
             console.error(`Unhandled modification action: ${exhaustiveCheck}`);
@@ -134,10 +157,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [aiStandardizationTags, setAiStandardizationTags] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
-    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({}); // Allows undefined values
 
-    const { data: availableDestinations = [], isLoading: destinationsLoading, error: destinationsError, refetch: refetchDestinations } = useQuery<StorageBackendConfigRead[], Error>({ queryKey: ['storageBackendConfigsList'], queryFn: () => getStorageBackendConfigs(0, 500), enabled: isOpen, staleTime: 300000, gcTime: 600000, refetchOnWindowFocus: false });
-    const { data: combinedSources = [], isLoading: sourcesLoading, error: sourcesError } = useQuery<SourceInfo[], Error>({
+    const { data: availableDestinations = [], isLoading: destinationsLoading, refetch: refetchDestinations } = useQuery<StorageBackendConfigRead[], Error>({
+        queryKey: ['storageBackendConfigsList'],
+        queryFn: () => getStorageBackendConfigs(0, 500),
+        enabled: isOpen, staleTime: 300000, gcTime: 600000, refetchOnWindowFocus: false
+    });
+    const { data: combinedSources = [], isLoading: sourcesLoading } = useQuery<SourceInfo[], Error>({
         queryKey: ['applicableSourcesListWithType'],
         queryFn: async (): Promise<SourceInfo[]> => {
             try {
@@ -154,7 +181,6 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 dimseQrConfigs.forEach(s => { if (s.name) sourcesMap.set(String(s.name), { name: String(s.name), type: 'scraper' }); });
                 const allSources = Array.from(sourcesMap.values());
                 allSources.sort((a, b) => a.name.localeCompare(b.name));
-                console.log("RuleFormModal: Fetched combined sources:", allSources);
                 return allSources;
             } catch (fetchError) {
                 console.error("Failed to fetch combined source lists:", fetchError);
@@ -163,8 +189,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         },
         enabled: isOpen, staleTime: 60000, gcTime: 300000, refetchOnWindowFocus: false
     });
-    const { data: availableCrosswalkMaps = [], isLoading: crosswalkMapsLoading, error: crosswalkMapsError } = useQuery<CrosswalkMapRead[], Error>({ queryKey: ['crosswalkMapsListForRuleForm'], queryFn: () => getCrosswalkMaps(undefined, 0, 500), enabled: isOpen, staleTime: 300000, gcTime: 600000, refetchOnWindowFocus: false });
-    const { data: availableSchedules = [], isLoading: schedulesLoading, error: schedulesError, refetch: refetchSchedules } = useQuery<ScheduleRead[], Error>({
+    const { data: availableCrosswalkMaps = [], isLoading: crosswalkMapsLoading, error: crosswalkMapsError } = useQuery<CrosswalkMapRead[], Error>({
+        queryKey: ['crosswalkMapsListForRuleForm'],
+        queryFn: () => getCrosswalkMaps(undefined, 0, 500),
+        enabled: isOpen, staleTime: 300000, gcTime: 600000, refetchOnWindowFocus: false
+    });
+    const { data: availableSchedules = [], isLoading: schedulesLoading, error: schedulesError, refetch: refetchSchedules } = useQuery<Schedule[], Error>({ // Use ScheduleRead type
         queryKey: ['schedulesListForRuleForm'],
         queryFn: () => getSchedules(0, 500),
         enabled: isOpen, staleTime: 300000, gcTime: 600000, refetchOnWindowFocus: false,
@@ -180,7 +210,6 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         if (isOpen) {
             const currentRuleIdentifier = existingRule ? existingRule.id : 'create';
             if (processedRuleIdRef.current !== currentRuleIdentifier) {
-                console.log(`RuleFormModal useEffect: Running full reset for rule ${currentRuleIdentifier}`);
                 processedRuleIdRef.current = currentRuleIdentifier;
 
                 refetchDestinations();
@@ -192,8 +221,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setDescription(existingRule.description ?? '');
                     setPriority(existingRule.priority ?? 100);
                     setIsActive(existingRule.is_active ?? true);
-		    setAiStandardizationTags(existingRule.ai_standardization_tags || []);
-
+                    setAiStandardizationTags(existingRule.ai_standardization_tags || []);
                     setSelectedScheduleId(existingRule.schedule_id ?? null);
 
                     if (combinedSources.length > 0) {
@@ -225,9 +253,11 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                         const defaultMod = _createDefaultModification(action.success ? action.data : ModifyActionSchema.enum.set);
                          if (m.action === ModifyActionSchema.enum.crosswalk && m.crosswalk_map_id !== undefined && m.crosswalk_map_id !== null) {
                              m.crosswalk_map_id = parseInt(String(m.crosswalk_map_id), 10);
-                             if (isNaN(m.crosswalk_map_id)) {
-                                 m.crosswalk_map_id = undefined;
+                             if (isNaN(m.crosswalk_map_id) || m.crosswalk_map_id <= 0) { // Treat non-positive as unselected (matches default 0)
+                                 m.crosswalk_map_id = 0;
                              }
+                         } else if (m.action === ModifyActionSchema.enum.crosswalk) {
+                              m.crosswalk_map_id = 0; // Ensure it's 0 if not provided or null
                          }
                         return { ...defaultMod, ...m };
                     }));
@@ -237,7 +267,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setMatchCriteria([]); setAssociationCriteria([]); setTagModifications([]);
                     setSelectedSources([]);
                     setSelectedDestinationIds(new Set());
-		    setAiStandardizationTags([]);
+                    setAiStandardizationTags([]);
                     setSelectedScheduleId(null);
                     processedRuleIdRef.current = 'create';
                 }
@@ -245,7 +275,6 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 setIsSubmitting(false);
 
             } else if (existingRule && combinedSources.length > 0 && selectedSources.length === 0 && (existingRule.applicable_sources?.length ?? 0) > 0) {
-                 console.log("RuleFormModal useEffect: Updating selectedSources after combinedSources loaded.");
                  const initialSelectedNames = existingRule.applicable_sources || [];
                  const initialSelectedSourceObjects = combinedSources.filter(source =>
                     initialSelectedNames.includes(source.name)
@@ -266,24 +295,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
     const handlePotentialOutsideClick = useCallback((event: React.MouseEvent | React.TouchEvent) => {
         const targetElement = event.target as HTMLElement;
-
-        // Check if click is inside a Radix dropdown/popover content area
-        // Adjust selectors based on actual attributes rendered by Radix/Shadcn
         if (targetElement.closest('[data-radix-popper-content-wrapper], [data-radix-select-content], [data-headlessui-state="open"]')) {
-            console.log("Click inside portal/dropdown detected, preventing modal close.");
-            return; // Don't close if click is inside a known dropdown/popover type
+            return;
         }
-
-        // Check if click is inside the main dialog panel
         if (panelRef.current && panelRef.current.contains(targetElement)) {
-             console.log("Click inside Dialog Panel detected.");
-             return; // Don't close if click is inside the panel itself
+             return;
         }
-
-
-        console.log("Click outside detected, closing modal.");
-        handleDialogClose(); // Close if click is truly outside relevant areas
-    }, [handleDialogClose]); // Depend on handleDialogClose
+        handleDialogClose();
+    }, [handleDialogClose]);
 
     const handleNameChange = useCallback((value: string) => { setName(value); setValidationErrors(p => ({ ...p, name: undefined })) }, []);
     const handleDescriptionChange = useCallback((value: string) => { setDescription(value) }, []);
@@ -316,7 +335,9 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         setMatchCriteria(prev => {
             const updated = deepClone(prev);
             const currentCrit = updated[index];
-            if (!currentCrit) return prev;
+            if (!currentCrit) {
+                return prev;
+            }
 
             if (field === 'tagInfo') {
                 currentCrit.tag = value ? value.tag : '';
@@ -347,7 +368,9 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         setAssociationCriteria(prev => {
             const updated = deepClone(prev);
             const currentCrit = updated[index];
-            if (!currentCrit) return prev;
+            if (!currentCrit) {
+                return prev;
+            }
 
             (currentCrit as any)[field] = value;
 
@@ -378,11 +401,15 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         setTagModifications((prev) => [...prev, _createDefaultModification(ModifyActionSchema.enum.set)]);
     }, [_createDefaultModification]);
 
-    const updateTagModification = useCallback((index: number, field: keyof TagModificationFormData | 'tagInfo' | 'sourceTagInfo' | 'destTagInfo' | 'crosswalk_map_id', value: any) => {
+    const updateTagModification = useCallback((index: number, field: UpdatableTagModificationField, value: any) => {
         setTagModifications(prev => {
             const updated = deepClone(prev);
-            const currentMod = updated[index] as any;
-            if (!currentMod) return prev;
+            const currentModFromState = updated[index];
+            if (!currentModFromState) {
+                return prev;
+            }
+
+            const currentMod = currentModFromState as any;
 
             const updateTagField = (
                 fieldName: 'tag' | 'source_tag' | 'destination_tag',
@@ -403,38 +430,61 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 updateTagField('destination_tag', 'destination_vr', value);
             } else if (field === 'action') {
                 const newAction = value as ModifyAction;
-                const oldMod = updated[index];
+                const oldModData = { ...currentModFromState };
+
                 updated[index] = _createDefaultModification(newAction);
+                const newModObject = updated[index] as any;
 
-                if ('tag' in updated[index] && 'tag' in oldMod) (updated[index] as any).tag = oldMod.tag;
-                if ('source_tag' in updated[index] && 'source_tag' in oldMod) (updated[index] as any).source_tag = oldMod.source_tag;
-                if ('destination_tag' in updated[index] && 'destination_tag' in oldMod) (updated[index] as any).destination_tag = oldMod.destination_tag;
-                if ('crosswalk_map_id' in updated[index] && 'crosswalk_map_id' in oldMod) (updated[index] as any).crosswalk_map_id = oldMod.crosswalk_map_id;
+                if ('tag' in newModObject && 'tag' in oldModData) newModObject.tag = oldModData.tag;
+                if ('value' in newModObject && 'value' in oldModData && typeof oldModData.value === 'string') newModObject.value = oldModData.value;
 
-                const tagToUseForVrLookup = (updated[index] as any).tag || (updated[index] as any).destination_tag;
-                const needsVrUpdate = [ModifyActionSchema.enum.set, ModifyActionSchema.enum.copy, ModifyActionSchema.enum.move].includes(newAction);
+                if ('source_tag' in newModObject && 'source_tag' in oldModData) newModObject.source_tag = oldModData.source_tag;
+                if ('destination_tag' in newModObject && 'destination_tag' in oldModData) newModObject.destination_tag = oldModData.destination_tag;
+
+                if ('crosswalk_map_id' in newModObject && 'crosswalk_map_id' in oldModData) newModObject.crosswalk_map_id = oldModData.crosswalk_map_id;
+
+                const tagToUseForVrLookup = newModObject.tag || newModObject.destination_tag;
+
+                const ACTIONS_REQUIRING_VR_UPDATE = new Set<ModifyAction>([
+                    ModifyActionSchema.enum.set,
+                    ModifyActionSchema.enum.copy,
+                    ModifyActionSchema.enum.move,
+                ]);
+                const needsVrUpdate = ACTIONS_REQUIRING_VR_UPDATE.has(newAction);
 
                 if (needsVrUpdate && tagToUseForVrLookup) {
                     const tagInfo = getTagInfo(tagToUseForVrLookup);
-                    const vrField = newAction === ModifyActionSchema.enum.set ? 'vr' : 'destination_vr';
-                    if (tagInfo && vrField in updated[index]) {
-                        (updated[index] as any)[vrField] = tagInfo.vr;
+                    let vrFieldToUpdate: 'vr' | 'destination_vr' | null = null;
+                    if (newAction === ModifyActionSchema.enum.set) {
+                        vrFieldToUpdate = 'vr';
+                    } else if (newAction === ModifyActionSchema.enum.copy || newAction === ModifyActionSchema.enum.move) {
+                        vrFieldToUpdate = 'destination_vr';
+                    }
+
+                    if (tagInfo && vrFieldToUpdate && vrFieldToUpdate in newModObject) {
+                        newModObject[vrFieldToUpdate] = tagInfo.vr;
                     }
                 }
-                 const relevantFields = Object.keys(updated[index]);
-                 Object.keys(oldMod).forEach(key => {
-                     if (!relevantFields.includes(key)) {
-                         delete (updated[index] as any)[key];
-                     }
-                 });
-
+            } else if (field === 'crosswalk_map_id') {
+                let finalValue: number = 0; // Default to 0 (not selected / invalid input state)
+                if (value !== undefined && value !== null) {
+                    const stringValue = String(value).trim();
+                    if (stringValue !== '') { // Only parse if not an empty string
+                        const num = Number(stringValue);
+                        if (!isNaN(num) && isFinite(num)) {
+                            finalValue = num; // Assign the parsed number (could be positive, zero, or negative)
+                                              // Zod's .refine(id > 0) will validate it upon submission.
+                        }
+                        // If stringValue is not a valid number, finalValue remains 0.
+                    }
+                    // If stringValue is empty, finalValue remains 0.
+                }
+                // If value is undefined or null, finalValue remains 0.
+                currentMod[field] = finalValue;
+            } else if (field in currentMod) {
+                 currentMod[field] = value;
             } else {
-                 if (field === 'crosswalk_map_id') {
-                     const numValue = value !== undefined && value !== null && String(value).trim() !== '' ? Number(value) : undefined;
-                     currentMod[field] = isNaN(numValue) ? undefined : numValue;
-                 } else if (field in currentMod) {
-                     currentMod[field] = value;
-                 }
+                console.warn(`Attempted to set field '${field}' which does not exist on current modification action '${currentMod.action}'.`);
             }
             return updated;
         });
@@ -448,8 +498,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 keysToClear.push(`${baseKey}.${f}`);
             });
             const currentAction = value as ModifyAction;
-            if (!('tag' in createDefaultModification(currentAction))) keysToClear.push(`${baseKey}.tag`);
-            if (!('source_tag' in createDefaultModification(currentAction))) keysToClear.push(`${baseKey}.source_tag`);
+            if (!('tag' in createDefaultModification(currentAction))) {
+                keysToClear.push(`${baseKey}.tag`);
+            }
+            if (!('source_tag' in createDefaultModification(currentAction))) {
+                keysToClear.push(`${baseKey}.source_tag`);
+            }
         }
 
         setValidationErrors(prev => {
@@ -471,22 +525,21 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const removeTagModification = useCallback((index: number) => {
         setTagModifications(prev => prev.filter((_, i) => i !== index));
         setValidationErrors(prev => {
-            const next: Record<string, string> = {};
-            Object.entries(prev).forEach(([key, message]) => {
+            const next: Record<string, string | undefined> = {}; // Correct type for next
+            Object.entries(prev).forEach(([key, message]) => { // message is string | undefined
                 const match = key.match(/^tag_modifications\[(\d+)\](\..+)?$/);
                 if (match) {
                     const errorIndex = parseInt(match[1], 10);
                     const suffix = match[2] || '';
                     if (errorIndex < index) {
-                        next[key] = message;
+                        next[key] = message; 
                     } else if (errorIndex > index) {
-                        next[`tag_modifications[${errorIndex - 1}]${suffix}`] = message;
+                        next[`tag_modifications[${errorIndex - 1}]${suffix}`] = message; 
                     }
                 } else {
-                    next[key] = message;
+                    next[key] = message; 
                 }
             });
-             delete next[`tag_modifications[${index}]`];
             return next;
         });
     }, []);
@@ -518,7 +571,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { ruleId: number; data: RuleUpdatePayload }) => updateRule(payload.ruleId, payload.data),
+        mutationFn: (payload: { ruleId: number; data: RuleUpdate }) => updateRule(payload.ruleId, payload.data),
         onSuccess: (savedRule) => {
             onSuccess(savedRule);
             queryClient.invalidateQueries({ queryKey: ['rules', rulesetId] });
@@ -535,7 +588,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
          console.error(`Failed to ${action} rule${ruleId ? ` (ID: ${ruleId})` : ''}:`, err);
          const errorDetail = err.detail?.detail || err.detail;
          let errorMessage = `Failed to ${action} rule.`;
-         let backendValidationErrors: Record<string, string> = {};
+         let backendValidationErrors: Record<string, string | undefined> = {}; // Allow undefined
 
          if (err.status === 422 && Array.isArray(errorDetail)) {
              errorDetail.forEach((validationError: any) => {
@@ -566,6 +619,15 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
          setIsSubmitting(false);
      };
 
+
+     const transformPayloadValue = (value: any, op: MatchOperation): any => {
+        if ((op === 'in' || op === 'not_in') && typeof value === 'string') {
+            return value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        return value;
+    };
+
+
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         setError(null);
@@ -573,79 +635,107 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
         const selectedSourceNames = selectedSources.map(source => source.name);
 
-        const formDataForZod = {
-            name, description, priority, is_active: isActive,
+        const baseFormData = {
+            name: name,
+            description: description,
+            priority: priority,
+            is_active: isActive,
             match_criteria: matchCriteria,
             association_criteria: associationCriteria.length > 0 ? associationCriteria : null,
             tag_modifications: tagModifications,
             applicable_sources: selectedSourceNames.length > 0 ? selectedSourceNames : null,
             destination_ids: Array.from(selectedDestinationIds),
-	    ai_standardization_tags: aiStandardizationTags.length > 0 ? aiStandardizationTags : null,
+            ai_standardization_tags: aiStandardizationTags.length > 0 ? aiStandardizationTags : null,
             schedule_id: selectedScheduleId,
         };
 
-        console.log("Data before Zod validation:", JSON.stringify(formDataForZod, null, 2));
-
-        const validationResult = RuleFormDataSchema.safeParse(formDataForZod);
-
-        if (!validationResult.success) {
-            const errors: Record<string, string> = {};
-            validationResult.error.errors.forEach((err) => {
-                const path = err.path.map(p => typeof p === 'number' ? `[${p}]` : p).join('.').replace(/\.\[/g, '[');
-                errors[path] = err.message;
-            });
-            setValidationErrors(errors);
-            setError("Please fix the validation errors marked below.");
-            console.warn("Frontend Validation Errors:", errors);
-            toast.error("Validation Error", { description: "Please check the form fields." });
-            return;
-        }
-
-        const validatedData = validationResult.data;
-        console.log("Data AFTER Zod validation:", JSON.stringify(validatedData, null, 2));
-
-        const commonPayload = {
-            name: validatedData.name,
-            description: validatedData.description,
-            priority: validatedData.priority,
-            is_active: validatedData.is_active,
-             match_criteria: validatedData.match_criteria.map(crit => ({
-                ...crit,
-                value: (crit.op === 'in' || crit.op === 'not_in') && typeof crit.value === 'string'
-                    ? crit.value.split(',').map(s => s.trim()).filter(Boolean)
-                    : crit.value
-            })),
-            association_criteria: validatedData.association_criteria?.map(crit => ({
-                 ...crit,
-                  value: (crit.op === 'in' || crit.op === 'not_in') && typeof crit.value === 'string'
-                    ? crit.value.split(',').map(s => s.trim()).filter(Boolean)
-                    : crit.value
-            })) || null,
-            tag_modifications: validatedData.tag_modifications,
-            applicable_sources: validatedData.applicable_sources,
-            destination_ids: validatedData.destination_ids,
-	    ai_standardization_tags: validatedData.ai_standardization_tags,
-            schedule_id: validatedData.schedule_id,
-        };
-
         setIsSubmitting(true);
-        console.log('Submitting Final Rule Payload to API:', JSON.stringify(commonPayload, null, 2));
 
         if (existingRule) {
-             const updatePayload: RuleUpdatePayload = commonPayload;
-             updateMutation.mutate({ ruleId: existingRule.id, data: updatePayload });
+            const validationResult = RuleUpdateSchema.safeParse(baseFormData);
+            if (!validationResult.success) {
+                const errors: Record<string, string> = {};
+                validationResult.error.errors.forEach((err) => {
+                    const path = err.path.map(p => typeof p === 'number' ? `[${p}]` : p).join('.').replace(/\.\[/g, '[');
+                    errors[path] = err.message;
+                });
+                setValidationErrors(errors);
+                setError("Please fix the validation errors marked below.");
+                toast.error("Validation Error", { description: "Please check the form fields." });
+                setIsSubmitting(false);
+                return;
+            }
+
+            const validatedUpdateData = validationResult.data;
+            const updateApiPayload: RuleUpdate = {
+                name: validatedUpdateData.name,
+                description: validatedUpdateData.description,
+                priority: validatedUpdateData.priority,
+                is_active: validatedUpdateData.is_active,
+                match_criteria: validatedUpdateData.match_criteria?.map(crit => ({
+                    ...crit,
+                    value: transformPayloadValue(crit.value, crit.op)
+                })),
+                association_criteria: validatedUpdateData.association_criteria?.map(crit => ({
+                     ...crit,
+                      value: transformPayloadValue(crit.value, crit.op)
+                })) || null,
+                tag_modifications: validatedUpdateData.tag_modifications,
+                applicable_sources: validatedUpdateData.applicable_sources,
+                destination_ids: validatedUpdateData.destination_ids,
+                ai_standardization_tags: validatedUpdateData.ai_standardization_tags,
+                schedule_id: validatedUpdateData.schedule_id,
+            };
+            console.log('Submitting Final Update Rule Payload to API:', JSON.stringify(updateApiPayload, null, 2));
+            updateMutation.mutate({ ruleId: existingRule.id, data: updateApiPayload });
+
         } else {
-            const createPayload: RuleCreatePayload = { ...commonPayload, ruleset_id: rulesetId };
-            createMutation.mutate(createPayload);
+            const createDataForZod = { ...baseFormData, ruleset_id: rulesetId };
+            const validationResult = RuleCreateSchema.safeParse(createDataForZod);
+            if (!validationResult.success) {
+                 const errors: Record<string, string> = {};
+                 validationResult.error.errors.forEach((err) => {
+                     const path = err.path.map(p => typeof p === 'number' ? `[${p}]` : p).join('.').replace(/\.\[/g, '[');
+                     errors[path] = err.message;
+                 });
+                 setValidationErrors(errors);
+                 setError("Please fix the validation errors marked below.");
+                 toast.error("Validation Error", { description: "Please check the form fields." });
+                 setIsSubmitting(false);
+                 return;
+            }
+
+            const validatedCreateData = validationResult.data;
+            const createApiPayload: RuleCreate = {
+                ruleset_id: validatedCreateData.ruleset_id,
+                name: validatedCreateData.name,
+                description: validatedCreateData.description,
+                priority: validatedCreateData.priority,
+                is_active: validatedCreateData.is_active,
+                match_criteria: validatedCreateData.match_criteria.map(crit => ({
+                    ...crit,
+                    value: transformPayloadValue(crit.value, crit.op)
+                })),
+                association_criteria: validatedCreateData.association_criteria?.map(crit => ({
+                    ...crit,
+                     value: transformPayloadValue(crit.value, crit.op)
+                })) || null,
+                tag_modifications: validatedCreateData.tag_modifications,
+                applicable_sources: validatedCreateData.applicable_sources,
+                destination_ids: validatedCreateData.destination_ids,
+                ai_standardization_tags: validatedCreateData.ai_standardization_tags,
+                schedule_id: validatedCreateData.schedule_id,
+            };
+            console.log('Submitting Final Create Rule Payload to API:', JSON.stringify(createApiPayload, null, 2));
+            createMutation.mutate(createApiPayload);
         }
     };
 
 
     return (
         <Transition appear show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-20" onClose={() => { /* No direct close */ }}>
+            <Dialog as="div" className="relative z-20" onClose={() => {}}>
                 <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
-                    {/* Use onClick capture to handle overlay clicks */}
                     <div
                         className="fixed inset-0 bg-black bg-opacity-30 dark:bg-opacity-60"
                         onClick={handlePotentialOutsideClick}
@@ -665,14 +755,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                 </Dialog.Title>
 
                                 <form onSubmit={handleSubmit} className="space-y-6 flex-grow overflow-y-auto p-6">
-                                     {error && !Object.keys(validationErrors).length && (
+                                     {(error && !Object.keys(validationErrors).length) && (
                                          <Alert variant="destructive" className="mb-4">
                                              <AlertCircle className="h-4 w-4" />
                                              <AlertTitle>Error</AlertTitle>
                                              <AlertDescription>{error}</AlertDescription>
                                          </Alert>
                                      )}
-                                     {Object.keys(validationErrors).length > 0 && validationErrors['general'] && (
+                                     {(Object.keys(validationErrors).length > 0 && validationErrors['general']) && (
                                           <Alert variant="destructive" className="mb-4">
                                               <AlertCircle className="h-4 w-4" />
                                               <AlertTitle>Validation Error</AlertTitle>
@@ -681,7 +771,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                      )}
 
                                      <RuleFormBasicInfo
-                                        name={name} description={description} priority={priority} isActive={isActive}
+                                        name={name} description={description ?? ''} priority={priority} isActive={isActive}
                                         onNameChange={handleNameChange}
                                         onDescriptionChange={handleDescriptionChange}
                                         onPriorityChange={handlePriorityChange}
@@ -698,26 +788,39 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                         selectedScheduleId={selectedScheduleId} availableSchedules={availableSchedules ?? []}
                                         onScheduleChange={handleScheduleChange}
                                         isLoading={overallIsLoading} schedulesLoading={schedulesLoading} schedulesError={schedulesError}
-                                        validationErrors={validationErrors} containerRef={panelRef}
+                                        validationErrors={validationErrors} 
+                                        // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
+                                        // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
+                                        containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
                                      <RuleFormMatchCriteria
                                         matchCriteria={matchCriteria} updateMatchCriterion={updateMatchCriterion}
                                         addMatchCriterion={addMatchCriterion} removeMatchCriterion={removeMatchCriterion}
-                                        isLoading={overallIsLoading} validationErrors={validationErrors} containerRef={panelRef}
+                                        isLoading={overallIsLoading} validationErrors={validationErrors} 
+                                        // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
+                                        // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
+                                        containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
                                      <RuleFormAssociationCriteria
                                         associationCriteria={associationCriteria} updateAssociationCriterion={updateAssociationCriterion}
                                         addAssociationCriterion={addAssociationCriterion} removeAssociationCriterion={removeAssociationCriterion}
-                                        isLoading={overallIsLoading} validationErrors={validationErrors} containerRef={panelRef}
+                                        isLoading={overallIsLoading} validationErrors={validationErrors} 
+                                        // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
+                                        // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
+                                        containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
                                      <RuleFormTagModifications
                                         tagModifications={tagModifications} updateTagModification={updateTagModification}
                                         addTagModification={addTagModification} removeTagModification={removeTagModification}
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
-                                        availableCrosswalkMaps={availableCrosswalkMaps} crosswalkMapsLoading={crosswalkMapsLoading} crosswalkMapsError={crosswalkMapsError}
-                                        containerRef={panelRef}
+                                        availableCrosswalkMaps={availableCrosswalkMaps} crosswalkMapsLoading={crosswalkMapsLoading} 
+                                        crosswalkMapsError={crosswalkMapsError ? crosswalkMapsError.message : undefined}
+                                        // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop (containerRef) expects RefObject<HTMLDivElement>.
+                                        // This assertion silences the TS error.
+                                        // Ideal fix: Change RuleFormTagModificationsProps.containerRef to React.RefObject<HTMLDivElement | null>.
+                                        containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
-				     <RuleFormAiStandardization
+                                     <RuleFormAiStandardization
                                         tags={aiStandardizationTags}
                                         onTagsChange={handleAiStandardizationTagsChange}
                                         isLoading={overallIsLoading}
@@ -729,10 +832,10 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
                                     />
 
-                                     <div className="flex justify-end space-x-3 pt-4">
+                                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
                                          <Button type="button" variant="outline" onClick={handleDialogClose} disabled={overallIsLoading}> Cancel </Button>
                                          <Button type="submit" disabled={overallIsLoading}>
-                                             {overallIsLoading && ( <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"/> )}
+                                             {overallIsLoading ? ( <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5"/> ) : null}
                                              {isSubmitting ? 'Saving...' : (isDataLoading ? 'Loading Data...' : (existingRule ? 'Update Rule' : 'Create Rule'))}
                                          </Button>
                                      </div>

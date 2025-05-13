@@ -1,31 +1,100 @@
 // frontend/src/services/api.ts
+// import json5 from 'json5';
 import { AuthContextType } from '../context/AuthContext';
+import { 
+    CrosswalkDataSourceUpdatePayload,
+    CrosswalkDataSourceRead,
+    CrosswalkDataSourceCreatePayload, 
+} from '@/schemas/crosswalkDataSourceSchema';   
 
 import {
-    Ruleset, RulesetCreate, RulesetUpdate, Rule, RuleCreate, RuleUpdate,
-    ApiKey, ApiKeyCreate, ApiKeyCreateResponse, ApiKeyUpdate, UserWithRoles, Role,
-    UserUpdate as UserRoleUpdatePayload, SystemStatusReport,
-    DicomWebSourceStatus, DicomWebPollersStatusResponse, DimseListenerStatus,
-    DimseListenersStatusResponse, DicomWebSourceConfigRead, DicomWebSourceConfigCreatePayload,
-    DicomWebSourceConfigUpdatePayload, DimseListenerConfigRead, DimseListenerConfigCreatePayload,
-    DimseListenerConfigUpdatePayload, StorageBackendConfigRead, StorageBackendConfigCreatePayload,
-    StorageBackendConfigUpdatePayload, Schedule, ScheduleCreate, ScheduleUpdate,
-    DimseQueryRetrieveSourceRead, DimseQueryRetrieveSourceCreatePayload, DimseQueryRetrieveSourceUpdatePayload,
-    DimseQrSourceStatus, DimseQrSourcesStatusResponse, CrosswalkDataSourceRead,
-    CrosswalkDataSourceCreatePayload, CrosswalkDataSourceUpdatePayload, CrosswalkMapRead,
-    CrosswalkMapCreatePayload, CrosswalkMapUpdatePayload, RuleGenRequest, RuleGenResponse,
-    SystemInfo,
+    CrosswalkMapRead,
+    CrosswalkMapCreatePayload, 
+    CrosswalkMapUpdatePayload,
+} from '@/schemas/crosswalkMappingSchema'
+
+import {
+    // From ruleSchema.ts (assuming index.ts re-exports them correctly)
+    RulesetCreate,
+    RulesetUpdate,
+    RuleCreate,
+    RuleUpdate,
+    Rule, // This should be Rule (from RuleSchema)
+    Ruleset, // This should be Ruleset (from RulesetSchema)
+
+    // From apiKeySchema.ts
+    ApiKey,
+    ApiKeyCreate,
+    ApiKeyCreateResponse,
+    // ApiKeyUpdate, // This one is unused in api.ts per your problems.txt, but good to keep if schemas/index.ts exports it
+
+    // From userSchema.ts (assuming index.ts re-exports them)
+    UserWithRoles,
+    Role,
+    UserUpdate as UserRoleUpdatePayload, // Assuming UserUpdate is exported from userSchema
+
+    // From system.ts (or dashboardSchema.ts via index.ts)
+    SystemStatusReport, // Check where this actually lives and is exported from
+    ComponentStatus,    // Check where this actually lives and is exported from
+    SystemInfo,         // This is from system.ts, seems okay
+
+    // From dicomWebSourceSchema.ts (via index.ts)
+    DicomWebSourceConfigRead,
+    DicomWebSourceConfigCreatePayload,
+    DicomWebSourceConfigUpdatePayload,
+    // DicomWebSourceStatus, // This is unused in api.ts per problems.txt
+
+    // From dimseListenerSchema.ts (via index.ts)
+    DimseListenerConfigRead,
+    DimseListenerConfigCreatePayload,
+    DimseListenerConfigUpdatePayload,
+    // DimseListenerStatus, // This is unused in api.ts per problems.txt
+
+    // From dimseQrSourceSchema.ts (via index.ts)
+    DimseQueryRetrieveSourceRead,
+    DimseQueryRetrieveSourceCreatePayload,
+    DimseQueryRetrieveSourceUpdatePayload,
+    // DimseQrSourceStatus, // This is unused in api.ts per problems.txt
+
+    // From storageBackendSchema.ts (via index.ts)
+    StorageBackendConfigRead,
+    StorageBackendConfigCreatePayload,
+    StorageBackendConfigUpdatePayload,
+
+    // From scheduleSchema.ts (via index.ts) - CRITICAL CHANGE HERE
+    Schedule, // RENAME: This is what you likely mean by 'Schedule' for reading
+    ScheduleCreate,
+    ScheduleUpdate,
+
+    // From dashboardSchema.ts (via index.ts)
+    DicomWebPollersStatusResponse,
+    DimseListenersStatusResponse,
+    DimseQrSourcesStatusResponse,
+
+    // From aiAssistSchema.ts (via index.ts)
+    RuleGenRequest,
+    RuleGenResponse,
+
+    // From googleHealthcareSourceSchema.ts (via index.ts)
     GoogleHealthcareSourceRead,
     GoogleHealthcareSourceCreate,
     GoogleHealthcareSourceUpdate,
-} from '../schemas';
-import { DiskUsageStats } from '@/schemas';
+    // GoogleHealthcareSourceFormData, // Already imported separately below
+
+    DiskUsageStats // from system.ts
+} from '@/schemas/';
+
+import { 
+    AiPromptConfigRead,
+    AiPromptConfigCreatePayload, // Add this
+    AiPromptConfigUpdatePayload,
+    // AiPromptConfigSummary, // If you use it
+ } from '@/schemas/aiPromptConfigSchema';
+
 import {
     DataBrowserQueryRequest,
     DataBrowserQueryResponse
 } from '../schemas/data_browser';
-import { GoogleHealthcareSourceFormData } from '@/schemas/googleHealthcareSourceSchema';
-import json5 from 'json5';
 
 let authContextRef: AuthContextType | null = null;
 
@@ -38,11 +107,11 @@ const determineApiBaseUrl = (): string => {
     const apiPrefix: string = '/api/v1';
 
     let origin: string = '';
-    let protocol: string = 'https';
+ //   let protocol: string = 'https';
 
     if (typeof window !== 'undefined') {
         origin = window.location.origin;
-        protocol = window.location.protocol.replace(':', '');
+ //       protocol = window.location.protocol.replace(':', '');
     } else {
         console.warn("Cannot determine window origin, API calls might fail if relative path doesn't work.");
     }
@@ -356,61 +425,123 @@ export const getGoogleHealthcareSource = async (id: number): Promise<GoogleHealt
     return apiClient<GoogleHealthcareSourceRead>(`/config/google-healthcare-sources/${id}`);
 };
 
-export const createGoogleHealthcareSource = async (
-    data: GoogleHealthcareSourceFormData
-): Promise<GoogleHealthcareSourceRead> => {
-    let parsedFilters: Record<string, any> | null = null;
-    if (data.query_filters && data.query_filters.trim()) {
-        try {
-            parsedFilters = json5.parse(data.query_filters);
-        } catch (e) {
-             console.error("Error parsing query_filters on create", e);
-             throw new Error(`Invalid JSON in query_filters: ${e instanceof Error ? e.message : String(e)}`);
-        }
-    }
-    const payload: GoogleHealthcareSourceCreate = {
-        ...data,
-        query_filters: parsedFilters,
-        description: data.description?.trim() || null,
-    };
-    return apiClient<GoogleHealthcareSourceRead>('/config/google-healthcare-sources/', { method: 'POST', body: JSON.stringify(payload) });
-};
-
-export const updateGoogleHealthcareSource = async (
-    id: number,
-    data: Partial<GoogleHealthcareSourceFormData>
-): Promise<GoogleHealthcareSourceRead> => {
-    let parsedFilters: Record<string, any> | null | undefined = undefined;
-    if (data.query_filters !== undefined) {
-        if (data.query_filters && data.query_filters.trim()) {
-             try {
-                 parsedFilters = json5.parse(data.query_filters);
-             } catch (e) {
-                  console.error("Error parsing query_filters on update", e);
-                  throw new Error(`Invalid JSON in query_filters: ${e instanceof Error ? e.message : String(e)}`);
-             }
-        } else {
-             parsedFilters = null;
-        }
-    }
-
-    const payload: Partial<GoogleHealthcareSourceUpdate> = {
-        ...data,
-        ...(parsedFilters !== undefined && { query_filters: parsedFilters }),
-        ...(data.description !== undefined && { description: data.description?.trim() || null }),
-    };
-    if (parsedFilters === undefined) {
-        delete payload.query_filters;
-    }
-
-    return apiClient<GoogleHealthcareSourceRead>(`/config/google-healthcare-sources/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-};
-
-
 export const deleteGoogleHealthcareSource = async (id: number): Promise<void> => {
     return apiClient<void>(`/config/google-healthcare-sources/${id}`, { method: 'DELETE' });
 };
 
+export const getAiPromptConfigs = (
+    skip: number = 0,
+    limit: number = 100
+): Promise<AiPromptConfigRead[]> => {
+    return apiClient<AiPromptConfigRead[]>('/config/ai-prompts', { params: { skip, limit } });
+};
+
+export const getAiPromptConfigById = (id: number): Promise<AiPromptConfigRead> => {
+    return apiClient<AiPromptConfigRead>(`/config/ai-prompts/${id}`);
+};
+
+export const createAiPromptConfig = (
+    data: AiPromptConfigCreatePayload
+): Promise<AiPromptConfigRead> => {
+    return apiClient<AiPromptConfigRead>('/config/ai-prompts', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+};
+
+export const updateAiPromptConfig = (
+    id: number,
+    data: AiPromptConfigUpdatePayload
+): Promise<AiPromptConfigRead> => {
+    return apiClient<AiPromptConfigRead>(`/config/ai-prompts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+};
+
+export const deleteAiPromptConfig = (id: number): Promise<AiPromptConfigRead> => { // Backend returns deleted obj
+    return apiClient<AiPromptConfigRead>(`/config/ai-prompts/${id}`, { method: 'DELETE' });
+};
+
+export const createGoogleHealthcareSource = async (
+    payload: GoogleHealthcareSourceCreate 
+): Promise<GoogleHealthcareSourceRead> => {
+
+    return apiClient<GoogleHealthcareSourceRead>(
+        '/config/google-healthcare-sources/', 
+        { method: 'POST', body: JSON.stringify(payload) }
+    );
+};
+
+export const updateGoogleHealthcareSource = async (
+    id: number,
+    payload: GoogleHealthcareSourceUpdate 
+): Promise<GoogleHealthcareSourceRead> => {
+    return apiClient<GoogleHealthcareSourceRead>(
+        `/config/google-healthcare-sources/${id}`, 
+        { method: 'PUT', body: JSON.stringify(payload) }
+    );
+};
+
 
 export type { UserWithRoles };
+
+export type {
+    Ruleset,
+    Rule,
+    ApiKey,
+    ApiKeyCreate,
+    ApiKeyCreateResponse,
+    // ApiKeyUpdate, // If needed by other components
+    UserRoleUpdatePayload, // Already UserUpdate as UserRoleUpdatePayload
+    Role,
+    SystemStatusReport,
+    ComponentStatus,
+    DicomWebSourceConfigRead,
+    DicomWebSourceConfigCreatePayload,
+    DicomWebSourceConfigUpdatePayload,
+    // DicomWebSourceStatus, // If needed
+    DimseListenerConfigRead,
+    DimseListenerConfigCreatePayload,
+    DimseListenerConfigUpdatePayload,
+    // DimseListenerStatus, // If needed
+    StorageBackendConfigRead,
+    StorageBackendConfigCreatePayload,
+    StorageBackendConfigUpdatePayload,
+    Schedule, // Use the corrected name
+    ScheduleCreate,
+    ScheduleUpdate,
+    DimseQueryRetrieveSourceRead,
+    DimseQueryRetrieveSourceCreatePayload,
+    DimseQueryRetrieveSourceUpdatePayload,
+    // DimseQrSourceStatus, // If needed
+    RuleGenRequest,
+    RuleGenResponse,
+    SystemInfo,
+    GoogleHealthcareSourceRead,
+    GoogleHealthcareSourceCreate,
+    GoogleHealthcareSourceUpdate,
+    DiskUsageStats,
+    DicomWebPollersStatusResponse,
+    DimseListenersStatusResponse,
+    DimseQrSourcesStatusResponse,
+    AiPromptConfigRead,
+    AiPromptConfigCreatePayload,
+    AiPromptConfigUpdatePayload,
+    DataBrowserQueryRequest,
+    DataBrowserQueryResponse,
+    CrosswalkDataSourceRead,
+    CrosswalkDataSourceCreatePayload,
+    CrosswalkDataSourceUpdatePayload,
+    CrosswalkMapRead,
+    CrosswalkMapCreatePayload,
+    CrosswalkMapUpdatePayload,
+    // Add any other types that components import from api.ts
+    // For example, if RulesetCreate, RulesetUpdate are used by components directly from api.ts
+    RulesetCreate, 
+    RulesetUpdate, 
+    RuleCreate, 
+    RuleUpdate
+};
+
 export default apiClient;

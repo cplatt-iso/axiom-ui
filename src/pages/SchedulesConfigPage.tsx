@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from 'lucide-react';
 
-import { ScheduleRead } from '@/schemas'; // Import ScheduleRead type
+import { Schedule } from '@/schemas'; // Import ScheduleRead type
 import { getSchedules } from '@/services/api'; // Import API function
 
 import SchedulesTable from '@/components/SchedulesTable'; // Import the table component
@@ -15,11 +15,11 @@ import ScheduleFormModal from '@/components/ScheduleFormModal'; // Import the mo
 const SchedulesConfigPage: React.FC = () => {
     // --- State for Modal and Editing ---
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingSchedule, setEditingSchedule] = useState<ScheduleRead | null>(null);
+    const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
     // --- End State ---
 
     // --- Data Fetching ---
-    const { data: schedules, isLoading, error, refetch } = useQuery<ScheduleRead[], Error>({
+    const { data: schedules, isLoading, error, refetch } = useQuery<Schedule[], Error>({
         queryKey: ['schedules'], // Query key for fetching schedules
         queryFn: () => getSchedules(0, 500), // Fetch schedules
         // Optional: Add staleTime, gcTime etc. if desired
@@ -32,7 +32,7 @@ const SchedulesConfigPage: React.FC = () => {
         setIsModalOpen(true);
     }, []); // Stable callback
 
-    const handleEdit = useCallback((schedule: ScheduleRead) => {
+    const handleEdit = useCallback((schedule: Schedule) => {
         setEditingSchedule(schedule);
         setIsModalOpen(true);
     }, []); // Stable callback
@@ -42,15 +42,6 @@ const SchedulesConfigPage: React.FC = () => {
         setEditingSchedule(null); // Clear editing state
     }, []); // Stable callback
 
-    // Success handler for modal (refetch handled by mutations inside modal now)
-    const handleSuccess = useCallback(() => {
-        // Refetch is handled by query invalidation within the modal's mutation callbacks
-        // refetch(); // Optionally force refetch here if needed, but invalidation is better
-        closeModal();
-    }, [closeModal]); // Depends only on stable closeModal
-    // --- End Handlers ---
-
-    // --- Render Logic ---
     const renderContent = () => {
         if (isLoading) {
             return <p className="text-center text-gray-500 dark:text-gray-400 py-10">Loading Schedules...</p>;
@@ -107,7 +98,6 @@ const SchedulesConfigPage: React.FC = () => {
             <ScheduleFormModal
                 isOpen={isModalOpen}
                 onClose={closeModal}
-                onSuccess={handleSuccess} // Use the updated success handler
                 existingSchedule={editingSchedule} // Pass the schedule being edited
             />
             {/* --- End Render Modal --- */}

@@ -1,11 +1,10 @@
 // src/components/rule-form/RuleFormTagModifications.tsx
 import React, { useCallback } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'; // Keep TrashIcon
-import { Loader2 } from 'lucide-react'; // Keep Loader2 if used elsewhere, or remove
+//import { Loader2 } from 'lucide-react'; // Keep Loader2 if used elsewhere, or remove
 import { z } from 'zod';
 
 import {
-    TagModificationFormData,
     ModifyActionSchema,
     TagSetModificationSchema,
     TagPrependModificationSchema,
@@ -14,7 +13,9 @@ import {
     TagCopyModificationSchema,
     TagMoveModificationSchema,
     TagCrosswalkModificationSchema,
-    ModifyAction, // Import the type
+    ModifyAction, 
+    TagModificationFormData,
+//    TagModificationUnion
 } from '@/schemas/ruleSchema';
 
 import { CrosswalkMapRead } from '@/schemas'; // Main schema import
@@ -29,20 +30,40 @@ import { Input } from '@/components/ui/input';
 import { cn } from "@/lib/utils"; // Import cn utility
 
 interface RuleFormTagModificationsProps {
-    tagModifications: TagModificationFormData[];
-    updateTagModification: (index: number, field: keyof TagModificationFormData | 'tagInfo' | 'sourceTagInfo' | 'destTagInfo' | 'crosswalk_map_id', value: any) => void;
-    addTagModification: () => void;
-    removeTagModification: (index: number) => void;
-    isLoading: boolean;
-    validationErrors: Record<string, string>; // Expects errors like "tag_modifications[0].tag"
-    // Remove style props if not strictly needed
-    // baseInputStyles: string;
-    // errorInputStyles: string;
-    // normalInputStyles: string;
-    availableCrosswalkMaps: CrosswalkMapRead[];
-    crosswalkMapsLoading: boolean;
-    crosswalkMapsError: Error | null;
-    containerRef?: React.RefObject<HTMLElement>; // Add containerRef prop
+  tagModifications: TagModificationFormData[];
+
+  updateTagModification: (
+    index: number,
+    field:
+      | 'action'
+      | 'tag'
+      | 'value'
+      | 'vr'
+      | 'pattern'
+      | 'replacement'
+      | 'source_tag'
+      | 'destination_tag'
+      | 'destination_vr'
+      | 'crosswalk_map_id'
+      | 'tagInfo'
+      | 'sourceTagInfo'
+      | 'destTagInfo',
+    value: any
+  ) => void;
+
+  addTagModification: () => void;
+  removeTagModification: (index: number) => void;
+
+  isLoading?: boolean;
+  validationErrors?: Record<string, any>;
+
+  availableCrosswalkMaps?: CrosswalkMapRead[];
+  crosswalkMapsLoading?: boolean;
+  crosswalkMapsError?: string;
+
+  containerRef?: React.RefObject<HTMLDivElement>;
+  errors?: Record<string, any>;
+  disabled?: boolean;
 }
 
 // Define constants
@@ -81,7 +102,7 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
     const renderModificationInputs = useCallback((mod: TagModificationFormData, index: number): [React.ReactNode, React.ReactNode] => {
         // Helper to get error message for a specific field
         const getError = (keySuffix: string): string | undefined => validationErrors?.[`tag_modifications[${index}].${keySuffix}`];
-        const hasError = (keySuffix: string): boolean => !!getError(keySuffix);
+        // const hasError = (keySuffix: string): boolean => !!getError(keySuffix);
 
         switch (mod.action) {
             case ModifyActionSchema.enum.set:
@@ -345,8 +366,8 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                      const [inputCol1, inputCol2] = renderModificationInputs(mod, index);
 
                      // Determine if we need a target tag or source tag based on action
-                     const needsTargetTag = ![ModifyActionSchema.enum.copy, ModifyActionSchema.enum.move, ModifyActionSchema.enum.crosswalk].includes(mod.action);
-                     const needsSourceTag = [ModifyActionSchema.enum.copy, ModifyActionSchema.enum.move].includes(mod.action);
+                     const needsTargetTag = !(['copy', 'move', 'crosswalk'] as ModifyAction[]).includes(mod.action);
+                     const needsSourceTag = (['copy', 'move'] as ModifyAction[]).includes(mod.action);
 
                      return (
                         <div key={index} className="relative flex items-start space-x-2 p-3 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700/50">

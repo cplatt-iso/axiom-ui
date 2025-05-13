@@ -5,7 +5,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 // --- Import updateRuleset ---
 import { createRuleset, updateRuleset } from '../services/api';
 // --- Import Ruleset, RulesetCreate, AND RulesetUpdate schemas ---
-import { Ruleset, RulesetCreate, RulesetUpdate } from '../schemas';
+import { Ruleset, RulesetCreate, RulesetUpdate } from '@/schemas/';
 
 interface CreateRulesetModalProps {
   isOpen: boolean;

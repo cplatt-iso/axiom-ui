@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { formatDistanceToNowStrict } from 'date-fns';
+// import { formatDistanceToNowStrict } from 'date-fns';
 import {
     ColumnDef, flexRender, getCoreRowModel, useReactTable, SortingState, getSortedRowModel
 } from "@tanstack/react-table";
@@ -15,17 +15,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Edit, Trash2, ArrowUpDown, Loader2, Wifi, WifiOff } from 'lucide-react';
 import { CrosswalkMapRead } from '@/schemas'; // Import types
 import { deleteCrosswalkMap } from '@/services/api'; // Import API functions
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Helper to format optional dates (reuse)
-const formatOptionalDate = (dateString: string | null | undefined): string => {
-    if (!dateString) return 'N/A';
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return 'Invalid Date';
-        return formatDistanceToNowStrict(date, { addSuffix: true });
-    } catch (e) { return 'Invalid Date'; }
-};
+//const formatOptionalDate = (dateString: string | null | undefined): string => {
+//    if (!dateString) return 'N/A';
+//    try {
+//        const date = new Date(dateString);
+//        if (isNaN(date.getTime())) return 'Invalid Date';
+//        return formatDistanceToNowStrict(date, { addSuffix: true });
+//    } catch (e) { return 'Invalid Date'; }
+//};
 
 // SortableHeader component (reuse)
 const SortableHeader = ({ column, title }: { column: any, title: string }) => (

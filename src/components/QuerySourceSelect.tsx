@@ -1,5 +1,5 @@
 // frontend/src/components/QuerySourceSelect.tsx
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, Database, Check, ChevronsUpDown } from 'lucide-react';
+import { AlertTriangle, Database, ChevronsUpDown } from 'lucide-react';
 
 import { getDicomWebSources, getDimseQrSources, getGoogleHealthcareSources } from '@/services/api';
 import { DicomWebSourceConfigRead, DimseQueryRetrieveSourceRead, GoogleHealthcareSourceRead } from '@/schemas';

@@ -1,6 +1,6 @@
 // src/components/UserManagementTable.tsx
 import React from 'react';
-import { UserWithRoles, Role } from '../services/api'; // Import types
+import { UserWithRoles } from '../services/api'; // Import types
 import { formatDistanceToNow } from 'date-fns';
 import { PencilSquareIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 

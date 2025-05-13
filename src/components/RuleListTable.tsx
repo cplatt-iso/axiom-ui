@@ -1,16 +1,14 @@
 // src/components/RuleListTable.tsx
 import React from 'react';
 import { Rule } from '../services/api';
-import { formatDistanceToNow, format } from 'date-fns';
 import {
     PencilSquareIcon, TrashIcon, PlayIcon, PauseIcon, CheckCircleIcon, XCircleIcon,
-    PencilIcon, ListBulletIcon, ArrowRightCircleIcon, ClockIcon
+    ClockIcon
 } from '@heroicons/react/24/outline';
 // --- ADDED: Lucide Icons for Destinations ---
 import { Database, Server, Cloud, HardDrive } from 'lucide-react';
 // --- END ADDED ---
 import { Badge } from "@/components/ui/badge";
-import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // --- ADDED BACK: Helper for Destination Styling ---
@@ -36,12 +34,12 @@ interface RuleListTableProps {
 
 const RuleListTable: React.FC<RuleListTableProps> = ({ rules, onEdit, onDelete, onToggleStatus }) => {
 
-    const formatDate = (dateString: string | null | undefined, formatType: 'relative' | 'absolute' = 'relative'): string => {
-        // ... date formatting logic ...
-        if (!dateString) return 'N/A';
-        try { const date = new Date(dateString); if (isNaN(date.getTime())) return 'Invalid Date'; if (formatType === 'relative') return formatDistanceToNow(date) + ' ago'; else return format(date, 'PPpp'); }
-        catch (error) { console.error("Failed to format date:", dateString, error); return 'Invalid Date'; }
-    };
+//    const formatDate = (dateString: string | null | undefined, formatType: 'relative' | 'absolute' = 'relative'): string => {
+//        // ... date formatting logic ...
+//        if (!dateString) return 'N/A';
+//        try { const date = new Date(dateString); if (isNaN(date.getTime())) return 'Invalid Date'; if (formatType === 'relative') return formatDistanceToNow(date) + ' ago'; else return format(date, 'PPpp'); }
+//        catch (error) { console.error("Failed to format date:", dateString, error); return 'Invalid Date'; }
+//   };
 
     if (!rules || rules.length === 0) {
         return <p className="text-center text-gray-500 dark:text-gray-400 py-4">No rules defined for this ruleset yet.</p>;

@@ -1,7 +1,7 @@
 // src/pages/JsonApiInfoPage.tsx
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, Server, CheckCircle, Code } from 'lucide-react';
+import { AlertCircle, CheckCircle, Code } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const JsonApiInfoPage: React.FC = () => {

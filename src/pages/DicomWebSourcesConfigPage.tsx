@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 // Updated Icons
-import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Loader2, Globe, PowerOff, PauseCircle, PlayCircle, LinkIcon } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Loader2, PowerOff, PauseCircle, PlayCircle, LinkIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip components
 
 import { DicomWebSourceConfigRead } from '@/schemas';
@@ -105,7 +105,7 @@ const DicomWebSourcesConfigPage: React.FC = () => {
         { // Type Icon
             id: 'type',
             header: () => <div className="px-2 text-center">Type</div>,
-            cell: ({ row }) => {
+            cell: ({ }) => {
                 const style = getScraperTypeStyle('dicomweb'); // Always dicomweb here
                  return (
                      <Tooltip>

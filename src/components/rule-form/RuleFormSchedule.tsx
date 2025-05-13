@@ -1,6 +1,6 @@
 // src/components/rule-form/RuleFormSchedule.tsx
 import React from 'react';
-import { ScheduleRead } from '@/schemas'; // API Schema Type
+import { Schedule } from '@/schemas'; // API Schema Type
 import { Label } from "@/components/ui/label"; // Shadcn Label
 import {
     Select,
@@ -13,17 +13,17 @@ import { cn } from "@/lib/utils"; // For conditional classes
 
 interface RuleFormScheduleProps {
     selectedScheduleId: number | null | undefined;
-    availableSchedules: ScheduleRead[]; // Array of Schedule objects from API
+    availableSchedules: Schedule[]; // Array of Schedule objects from API
     onScheduleChange: (scheduleId: number | null) => void; // Callback to update parent state
     isLoading: boolean; // General loading state for the form
     schedulesLoading: boolean; // Specific loading state for schedules data
     schedulesError: Error | null; // Error object if schedules fetch failed
-    validationErrors: Record<string, string>; // Validation errors object
+    validationErrors: Record<string, string | undefined>; // Validation errors object
     // Remove style props if not needed, or adjust as necessary
     // baseInputStyles: string;
     // errorInputStyles: string;
     // normalInputStyles: string;
-    containerRef?: React.RefObject<HTMLElement>; // Prop for Radix Portal container fix
+    containerRef: React.RefObject<HTMLDivElement | null>; // Prop for Radix Portal container fix
 }
 
 // Re-define style constants locally if needed

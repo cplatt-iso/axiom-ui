@@ -15,7 +15,7 @@ interface DicomTagComboboxProps {
     inputId?: string; // <-- ADDED: ID prop for the input element
 }
 
-const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
+export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
     value,
     onChange,
     disabled = false,

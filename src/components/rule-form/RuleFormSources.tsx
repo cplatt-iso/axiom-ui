@@ -16,7 +16,7 @@ interface RuleFormSourcesProps {
     // --- End Prop Types Update ---
     isLoading: boolean; // Overall form/data loading state (used for disabling)
     sourcesLoading: boolean; // Specific loading state for the sources data
-    validationErrors: Record<string, string>;
+    validationErrors: Record<string, string | undefined>;
     normalInputStyles: string;
 }
 

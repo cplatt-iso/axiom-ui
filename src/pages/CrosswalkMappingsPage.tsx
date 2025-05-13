@@ -2,10 +2,10 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusCircle, Map } from 'lucide-react'; // Use Map icon
-import { CrosswalkMapRead } from '@/schemas'; // Import schema type
+import { CrosswalkMapFormData, CrosswalkMapRead } from '@/schemas'; // Import schema type
 import { getCrosswalkMaps } from '@/services/api'; // Import API function
 import CrosswalkMappingTable from '@/components/CrosswalkMappingTable'; // Import the table component (we created this)
-import CrosswalkMappingFormModal from '@/components/CrosswalkMappingFormModal'; // Import the modal component (we created this)
+import { CrosswalkMappingFormModal } from '@/components/CrosswalkMappingFormModal'
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
 import { AlertCircle } from 'lucide-react'; // Import icon for Alert
@@ -38,9 +38,6 @@ const CrosswalkMappingsPage: React.FC = () => {
     }, []); // Empty dependency array
 
     // Success handler (currently just closes modal, refetch done by mutation)
-    const handleSuccess = useCallback(() => {
-        closeModal();
-    }, [closeModal]);
 
     // Render Logic
     const renderContent = () => {
@@ -97,8 +94,13 @@ const CrosswalkMappingsPage: React.FC = () => {
             <CrosswalkMappingFormModal
                 isOpen={isModalOpen}
                 onClose={closeModal}
-                existingMap={editingMap}
-                // onSuccess={handleSuccess} // onSuccess is handled internally by mutation now
+                existingMap={editingMap} onSubmitSuccess={function (_data: CrosswalkMapRead): void {
+                    throw new Error('Function not implemented.');
+                } } dataSources={[]} createApiFn={function (_data: CrosswalkMapFormData): Promise<CrosswalkMapRead> {
+                    throw new Error('Function not implemented.');
+                } } updateApiFn={function (_id: number, _data: Partial<CrosswalkMapFormData>): Promise<CrosswalkMapRead> {
+                    throw new Error('Function not implemented.');
+                } }                // onSuccess={handleSuccess} // onSuccess is handled internally by mutation now
             />
         </div>
     );

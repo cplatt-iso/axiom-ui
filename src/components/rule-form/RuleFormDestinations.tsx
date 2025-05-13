@@ -11,7 +11,7 @@ interface RuleFormDestinationsProps {
     availableDestinations: StorageBackendConfigRead[]; // Array of Destination objects from API
     onSelectionChange: (backendId: number, checked: boolean) => void; // Callback to update parent state
     isLoading: boolean; // General loading state for the form
-    validationErrors: Record<string, string>; // Validation errors object (expects "destination_ids" key for general error)
+    validationErrors: Record<string, string | undefined>; // Validation errors object (expects "destination_ids" key for general error)
 }
 
 const RuleFormDestinations: React.FC<RuleFormDestinationsProps> = ({

@@ -1,5 +1,5 @@
 // src/components/ManageUserRolesModal.tsx
-import React, { useState, useEffect, Fragment, useCallback } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { UserWithRoles, Role, assignRoleToUser, removeRoleFromUser } from '../services/api'; // Import types and API calls
 

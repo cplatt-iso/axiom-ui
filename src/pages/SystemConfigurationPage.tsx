@@ -1,8 +1,7 @@
 // src/pages/SystemConfigurationPage.tsx
 import React from 'react';
-import { Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { WrenchScrewdriverIcon } from '@heroicons/react/24/outline'; // Use correct icon if needed elsewhere
 
 interface SystemConfigTab {
     value: string;

@@ -25,11 +25,9 @@ import {
     AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger, // Often needed with AlertDialog
+    AlertDialogTitle, // Often needed with AlertDialog
 } from "@/components/ui/alert-dialog";
 
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal, ArrowUpDown, PlusCircle, Trash2, Edit } from "lucide-react";
 import {
@@ -54,12 +52,21 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
     const [sourceToDelete, setSourceToDelete] = useState<GoogleHealthcareSourceRead | null>(null);
 
     // Fetch data using TanStack Query
-    const { data: sources = [], isLoading, error } = useQuery<GoogleHealthcareSourceRead[]>({
+    const { data: sources = [], isLoading, error } = useQuery<
+        GoogleHealthcareSourceRead[],           // ←  queryFnData
+        Error                                   // ←  error type (optional but nice)
+    >({
         queryKey: ['googleHealthcareSources'], // Unique query key for this source type
-        queryFn: getGoogleHealthcareSources,
+        queryFn: ({ queryKey }) => {
+            const [, { skip, limit }] = queryKey as [
+                string,
+                { skip?: number; limit?: number }
+            ];
+            return getGoogleHealthcareSources(skip, limit);
+        },
     });
 
-     // Mutation for deleting a source
+    // Mutation for deleting a source
     const deleteMutation = useMutation({
         mutationFn: deleteGoogleHealthcareSource,
         onSuccess: (_, deletedId) => {
@@ -71,11 +78,11 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
             toast.error(`Deletion failed for ID ${deletedId}: ${errorMsg}`);
             console.error(`Delete Google Healthcare Source error for ID ${deletedId}:`, err);
         },
-         onSettled: () => {
-             // Always close dialog regardless of outcome
-             setIsDeleteDialogOpen(false);
-             setSourceToDelete(null);
-         }
+        onSettled: () => {
+            // Always close dialog regardless of outcome
+            setIsDeleteDialogOpen(false);
+            setSourceToDelete(null);
+        }
     });
 
     const openModalForCreate = () => {
@@ -88,16 +95,16 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
-     const openDeleteDialog = (source: GoogleHealthcareSourceRead) => {
-         setSourceToDelete(source);
-         setIsDeleteDialogOpen(true);
-     };
+    const openDeleteDialog = (source: GoogleHealthcareSourceRead) => {
+        setSourceToDelete(source);
+        setIsDeleteDialogOpen(true);
+    };
 
-     const confirmDelete = () => {
-         if (sourceToDelete) {
-             deleteMutation.mutate(sourceToDelete.id);
-         }
-     };
+    const confirmDelete = () => {
+        if (sourceToDelete) {
+            deleteMutation.mutate(sourceToDelete.id);
+        }
+    };
 
     // Define table columns
     const columns = useMemo<ColumnDef<GoogleHealthcareSourceRead>[]>(() => [
@@ -117,48 +124,48 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
         { accessorKey: 'gcp_dataset_id', header: 'Dataset ID', cell: info => info.getValue() },
         { accessorKey: 'gcp_dicom_store_id', header: 'DICOM Store ID', cell: info => info.getValue() },
         {
-             accessorKey: 'is_enabled',
-             header: 'Enabled',
-             cell: info => <Checkbox checked={info.getValue<boolean>()} disabled className="block mx-auto" />
+            accessorKey: 'is_enabled',
+            header: 'Enabled',
+            cell: info => <Checkbox checked={info.getValue<boolean>()} disabled className="block mx-auto" />
         },
         {
-             accessorKey: 'is_active',
-             header: 'Polling Active',
-             cell: info => <Checkbox checked={info.getValue<boolean>()} disabled className="block mx-auto"/>
+            accessorKey: 'is_active',
+            header: 'Polling Active',
+            cell: info => <Checkbox checked={info.getValue<boolean>()} disabled className="block mx-auto" />
         },
-         {
+        {
             accessorKey: 'polling_interval_seconds',
             header: 'Poll Interval (s)',
             cell: info => info.getValue()
         },
         {
-             accessorKey: 'updated_at',
-             header: ({ column }) => (
+            accessorKey: 'updated_at',
+            header: ({ column }) => (
                 <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
                     Last Updated <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             ),
-	    cell: info => {
-                 const dateValue = info.getValue<string | null | undefined>();
-                 if (!dateValue) {
-                     return <span className="text-muted-foreground italic">N/A</span>; // Handle null/undefined
-                 }
-                 try {
+            cell: info => {
+                const dateValue = info.getValue<string | null | undefined>();
+                if (!dateValue) {
+                    return <span className="text-muted-foreground italic">N/A</span>; // Handle null/undefined
+                }
+                try {
                     // Use parseISO for better ISO 8601 parsing and check validity
                     const parsedDate = parseISO(dateValue);
                     if (isValid(parsedDate)) {
-                         return format(parsedDate, 'yyyy-MM-dd HH:mm');
+                        return format(parsedDate, 'yyyy-MM-dd HH:mm');
                     } else {
-                         // Handle cases where the string is present but not valid ISO
-                         console.warn(`Invalid date format received for updated_at: ${dateValue}`);
-                         return <span className="text-destructive text-xs">Invalid Date</span>;
+                        // Handle cases where the string is present but not valid ISO
+                        console.warn(`Invalid date format received for updated_at: ${dateValue}`);
+                        return <span className="text-destructive text-xs">Invalid Date</span>;
                     }
-                 } catch (e) {
+                } catch (e) {
                     // Catch any unexpected errors during parsing/formatting
-                     console.error(`Error formatting date: ${dateValue}`, e);
-                     return <span className="text-destructive text-xs">Error</span>;
-                 }
-             }
+                    console.error(`Error formatting date: ${dateValue}`, e);
+                    return <span className="text-destructive text-xs">Error</span>;
+                }
+            }
         },
         {
             id: 'actions',
@@ -176,12 +183,12 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
                             <DropdownMenuItem onClick={() => openModalForEdit(source)}>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
                             </DropdownMenuItem>
-                             <DropdownMenuSeparator />
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                 onClick={() => openDeleteDialog(source)}
-                             >
-                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
@@ -208,9 +215,9 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
         <div className="container mx-auto py-6 px-4">
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-semibold">Google Healthcare DICOM Store Sources</h1>
-                 <Button onClick={openModalForCreate}>
-                     <PlusCircle className="mr-2 h-4 w-4" /> Add GHC Source
-                 </Button>
+                <Button onClick={openModalForCreate}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add GHC Source
+                </Button>
             </div>
             <p className="text-muted-foreground mb-4">Configure Google Cloud Healthcare DICOM Stores as sources for polling.</p>
 
@@ -229,10 +236,10 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
-                             Array.from({ length: 5 }).map((_, i) => (
+                            Array.from({ length: 5 }).map((_, i) => (
                                 <TableRow key={`skeleton-${i}`}>
-                                    {columns.map(column => (
-                                        <TableCell key={column.id || i + '-cell-' + column.accessorKey}>
+                                    {columns.map((_, colIdx) => (
+                                        <TableCell key={`skeleton-${i}-${colIdx}`}>
                                             <Skeleton className="h-6 w-full" />
                                         </TableCell>
                                     ))}
@@ -260,8 +267,8 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
             </div>
 
             {/* Pagination Controls */}
-             <div className="flex items-center justify-end space-x-2 py-4">
-                 <Button
+            <div className="flex items-center justify-end space-x-2 py-4">
+                <Button
                     variant="outline"
                     size="sm"
                     onClick={() => table.previousPage()}
@@ -270,8 +277,8 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
                     Previous
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                     Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                 </span>
+                    Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                </span>
                 <Button
                     variant="outline"
                     size="sm"
@@ -284,32 +291,32 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
 
             {/* Create/Edit Modal */}
             <GoogleHealthcareSourceFormModal
-                 isOpen={isModalOpen}
-                 onClose={() => setIsModalOpen(false)}
-                 source={editingSource}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                source={editingSource}
             />
 
-             {/* Delete Confirmation Dialog */}
-             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                 <AlertDialogContent>
-                     <AlertDialogHeader>
-                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                         <AlertDialogDescription>
-                             This action cannot be undone. This will permanently delete the Google Healthcare source configuration named "{sourceToDelete?.name}".
-                         </AlertDialogDescription>
-                     </AlertDialogHeader>
-                     <AlertDialogFooter>
-                         <AlertDialogCancel onClick={() => setSourceToDelete(null)}>Cancel</AlertDialogCancel>
-                         <AlertDialogAction
-                             onClick={confirmDelete}
-                             disabled={deleteMutation.isPending}
-                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                             {deleteMutation.isPending ? "Deleting..." : "Delete"}
-                         </AlertDialogAction>
-                     </AlertDialogFooter>
-                 </AlertDialogContent>
-             </AlertDialog>
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the Google Healthcare source configuration named "{sourceToDelete?.name}".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setSourceToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            disabled={deleteMutation.isPending}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
         </div>
     );

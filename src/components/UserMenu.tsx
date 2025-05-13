@@ -1,7 +1,7 @@
 // src/components/UserMenu.tsx
 import React, { Fragment } from 'react';
 import { Menu, Transition } from '@headlessui/react';
-import { ChevronDownIcon, Cog8ToothIcon, KeyIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/20/solid';
+import { Cog8ToothIcon, KeyIcon, ArrowLeftOnRectangleIcon } from '@heroicons/react/20/solid';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 

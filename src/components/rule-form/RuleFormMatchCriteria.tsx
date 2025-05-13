@@ -1,7 +1,7 @@
 // src/components/rule-form/RuleFormMatchCriteria.tsx
 import React from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { z } from 'zod';
+// import { z } from 'zod';
 
 import {
     MatchCriterionFormData,
@@ -24,12 +24,12 @@ interface RuleFormMatchCriteriaProps {
     addMatchCriterion: () => void;
     removeMatchCriterion: (index: number) => void;
     isLoading: boolean;
-    validationErrors: Record<string, string>; // Expects errors keyed like "match_criteria[0].tag"
+    validationErrors: Record<string, string | undefined>; // Expects errors keyed like "match_criteria[0].tag"
     // Remove style props if not strictly needed
     // baseInputStyles: string;
     // errorInputStyles: string;
     // normalInputStyles: string;
-    containerRef?: React.RefObject<HTMLElement>; // Add containerRef for Select portal fix
+    containerRef: React.RefObject<HTMLDivElement | null>; // Add containerRef for Select portal fix
 }
 
 // Define constants within the component or globally if needed elsewhere

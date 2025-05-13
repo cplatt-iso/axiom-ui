@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 // Updated Icons
-import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Loader2, Network, PowerOff, PauseCircle, PlayCircle, LinkIcon } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Loader2, PowerOff, PauseCircle, PlayCircle, LinkIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip components
 
 import { DimseQueryRetrieveSourceRead } from '@/schemas';
@@ -101,7 +101,7 @@ const DimseQrSourcesConfigPage: React.FC = () => {
         { // Type Icon
             id: 'type',
             header: () => <div className="px-2 text-center">Type</div>,
-            cell: ({ row }) => {
+            cell: ({ }) => {
                 const style = getScraperTypeStyle('dimse-qr'); // Always dimse-qr here
                 return (
                      <Tooltip>

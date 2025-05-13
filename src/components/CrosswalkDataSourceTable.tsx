@@ -4,20 +4,61 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatDistanceToNowStrict } from 'date-fns';
 import {
-    ColumnDef, flexRender, getCoreRowModel, useReactTable, SortingState, getSortedRowModel
-} from "@tanstack/react-table";
-import {
-    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
-} from "@/components/ui/table";
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  SortingState,
+  useReactTable
+} from '@tanstack/react-table';
+
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
-    MoreHorizontal, Edit, Trash2, ArrowUpDown, Loader2, Wifi, WifiOff, Clock, AlertTriangle, CheckCircle, RefreshCw, DatabaseZap, Play, HelpCircle
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '@/components/ui/table';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
+} from '@/components/ui/tooltip';
+
+import {
+  AlertTriangle,
+  ArrowUpDown,
+  CheckCircle,
+  Clock,
+  DatabaseZap,
+  Edit,
+  HelpCircle,
+  Loader2,
+  MoreHorizontal,
+  RefreshCw,
+  Trash2,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
-import { CrosswalkDataSourceRead, CrosswalkSyncStatus } from '@/schemas'; // Import types
-import { deleteCrosswalkDataSource, testCrosswalkDataSourceConnection, triggerCrosswalkDataSourceSync } from '@/services/api'; // Import API functions
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+import { CrosswalkDataSourceRead } from '@/schemas';
+import { CrosswalkSyncStatus } from '@/schemas/crosswalkDataSourceSchema';
+
+import {
+  deleteCrosswalkDataSource,
+  testCrosswalkDataSourceConnection,
+  triggerCrosswalkDataSourceSync
+} from '@/services/api';
 
 // Helper to format optional dates (reuse from other components)
 const formatOptionalDate = (dateString: string | null | undefined): string => {
@@ -33,7 +74,7 @@ const formatOptionalDate = (dateString: string | null | undefined): string => {
 const getSyncStatusBadge = (status: CrosswalkSyncStatus): { text: string; Icon: React.ElementType; variant: 'default' | 'secondary' | 'destructive' | 'outline' } => {
     switch (status) {
         case 'SUCCESS': return { text: 'Success', Icon: CheckCircle, variant: 'default' };
-        case 'SYNCING': return { text: 'Syncing', Icon: Loader2, variant: 'secondary' };
+        case 'RUNNING': return { text: 'Syncing', Icon: Loader2, variant: 'secondary' };
         case 'FAILED': return { text: 'Failed', Icon: AlertTriangle, variant: 'destructive' };
         case 'PENDING': return { text: 'Pending', Icon: Clock, variant: 'outline' };
         default: return { text: 'Unknown', Icon: HelpCircle, variant: 'outline' };
@@ -129,13 +170,13 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
                 const { text, Icon, variant } = getSyncStatusBadge(status);
                 const tooltipText = status === 'FAILED'
                     ? `Failed: ${row.original.last_sync_error || 'Unknown error'}`
-                    : status === 'SYNCING'
+                    : status === 'RUNNING'
                     ? 'Currently syncing...'
                     : status === 'SUCCESS'
                     ? `Synced ${row.original.last_sync_row_count ?? '?'} rows ${formatOptionalDate(row.original.last_sync_time)}`
                     : `Sync pending. Last attempt: ${formatOptionalDate(row.original.last_sync_time)}`;
 
-                 const isSyncing = status === 'SYNCING' || syncingId === row.original.id;
+                 const isSyncing = status === 'RUNNING' || syncingId === row.original.id;
 
                  const badgeNode = (
                     <Badge variant={variant} className="flex items-center gap-1 w-fit">
@@ -169,7 +210,7 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
                  const isDeleting = deleteMutation.isPending && deleteMutation.variables === source.id;
                  const isTesting = testingConnectionId === source.id;
                  const isSyncingManual = syncingId === source.id;
-                 const isSyncingStatus = source.last_sync_status === 'SYNCING';
+                 const isSyncingStatus = source.last_sync_status === 'RUNNING';
                  const busy = isDeleting || isTesting || isSyncingManual || isSyncingStatus;
 
                  return (

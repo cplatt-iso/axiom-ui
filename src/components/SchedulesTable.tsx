@@ -10,10 +10,10 @@ import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Badge } from "@/components/ui/badge";
+// import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit, Trash2, ArrowUpDown, Loader2, Wifi, WifiOff } from 'lucide-react'; // Keep necessary icons
-import { ScheduleRead } from '@/schemas'; // Import ScheduleRead type
+import { Schedule } from '@/schemas'; // Import ScheduleRead type
 // API function for delete - update will be handled by modal
 import { deleteSchedule, updateSchedule } from '@/services/api';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -29,7 +29,7 @@ const formatOptionalDate = (dateString: string | null | undefined): string => {
 };
 
 // Helper to format TimeRanges for display
-const formatTimeRanges = (ranges: ScheduleRead['time_ranges']): string => {
+const formatTimeRanges = (ranges: Schedule['time_ranges']): string => {
     if (!Array.isArray(ranges) || ranges.length === 0) {
         return 'No ranges defined';
     }
@@ -46,7 +46,7 @@ const formatTimeRanges = (ranges: ScheduleRead['time_ranges']): string => {
 };
 
 // Tooltip content for TimeRanges
-const formatTimeRangesTooltip = (ranges: ScheduleRead['time_ranges']): string => {
+const formatTimeRangesTooltip = (ranges: Schedule['time_ranges']): string => {
      if (!Array.isArray(ranges) || ranges.length === 0) {
         return 'No time ranges defined for this schedule.';
     }
@@ -65,8 +65,8 @@ const SortableHeader = ({ column, title }: { column: any, title: string }) => (
 );
 
 interface SchedulesTableProps {
-    schedules: ScheduleRead[];
-    onEdit: (schedule: ScheduleRead) => void; // Callback to open edit modal
+    schedules: Schedule[];
+    onEdit: (schedule: Schedule) => void; // Callback to open edit modal
 }
 
 const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) => {
@@ -113,7 +113,7 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
         }
     };
 
-    const handleToggleEnabled = (schedule: ScheduleRead) => {
+    const handleToggleEnabled = (schedule: Schedule) => {
          const newStatus = !schedule.is_enabled;
          const actionText = newStatus ? 'enable' : 'disable';
          if (window.confirm(`Are you sure you want to ${actionText} schedule "${schedule.name}"?`)) {
@@ -121,7 +121,7 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
          }
      };
 
-    const columns: ColumnDef<ScheduleRead>[] = useMemo(() => [
+    const columns: ColumnDef<Schedule>[] = useMemo(() => [
         { accessorKey: "id", header: ({ column }) => <SortableHeader column={column} title="ID" />, cell: ({ row }) => <div className="w-10 font-mono text-xs">{row.getValue("id")}</div>, size: 50 },
         { accessorKey: "name", header: ({ column }) => <SortableHeader column={column} title="Name" />, cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>, size: 180 },
         { accessorKey: "description", header: "Description", cell: ({ row }) => <div className="text-xs text-gray-600 dark:text-gray-400 truncate max-w-xs" title={row.original.description ?? ''}>{row.original.description || '-'}</div>, size: 250 },
@@ -129,7 +129,7 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
             accessorKey: "time_ranges",
             header: "Time Ranges",
             cell: ({ row }) => {
-                const ranges = row.getValue("time_ranges") as ScheduleRead['time_ranges'];
+                const ranges = row.getValue("time_ranges") as Schedule['time_ranges'];
                 const displayString = formatTimeRanges(ranges);
                 const tooltipString = formatTimeRangesTooltip(ranges);
                 return (

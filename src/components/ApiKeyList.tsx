@@ -78,8 +78,8 @@ const ApiKeyList: React.FC<ApiKeyListProps> = ({ keys, onDeleteSuccess }) => {
                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400" title={formatTimestamp(key.created_at)}>
                                 {formatOptionalDate(key.created_at)}
                             </td>
-                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400" title={key.last_used_at ? formatTimestamp(key.last_used_at) : 'Never'}>
-                                {formatOptionalDate(key.last_used_at)}
+                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500 dark:text-gray-400" title={typeof key.last_used_at === 'string' ? formatTimestamp(key.last_used_at) : 'Never'}>
+                                {formatOptionalDate(key.last_used_at ?? undefined)}
                             </td>
                             <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                                 <button

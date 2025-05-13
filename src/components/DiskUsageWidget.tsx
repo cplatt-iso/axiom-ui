@@ -2,11 +2,11 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from "@/components/ui/progress"; // Shadcn progress bar
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// import { Progress } from "@/components/ui/progress"; // Shadcn progress bar
 import { HardDrive, AlertTriangle, Loader2, FolderOutput, FolderSymlink, FolderX, Info } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DiskUsageStats, DirectoryUsageStats } from '@/schemas';
+import { Tooltip, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { DiskUsageStats } from '@/schemas';
 import { getDiskUsage } from '@/services/api';
 import { formatBytes } from '@/utils/formatters';
 
@@ -56,15 +56,15 @@ const DiskUsageWidget: React.FC = () => {
         const formattedTotal = formatBytes(total_bytes);
         const formattedFree = formatBytes(free_bytes);
 
-        let percent_used_incoming = 0;
-        if (total_bytes > 0 && incomingDirSize > 0) {
-            percent_used_incoming = Math.min(100, (incomingDirSize / total_bytes) * 100);
-        }
+//        let percent_used_incoming = 0;
+//        if (total_bytes > 0 && incomingDirSize > 0) {
+//           percent_used_incoming = Math.min(100, (incomingDirSize / total_bytes) * 100);
+//      }
 
-        // Basic styling for progress bar (adjust colors if needed)
-        const progressStyle = {
-             '--progress-fill': percent_used_incoming > 90 ? 'hsl(var(--destructive))' : percent_used_incoming > 75 ? 'hsl(var(--warning))' : 'hsl(var(--primary))',
-        } as React.CSSProperties;
+// Basic styling for progress bar (adjust colors if needed)
+//        const progressStyle = {
+//             '--progress-fill': percent_used_incoming > 90 ? 'hsl(var(--destructive))' : percent_used_incoming > 75 ? 'hsl(var(--warning))' : 'hsl(var(--primary))',
+//        } as React.CSSProperties;
 
         return (
             <TooltipProvider delayDuration={150}>

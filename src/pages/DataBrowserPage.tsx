@@ -1,5 +1,5 @@
 // frontend/src/pages/DataBrowserPage.tsx
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Database, Loader2 } from 'lucide-react';
@@ -40,12 +40,12 @@ const DataBrowserPage: React.FC = () => {
 
     const handleMultiQuerySubmit = useCallback(async (params: DataBrowserQueryParam[]): Promise<void> => {
         if (selectedCompositeIds.length === 0) {
-             toast.error("Please select at least one data source before querying.");
-             setQueryErrors(["Please select at least one data source before querying."]);
-             setQueryMessages([]);
-             setQueriedSourcesInfo("");
-             setQueryResults([]); // Keep clearing here on SUBMIT
-             return;
+            toast.error("Please select at least one data source before querying.");
+            setQueryErrors(["Please select at least one data source before querying."]);
+            setQueryMessages([]);
+            setQueriedSourcesInfo("");
+            setQueryResults([]); // Keep clearing here on SUBMIT
+            return;
         }
 
         setIsQuerying(true);
@@ -84,9 +84,9 @@ const DataBrowserPage: React.FC = () => {
                     resolve(response);
 
                 } catch (error: any) {
-                     const errorMessage = error?.message || `Query failed for ${sourceName}`;
-                     console.error(`Query construction or submission failed for ${compositeId}:`, error);
-                     reject({ sourceName: sourceName, message: errorMessage });
+                    const errorMessage = error?.message || `Query failed for ${sourceName}`;
+                    console.error(`Query construction or submission failed for ${compositeId}:`, error);
+                    reject({ sourceName: sourceName, message: errorMessage });
                 }
             });
         });
@@ -111,16 +111,26 @@ const DataBrowserPage: React.FC = () => {
                 queriedSourceNames.push(nameForResult);
                 aggregatedResults.push(...(response.results || []));
                 if (response.message) {
-                     infoMessages.push(`${nameForResult}: ${response.message}`);
+                    infoMessages.push(`${nameForResult}: ${response.message}`);
                 }
                 successfulSourcesCount++;
             } else {
-                const reason = result.reason as { sourceName?: string, message?: string } | Error;
-                nameForResult = (reason && typeof reason === 'object' && reason.sourceName) ? reason.sourceName : nameForResult;
-                const message = (reason && typeof reason === 'object' && reason.message) ? reason.message : String(reason);
+                const reason = result.reason as Error | { sourceName?: string; message?: string };
+
+                // ──────── nameForResult ────────
+                if (reason && typeof reason === 'object' && 'sourceName' in reason && reason.sourceName) {
+                    nameForResult = reason.sourceName;
+                }
+
+                // ──────── error message ────────
+                const message =
+                    reason && typeof reason === 'object' && 'message' in reason && reason.message
+                        ? reason.message
+                        : String(reason);
+
                 queriedSourceNames.push(nameForResult);
                 errors.push(message);
-                 console.error(`Settled Promise Error for ${nameForResult}:`, reason);
+                console.error(`Settled Promise Error for ${nameForResult}:`, reason);
             }
         });
 
@@ -131,7 +141,7 @@ const DataBrowserPage: React.FC = () => {
         setIsQuerying(false);
 
         if (errors.length > 0) {
-             toast.error(`${errors.length} source(s) failed to query. Check results area for details.`);
+            toast.error(`${errors.length} source(s) failed to query. Check results area for details.`);
         } else if (infoMessages.length > 0) {
             // Optional info toast
         } else {
@@ -155,10 +165,10 @@ const DataBrowserPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-             <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Data Browser</h1>
-             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                 Query configured and enabled scraper sources (DICOMweb, DIMSE Q/R, Google Healthcare) to view study information.
-             </p>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Data Browser</h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Query configured and enabled scraper sources (DICOMweb, DIMSE Q/R, Google Healthcare) to view study information.
+            </p>
 
             <Card>
                 <CardHeader>
@@ -185,55 +195,55 @@ const DataBrowserPage: React.FC = () => {
             </Card>
 
             {showResults && (
-                 <Card>
-                     <CardHeader>
-                         <CardTitle>Query Results</CardTitle>
-                         <CardDescription>
-                             {isQuerying ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Query Results</CardTitle>
+                        <CardDescription>
+                            {isQuerying ? (
                                 <span className="flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin" />{queriedSourcesInfo}</span>
-                             ) : (
-                                 queriedSourcesInfo || "Query results:"
-                             )}
-                         </CardDescription>
-                     </CardHeader>
-                     <CardContent>
-                          {queryErrors.length > 0 && !isQuerying && (
-                             <div className="mb-4 space-y-2">
-                                 <Alert variant="destructive">
-                                     <AlertCircle className="h-4 w-4" />
-                                     <AlertTitle>Query Errors Encountered</AlertTitle>
-                                     <AlertDescription>
-                                         <ul className="list-disc pl-5">
-                                             {queryErrors.map((error, index) => (
+                            ) : (
+                                queriedSourcesInfo || "Query results:"
+                            )}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {queryErrors.length > 0 && !isQuerying && (
+                            <div className="mb-4 space-y-2">
+                                <Alert variant="destructive">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <AlertTitle>Query Errors Encountered</AlertTitle>
+                                    <AlertDescription>
+                                        <ul className="list-disc pl-5">
+                                            {queryErrors.map((error, index) => (
                                                 <li key={index}>{error}</li>
-                                             ))}
-                                         </ul>
-                                     </AlertDescription>
-                                 </Alert>
-                             </div>
-                         )}
-                          {queryMessages.length > 0 && !isQuerying && (
-                             <div className="mb-4 space-y-2">
-                                 <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
+                                            ))}
+                                        </ul>
+                                    </AlertDescription>
+                                </Alert>
+                            </div>
+                        )}
+                        {queryMessages.length > 0 && !isQuerying && (
+                            <div className="mb-4 space-y-2">
+                                <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
                                     <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                     <AlertTitle className="text-blue-700 dark:text-blue-300">Query Info</AlertTitle>
                                     <AlertDescription className="text-blue-600 dark:text-blue-400">
                                         <ul className="list-disc pl-5">
                                             {queryMessages.map((msg, index) => (
                                                 <li key={index}>{msg}</li>
-                                             ))}
+                                            ))}
                                         </ul>
                                     </AlertDescription>
-                                 </Alert>
-                             </div>
-                          )}
-                         <DataBrowserResultsTable
-                             results={queryResults}
-                             isLoading={isQuerying}
-                         />
-                     </CardContent>
-                 </Card>
-             )}
+                                </Alert>
+                            </div>
+                        )}
+                        <DataBrowserResultsTable
+                            results={queryResults}
+                            isLoading={isQuerying}
+                        />
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 };

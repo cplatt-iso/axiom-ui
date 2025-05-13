@@ -1,6 +1,6 @@
 // src/components/DimseListenerFormModal.tsx
 import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -58,7 +58,18 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
 
     const form = useForm<DimseListenerFormData>({
         resolver: zodResolver(dimseListenerFormSchema),
-        defaultValues: initialFormDefaults,
+        defaultValues: {
+        name: "",
+        ae_title: "",
+        port: 104,
+        is_enabled: true,
+        tls_enabled: false, 
+        description: null,
+        instance_id: null,
+        tls_cert_secret_name: null,
+        tls_key_secret_name: null,
+        tls_ca_cert_secret_name: null,
+        },
     });
 
     // Watch the tls_enabled field to conditionally render other fields

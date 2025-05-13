@@ -1,7 +1,7 @@
 // src/components/rule-form/RuleFormAssociationCriteria.tsx
 import React from 'react'; // Removed useCallback as it wasn't strictly needed here
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { z } from 'zod';
+// import { z } from 'zod';
 
 import {
     AssociationMatchCriterionFormData,
@@ -24,12 +24,12 @@ interface RuleFormAssociationCriteriaProps {
     addAssociationCriterion: () => void;
     removeAssociationCriterion: (index: number) => void;
     isLoading: boolean;
-    validationErrors: Record<string, string>; // Expects errors keyed like "association_criteria[0].parameter"
+    validationErrors: Record<string, string | undefined>; // Expects errors keyed like "association_criteria[0].parameter"
     // Remove style props if not strictly needed
     // baseInputStyles: string;
     // errorInputStyles: string;
     // normalInputStyles: string;
-    containerRef?: React.RefObject<HTMLElement>; // Add containerRef for Select portal fix
+    containerRef: React.RefObject<HTMLDivElement | null>; // Add containerRef for Select portal fix
 }
 
 // Define constants within the component or globally

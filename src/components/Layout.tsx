@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
 import {
-    Bars3Icon, XMarkIcon, Cog6ToothIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
+    Bars3Icon, XMarkIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
     TableCellsIcon, // For Data Browser
     ArchiveBoxIcon, // For Inventory Tool
     ExclamationTriangleIcon,

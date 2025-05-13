@@ -19,9 +19,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
 // Removed Checkbox import as we use icons now
-import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Server, Wifi, WifiOff, Loader2 } from 'lucide-react'; // Added Loader2
+import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Wifi, WifiOff, Loader2 } from 'lucide-react'; // Added Loader2
 import { DimseListenerConfigRead } from '@/schemas';
 import { getDimseListenerConfigs, deleteDimseListenerConfig } from '@/services/api';
 import { toast } from 'sonner';

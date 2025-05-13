@@ -13,7 +13,9 @@ const InfoRow: React.FC<{ label: string; value: React.ReactNode; tooltip?: strin
     <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
         <dt className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center">
             {label}
-            {tooltip && <InfoIcon className="h-3 w-3 ml-1 text-gray-400 dark:text-gray-500" title={tooltip} />}
+            <span title={tooltip}>
+                <InfoIcon className="h-3 w-3 ml-1 text-gray-400 dark:text-gray-500" />
+            </span>
         </dt>
         <dd className="text-sm text-gray-900 dark:text-gray-100 text-right font-mono">{value}</dd>
     </div>

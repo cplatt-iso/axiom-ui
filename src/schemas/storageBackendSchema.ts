@@ -140,4 +140,47 @@ export const storageBackendApiPayloadSchema = z.discriminatedUnion("backend_type
     }),
 ]);
 
+export const StorageBackendConfigReadSchema = z.object({
+    id: z.number(),
+    name: z.string(),
+    description: z.string().nullable(),
+    backend_type: z.string(), // Consider z.enum if types are fixed
+    config: z.record(z.any()), // This is the detailed config JSON
+    is_enabled: z.boolean(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime(),
+});
+export type StorageBackendConfigRead = z.infer<typeof StorageBackendConfigReadSchema>;
+
+export const StorageBackendConfigCreatePayloadSchema = z.object({
+    name: z.string().min(1),
+    description: z.string().optional().nullable(),
+    backend_type: z.enum(["filesystem", "cstore", "gcs", "google_healthcare", "stow_rs"]),
+    config: z.record(z.any()), // User will provide this as JSON string in form, then parse
+    is_enabled: z.boolean().default(true),
+});
+export type StorageBackendConfigCreatePayload = z.infer<typeof StorageBackendConfigCreatePayloadSchema>;
+
+export const StorageBackendConfigUpdatePayloadSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional().nullable(),
+    backend_type: z.enum(["filesystem", "cstore", "gcs", "google_healthcare", "stow_rs"]).optional(),
+    config: z.record(z.any()).optional(),
+    is_enabled: z.boolean(),
+}).partial().refine(
+    (data) => Object.keys(data).length > 0,
+    { message: "At least one field must be provided for update." }
+);
+export type StorageBackendConfigUpdatePayload = z.infer<typeof StorageBackendConfigUpdatePayloadSchema>;
+
+// This is a summary used elsewhere, e.g. in Rule destinations.
+// It's good practice to define it here, near the main schema.
+export const StorageBackendConfigSummarySchema = StorageBackendConfigReadSchema.pick({
+    id: true,
+    name: true,
+    backend_type: true,
+    is_enabled: true, // Maybe useful for display
+});
+export type StorageBackendConfigSummary = z.infer<typeof StorageBackendConfigSummarySchema>;
+
 export type StorageBackendApiPayload = z.infer<typeof storageBackendApiPayloadSchema>;

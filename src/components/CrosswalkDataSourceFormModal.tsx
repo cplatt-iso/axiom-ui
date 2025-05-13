@@ -1,6 +1,6 @@
 // src/components/CrosswalkDataSourceFormModal.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import {
     Form,
-    FormControl, // Keep FormControl for Select wrapper if needed, but not direct child
+ //   FormControl, // Keep FormControl for Select wrapper if needed, but not direct child
     FormField,
     FormItem,
     FormLabel,
@@ -40,7 +40,7 @@ import {
     AlertCircle,
     ClipboardCopyIcon,
     DatabaseZap,
-    Loader2
+//   Loader2
 } from 'lucide-react';
 import {
     Alert,
@@ -50,12 +50,12 @@ import {
 
 import {
     CrosswalkDataSourceRead,
-    CrosswalkDataSourceCreatePayload,
+//    CrosswalkDataSourceCreatePayload,
     CrosswalkDataSourceUpdatePayload
 } from '@/schemas';
 import {
     crosswalkDataSourceFormSchema,
-    CrosswalkDataSourceFormData
+    CrosswalkDataSourceRawFormData
 } from '@/schemas/crosswalkDataSourceSchema';
 import {
     createCrosswalkDataSource,
@@ -123,7 +123,7 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
     const [copiedTimeout, setCopiedTimeout] = useState<NodeJS.Timeout | null>(null);
     const [showCopied, setShowCopied] = useState(false);
 
-    const form = useForm<CrosswalkDataSourceFormData>({
+    const form = useForm<CrosswalkDataSourceRawFormData>({
         resolver: zodResolver(crosswalkDataSourceFormSchema),
         defaultValues: {
              ...initialFormDefaults,
@@ -253,20 +253,30 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
         }
     }, [isEditMode, dataSource]);
 
-    const onSubmit = useCallback((values: CrosswalkDataSourceFormData) => {
-        const apiPayload = {
-            ...values,
-            description: values.description?.trim() || null,
-        };
-        console.log("Submitting Data Source Values (API Payload):", apiPayload);
-        if (isEditMode && dataSource) {
-            const updatePayload: CrosswalkDataSourceUpdatePayload = apiPayload;
-            updateMutation.mutate({ id: dataSource.id, data: updatePayload });
-        } else {
-             const createPayload: CrosswalkDataSourceCreatePayload = apiPayload;
-            createMutation.mutate(createPayload);
+    const onSubmit: SubmitHandler<CrosswalkDataSourceRawFormData> = useCallback((rawValues) => {
+        try {
+            const parsed = crosswalkDataSourceFormSchema.parse(rawValues);
+
+            const payload = {
+                ...parsed,
+                description: parsed.description?.trim() || null,
+            };
+
+            console.log("Submitting Data Source Values (API Payload):", payload);
+
+            if (isEditMode && dataSource) {
+                updateMutation.mutate({ id: dataSource.id, data: payload });
+            } else {
+                createMutation.mutate(payload);
+            }
+        } catch (error: any) {
+            console.error("Validation failed:", error);
+            toast.error("Invalid input", {
+                description: error.message || "Please check the form inputs.",
+            });
         }
-    }, [isEditMode, dataSource, createMutation, updateMutation]);
+}, [isEditMode, dataSource, createMutation, updateMutation]);
+
 
      const handleCopyExample = useCallback(() => {
          const exampleJson = json5.stringify(configExamples[watchedDbType] || {}, null, 2);

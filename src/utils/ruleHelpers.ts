@@ -1,22 +1,21 @@
 // src/utils/ruleHelpers.ts
-import { MatchOperation, MatchOperationSchema } from '@/schemas'; // Assuming schemas are correctly imported
+import { MatchOperation, MatchOperationSchema } from '@/schemas';
 
 export const isValueRequired = (op: MatchOperation | undefined | null): boolean => {
     if (!op) return false;
-    // Check against the Zod enum values directly for safety
-    return ![MatchOperationSchema.enum.exists, MatchOperationSchema.enum.not_exists].includes(op);
+    return !(op === MatchOperationSchema.enum.exists || op === MatchOperationSchema.enum.not_exists);
 };
 
 export const isValueList = (op: MatchOperation | undefined | null): boolean => {
     if (!op) return false;
-    return [MatchOperationSchema.enum.in, MatchOperationSchema.enum.not_in].includes(op);
+    return op === MatchOperationSchema.enum.in || op === MatchOperationSchema.enum.not_in;
 };
 
 export const isIpOperator = (op: MatchOperation | undefined | null): boolean => {
     if (!op) return false;
-    return [
-        MatchOperationSchema.enum.ip_eq,
-        MatchOperationSchema.enum.ip_startswith,
-        MatchOperationSchema.enum.ip_in_subnet
-    ].includes(op);
+    return (
+        op === MatchOperationSchema.enum.ip_eq ||
+        op === MatchOperationSchema.enum.ip_startswith ||
+        op === MatchOperationSchema.enum.ip_in_subnet
+    );
 };

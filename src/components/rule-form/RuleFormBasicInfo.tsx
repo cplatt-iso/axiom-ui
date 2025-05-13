@@ -17,7 +17,7 @@ interface RuleFormBasicInfoProps {
     onPriorityChange: (value: number) => void;
     onIsActiveChange: (value: boolean) => void;
     isLoading: boolean;
-    validationErrors: Record<string, string>; // Keep this for error messages
+    validationErrors: Record<string, string | undefined>; // Keep this for error messages
     // Remove style props if not strictly needed, or adjust as necessary
     // baseInputStyles: string;
     // errorInputStyles: string;

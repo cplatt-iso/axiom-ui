@@ -1,6 +1,6 @@
 // src/components/QueryForm.tsx
 import React, { useState } from 'react';
-import { DataBrowserQueryParam, AllowedQueryParam } from '@/schemas/data_browser';
+import { DataBrowserQueryParam } from '@/schemas/data_browser';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

@@ -2,7 +2,7 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo } from 'react'; // Import useMemo
 
 // --- Keep Interfaces the same ---
-interface UserProfile {
+export interface UserProfile {
     sessionToken: string;
     email?: string;
     name?: string;
@@ -10,7 +10,7 @@ interface UserProfile {
     roles?: string[];
 }
 
-interface AuthContextType {
+export interface AuthContextType {
     user: UserProfile | null;
     isLoading: boolean;
     isAuthenticated: boolean; // <-- Add isAuthenticated state
