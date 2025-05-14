@@ -9,6 +9,14 @@ export interface DicomTagInfo {
     keyword: string;
 }
 
+export function getTagInfoByKeyword(keyword: string | undefined): DicomTagInfo | null {
+    if (!keyword || typeof keyword !== 'string' || keyword.trim() === '') {
+        return null;
+    }
+    const foundTag = dicomDictionary.find(tag => tag.keyword === keyword);
+    return foundTag || null;
+}
+
 export const dicomDictionary: DicomTagInfo[] = [
     {
         "tag": "4010,1070",

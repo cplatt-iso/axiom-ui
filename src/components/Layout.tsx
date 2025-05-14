@@ -14,11 +14,13 @@ import {
     WrenchScrewdriverIcon // For System Config
     // --- END ADDED ---
 } from '@heroicons/react/24/outline';
+// import { NavLink } from 'react-router-dom'; 
+import { BrainCircuit } from 'lucide-react';
 import { Role } from '../schemas'; // Import the Role type if needed for casting
 
 // Utility for conditional classes
 function classNames(...classes: string[]) {
-  return classes.filter(Boolean).join(' ')
+    return classes.filter(Boolean).join(' ')
 }
 
 // Define navigation items with optional icons
@@ -44,11 +46,12 @@ const Layout: React.FC = () => {
 
     // --- UPDATED Admin Navigation ---
     const adminNavigation: NavItem[] = [
-         { name: 'User Management', href: '/admin/users', icon: UsersIcon },
-         // Renamed Configuration to Routing Config
-         { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
-         // Added System Configuration
-         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
+        { name: 'User Management', href: '/admin/users', icon: UsersIcon },
+        // Renamed Configuration to Routing Config
+        { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
+        // Added System Configuration
+        { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
+        { name: "AI Prompts", href: "/settings/ai-prompts", icon: BrainCircuit },
     ];
     // --- END UPDATED Admin Navigation ---
 
@@ -114,48 +117,48 @@ const Layout: React.FC = () => {
         // Use flex layout for the main structure
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex">
 
-             {/* --- Mobile Sidebar --- */}
-             {sidebarOpen && (
-                 <div className="fixed inset-0 z-40 flex md:hidden" role="dialog" aria-modal="true">
-                     {/* Overlay */}
-                     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity duration-300 ease-linear" onClick={() => setSidebarOpen(false)}></div>
-                     {/* Sidebar */}
-                     <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white dark:bg-gray-800 pt-5 pb-4 transition-transform duration-300 ease-in-out transform">
-                         {/* Close Button */}
-                         <div className="absolute top-0 right-0 -mr-12 pt-2">
-                             <button type="button" className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" onClick={() => setSidebarOpen(false)}>
-                                 <span className="sr-only">Close sidebar</span>
-                                 <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
-                             </button>
-                         </div>
-                         {/* Branding */}
-                         <div className="flex flex-shrink-0 items-center px-4">
-                             <img className="h-8 w-auto" src="/axiom-logo.svg" alt="Axiom Flow" />
-                             <span className="ml-3 text-xl font-semibold text-gray-900 dark:text-white">Axiom Flow</span>
-                         </div>
-                         {/* Navigation */}
-                         <div className="mt-5 h-0 flex-1 overflow-y-auto">
-                             <nav className="space-y-1 px-2">
-                                 {/* Standard Links */}
-                                 {navigation.map((item) => renderNavLink(item, true))}
+            {/* --- Mobile Sidebar --- */}
+            {sidebarOpen && (
+                <div className="fixed inset-0 z-40 flex md:hidden" role="dialog" aria-modal="true">
+                    {/* Overlay */}
+                    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity duration-300 ease-linear" onClick={() => setSidebarOpen(false)}></div>
+                    {/* Sidebar */}
+                    <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white dark:bg-gray-800 pt-5 pb-4 transition-transform duration-300 ease-in-out transform">
+                        {/* Close Button */}
+                        <div className="absolute top-0 right-0 -mr-12 pt-2">
+                            <button type="button" className="ml-1 flex h-10 w-10 items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" onClick={() => setSidebarOpen(false)}>
+                                <span className="sr-only">Close sidebar</span>
+                                <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
+                            </button>
+                        </div>
+                        {/* Branding */}
+                        <div className="flex flex-shrink-0 items-center px-4">
+                            <img className="h-8 w-auto" src="/axiom-logo.svg" alt="Axiom Flow" />
+                            <span className="ml-3 text-xl font-semibold text-gray-900 dark:text-white">Axiom Flow</span>
+                        </div>
+                        {/* Navigation */}
+                        <div className="mt-5 h-0 flex-1 overflow-y-auto">
+                            <nav className="space-y-1 px-2">
+                                {/* Standard Links */}
+                                {navigation.map((item) => renderNavLink(item, true))}
 
-                                 {/* Conditional Admin Section */}
-                                 {isAdmin && (
-                                     <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                                          <h3 className="px-2 mb-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider" id="admin-nav-headline-mobile">
-                                             Admin
-                                          </h3>
-                                          <div className="space-y-1">
-                                             {adminNavigation.map((item) => renderNavLink(item, true))}
-                                         </div>
-                                     </div>
-                                 )}
-                             </nav>
-                         </div>
-                     </div>
-                     <div className="w-14 flex-shrink-0" aria-hidden="true"></div> {/* Dummy element */}
-                 </div>
-             )}
+                                {/* Conditional Admin Section */}
+                                {isAdmin && (
+                                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <h3 className="px-2 mb-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider" id="admin-nav-headline-mobile">
+                                            Admin
+                                        </h3>
+                                        <div className="space-y-1">
+                                            {adminNavigation.map((item) => renderNavLink(item, true))}
+                                        </div>
+                                    </div>
+                                )}
+                            </nav>
+                        </div>
+                    </div>
+                    <div className="w-14 flex-shrink-0" aria-hidden="true"></div> {/* Dummy element */}
+                </div>
+            )}
 
             {/* --- Desktop Sidebar (Fixed) --- */}
             <div className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col">
@@ -209,12 +212,12 @@ const Layout: React.FC = () => {
                 {/* Page Content */}
                 <main className="flex-1">
                     <div className="py-6">
-                         {/* --- Adjusted max-width and padding --- */}
-			 {/* <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8 lg:max-w-7xl xl:max-w-8xl"> */}
-			 <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8">
+                        {/* --- Adjusted max-width and padding --- */}
+                        {/* <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8 lg:max-w-7xl xl:max-w-8xl"> */}
+                        <div className="mx-auto max-w-full px-4 sm:px-6 md:px-8">
                             <Outlet key={location.pathname} />
                         </div>
-                         {/* --- End Adjustment --- */}
+                        {/* --- End Adjustment --- */}
                     </div>
                 </main>
             </div>

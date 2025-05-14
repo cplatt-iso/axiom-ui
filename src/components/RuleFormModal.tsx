@@ -31,7 +31,7 @@ import {
 import {
     RuleCreate, // Correct type for create payload
     RuleUpdate, // Correct type for update payload
- //   RuleFormData, // Can be used for form state type if helpful
+    //   RuleFormData, // Can be used for form state type if helpful
     MatchCriterionFormData,
     AssociationMatchCriterionFormData,
     TagModificationFormData,
@@ -155,7 +155,8 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const [selectedDestinationIds, setSelectedDestinationIds] = useState<Set<number>>(new Set());
     const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [aiStandardizationTags, setAiStandardizationTags] = useState<string[]>([]);
+    // const [aiStandardizationTags, setAiStandardizationTags] = useState<string[]>([]);
+    const [selectedAiPromptConfigIds, setSelectedAiPromptConfigIds] = useState<number[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string | undefined>>({}); // Allows undefined values
 
@@ -208,7 +209,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
     useEffect(() => {
         if (isOpen) {
-            const currentRuleIdentifier = existingRule ? existingRule.id : 'create';
+            const currentRuleIdentifier = existingRule ? String(existingRule.id) : 'create';
             if (processedRuleIdRef.current !== currentRuleIdentifier) {
                 processedRuleIdRef.current = currentRuleIdentifier;
 
@@ -221,13 +222,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setDescription(existingRule.description ?? '');
                     setPriority(existingRule.priority ?? 100);
                     setIsActive(existingRule.is_active ?? true);
-                    setAiStandardizationTags(existingRule.ai_standardization_tags || []);
+                    // setAiStandardizationTags(existingRule.ai_standardization_tags || []);
+                    setSelectedAiPromptConfigIds(existingRule.ai_prompt_config_ids || []);
                     setSelectedScheduleId(existingRule.schedule_id ?? null);
 
                     if (combinedSources.length > 0) {
                         const initialSelectedNames = existingRule.applicable_sources || [];
                         const initialSelectedSourceObjects = combinedSources.filter(source =>
-                           initialSelectedNames.includes(source.name)
+                            initialSelectedNames.includes(source.name)
                         );
                         setSelectedSources(initialSelectedSourceObjects);
                     } else {
@@ -251,14 +253,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setTagModifications(deepClone(parsedMods).map((m: any) => {
                         const action = ModifyActionSchema.safeParse(m.action);
                         const defaultMod = _createDefaultModification(action.success ? action.data : ModifyActionSchema.enum.set);
-                         if (m.action === ModifyActionSchema.enum.crosswalk && m.crosswalk_map_id !== undefined && m.crosswalk_map_id !== null) {
-                             m.crosswalk_map_id = parseInt(String(m.crosswalk_map_id), 10);
-                             if (isNaN(m.crosswalk_map_id) || m.crosswalk_map_id <= 0) { // Treat non-positive as unselected (matches default 0)
-                                 m.crosswalk_map_id = 0;
-                             }
-                         } else if (m.action === ModifyActionSchema.enum.crosswalk) {
-                              m.crosswalk_map_id = 0; // Ensure it's 0 if not provided or null
-                         }
+                        if (m.action === ModifyActionSchema.enum.crosswalk && m.crosswalk_map_id !== undefined && m.crosswalk_map_id !== null) {
+                            m.crosswalk_map_id = parseInt(String(m.crosswalk_map_id), 10);
+                            if (isNaN(m.crosswalk_map_id) || m.crosswalk_map_id <= 0) { // Treat non-positive as unselected (matches default 0)
+                                m.crosswalk_map_id = 0;
+                            }
+                        } else if (m.action === ModifyActionSchema.enum.crosswalk) {
+                            m.crosswalk_map_id = 0; // Ensure it's 0 if not provided or null
+                        }
                         return { ...defaultMod, ...m };
                     }));
                     setSelectedDestinationIds(new Set(existingRule.destinations?.map(d => d.id) || []));
@@ -267,7 +269,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     setMatchCriteria([]); setAssociationCriteria([]); setTagModifications([]);
                     setSelectedSources([]);
                     setSelectedDestinationIds(new Set());
-                    setAiStandardizationTags([]);
+                    setSelectedAiPromptConfigIds([]);
                     setSelectedScheduleId(null);
                     processedRuleIdRef.current = 'create';
                 }
@@ -275,11 +277,11 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 setIsSubmitting(false);
 
             } else if (existingRule && combinedSources.length > 0 && selectedSources.length === 0 && (existingRule.applicable_sources?.length ?? 0) > 0) {
-                 const initialSelectedNames = existingRule.applicable_sources || [];
-                 const initialSelectedSourceObjects = combinedSources.filter(source =>
+                const initialSelectedNames = existingRule.applicable_sources || [];
+                const initialSelectedSourceObjects = combinedSources.filter(source =>
                     initialSelectedNames.includes(source.name)
-                 );
-                 setSelectedSources(initialSelectedSourceObjects);
+                );
+                setSelectedSources(initialSelectedSourceObjects);
             }
         } else {
             processedRuleIdRef.current = null;
@@ -299,7 +301,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             return;
         }
         if (panelRef.current && panelRef.current.contains(targetElement)) {
-             return;
+            return;
         }
         handleDialogClose();
     }, [handleDialogClose]);
@@ -309,9 +311,9 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     const handlePriorityChange = useCallback((value: number) => { setPriority(value) }, []);
     const handleIsActiveChange = useCallback((value: boolean) => { setIsActive(value) }, []);
 
-    const handleAiStandardizationTagsChange = useCallback((tags: string[]) => {
-        setAiStandardizationTags(tags);
-        setValidationErrors(prev => ({ ...prev, ai_standardization_tags: undefined }));
+    const handleAiPromptConfigIdsChange = useCallback((configIds: number[]) => {
+        setSelectedAiPromptConfigIds(configIds);
+        setValidationErrors(prev => ({ ...prev, ai_prompt_config_ids: undefined })); // Ensure error key matches new schema field
     }, []);
 
     const handleSourceSelectionChange = useCallback((selectedItems: SourceInfo[]) => {
@@ -386,7 +388,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     currentCrit.value = '';
                 }
             }
-             return updated;
+            return updated;
         });
         const key = `association_criteria[${index}].${field}`;
         setValidationErrors(prev => { const { [key]: _, ...rest } = prev; delete rest[`association_criteria[${index}]`]; return rest; });
@@ -473,7 +475,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                         const num = Number(stringValue);
                         if (!isNaN(num) && isFinite(num)) {
                             finalValue = num; // Assign the parsed number (could be positive, zero, or negative)
-                                              // Zod's .refine(id > 0) will validate it upon submission.
+                            // Zod's .refine(id > 0) will validate it upon submission.
                         }
                         // If stringValue is not a valid number, finalValue remains 0.
                     }
@@ -482,7 +484,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 // If value is undefined or null, finalValue remains 0.
                 currentMod[field] = finalValue;
             } else if (field in currentMod) {
-                 currentMod[field] = value;
+                currentMod[field] = value;
             } else {
                 console.warn(`Attempted to set field '${field}' which does not exist on current modification action '${currentMod.action}'.`);
             }
@@ -510,12 +512,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             let next = { ...prev };
             keysToClear.forEach(key => { delete next[key]; });
             Object.keys(next).filter(k => k.startsWith(baseKey + '.')).forEach(nestedKey => {
-                 const suffix = nestedKey.substring(baseKey.length + 1);
-                 if(keysToClear.includes(`${baseKey}.${suffix.split('.')[0]}`)) {
-                      delete next[nestedKey];
-                 }
+                const suffix = nestedKey.substring(baseKey.length + 1);
+                if (keysToClear.includes(`${baseKey}.${suffix.split('.')[0]}`)) {
+                    delete next[nestedKey];
+                }
             });
-             delete next[`tag_modifications[${index}]`];
+            delete next[`tag_modifications[${index}]`];
             return next;
         });
 
@@ -532,12 +534,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     const errorIndex = parseInt(match[1], 10);
                     const suffix = match[2] || '';
                     if (errorIndex < index) {
-                        next[key] = message; 
+                        next[key] = message;
                     } else if (errorIndex > index) {
-                        next[`tag_modifications[${errorIndex - 1}]${suffix}`] = message; 
+                        next[`tag_modifications[${errorIndex - 1}]${suffix}`] = message;
                     }
                 } else {
-                    next[key] = message; 
+                    next[key] = message;
                 }
             });
             return next;
@@ -585,42 +587,42 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     });
 
     const handleApiError = (err: any, action: 'create' | 'update', ruleId?: number) => {
-         console.error(`Failed to ${action} rule${ruleId ? ` (ID: ${ruleId})` : ''}:`, err);
-         const errorDetail = err.detail?.detail || err.detail;
-         let errorMessage = `Failed to ${action} rule.`;
-         let backendValidationErrors: Record<string, string | undefined> = {}; // Allow undefined
+        console.error(`Failed to ${action} rule${ruleId ? ` (ID: ${ruleId})` : ''}:`, err);
+        const errorDetail = err.detail?.detail || err.detail;
+        let errorMessage = `Failed to ${action} rule.`;
+        let backendValidationErrors: Record<string, string | undefined> = {}; // Allow undefined
 
-         if (err.status === 422 && Array.isArray(errorDetail)) {
-             errorDetail.forEach((validationError: any) => {
-                 const key = (validationError.loc || [])
-                             .slice(1)
-                             .map((item: string | number) => typeof item === 'number' ? `[${item}]` : `${item}`)
-                             .join('.')
-                             .replace(/\.\[/g, '[');
-                 backendValidationErrors[key || 'general'] = validationError.msg || 'Invalid input.';
-             });
-             errorMessage = "Please fix validation errors from the server.";
-             toast.error("Validation Error", { description: errorMessage });
-         } else if (typeof errorDetail === 'string') {
-             errorMessage = errorDetail;
-             backendValidationErrors['general'] = errorMessage;
-             toast.error("Save Failed", { description: errorMessage });
-         } else if (err.message) {
-             errorMessage = err.message;
-             backendValidationErrors['general'] = errorMessage;
-             toast.error("Save Failed", { description: errorMessage });
-         } else {
-             backendValidationErrors['general'] = errorMessage;
-             toast.error("Save Failed", { description: "An unknown error occurred." });
-         }
+        if (err.status === 422 && Array.isArray(errorDetail)) {
+            errorDetail.forEach((validationError: any) => {
+                const key = (validationError.loc || [])
+                    .slice(1)
+                    .map((item: string | number) => typeof item === 'number' ? `[${item}]` : `${item}`)
+                    .join('.')
+                    .replace(/\.\[/g, '[');
+                backendValidationErrors[key || 'general'] = validationError.msg || 'Invalid input.';
+            });
+            errorMessage = "Please fix validation errors from the server.";
+            toast.error("Validation Error", { description: errorMessage });
+        } else if (typeof errorDetail === 'string') {
+            errorMessage = errorDetail;
+            backendValidationErrors['general'] = errorMessage;
+            toast.error("Save Failed", { description: errorMessage });
+        } else if (err.message) {
+            errorMessage = err.message;
+            backendValidationErrors['general'] = errorMessage;
+            toast.error("Save Failed", { description: errorMessage });
+        } else {
+            backendValidationErrors['general'] = errorMessage;
+            toast.error("Save Failed", { description: "An unknown error occurred." });
+        }
 
-         setError(errorMessage);
-         setValidationErrors(backendValidationErrors);
-         setIsSubmitting(false);
-     };
+        setError(errorMessage);
+        setValidationErrors(backendValidationErrors);
+        setIsSubmitting(false);
+    };
 
 
-     const transformPayloadValue = (value: any, op: MatchOperation): any => {
+    const transformPayloadValue = (value: any, op: MatchOperation): any => {
         if ((op === 'in' || op === 'not_in') && typeof value === 'string') {
             return value.split(',').map(s => s.trim()).filter(Boolean);
         }
@@ -645,7 +647,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             tag_modifications: tagModifications,
             applicable_sources: selectedSourceNames.length > 0 ? selectedSourceNames : null,
             destination_ids: Array.from(selectedDestinationIds),
-            ai_standardization_tags: aiStandardizationTags.length > 0 ? aiStandardizationTags : null,
+            ai_prompt_config_ids: selectedAiPromptConfigIds.length > 0 ? selectedAiPromptConfigIds : null,
             schedule_id: selectedScheduleId,
         };
 
@@ -677,13 +679,14 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     value: transformPayloadValue(crit.value, crit.op)
                 })),
                 association_criteria: validatedUpdateData.association_criteria?.map(crit => ({
-                     ...crit,
-                      value: transformPayloadValue(crit.value, crit.op)
+                    ...crit,
+                    value: transformPayloadValue(crit.value, crit.op)
                 })) || null,
                 tag_modifications: validatedUpdateData.tag_modifications,
                 applicable_sources: validatedUpdateData.applicable_sources,
                 destination_ids: validatedUpdateData.destination_ids,
-                ai_standardization_tags: validatedUpdateData.ai_standardization_tags,
+                // ai_standardization_tags: validatedUpdateData.ai_standardization_tags,
+                ai_prompt_config_ids: validatedUpdateData.ai_prompt_config_ids,
                 schedule_id: validatedUpdateData.schedule_id,
             };
             console.log('Submitting Final Update Rule Payload to API:', JSON.stringify(updateApiPayload, null, 2));
@@ -693,16 +696,16 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             const createDataForZod = { ...baseFormData, ruleset_id: rulesetId };
             const validationResult = RuleCreateSchema.safeParse(createDataForZod);
             if (!validationResult.success) {
-                 const errors: Record<string, string> = {};
-                 validationResult.error.errors.forEach((err) => {
-                     const path = err.path.map(p => typeof p === 'number' ? `[${p}]` : p).join('.').replace(/\.\[/g, '[');
-                     errors[path] = err.message;
-                 });
-                 setValidationErrors(errors);
-                 setError("Please fix the validation errors marked below.");
-                 toast.error("Validation Error", { description: "Please check the form fields." });
-                 setIsSubmitting(false);
-                 return;
+                const errors: Record<string, string> = {};
+                validationResult.error.errors.forEach((err) => {
+                    const path = err.path.map(p => typeof p === 'number' ? `[${p}]` : p).join('.').replace(/\.\[/g, '[');
+                    errors[path] = err.message;
+                });
+                setValidationErrors(errors);
+                setError("Please fix the validation errors marked below.");
+                toast.error("Validation Error", { description: "Please check the form fields." });
+                setIsSubmitting(false);
+                return;
             }
 
             const validatedCreateData = validationResult.data;
@@ -718,15 +721,15 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 })),
                 association_criteria: validatedCreateData.association_criteria?.map(crit => ({
                     ...crit,
-                     value: transformPayloadValue(crit.value, crit.op)
+                    value: transformPayloadValue(crit.value, crit.op)
                 })) || null,
                 tag_modifications: validatedCreateData.tag_modifications,
                 applicable_sources: validatedCreateData.applicable_sources,
                 destination_ids: validatedCreateData.destination_ids,
-                ai_standardization_tags: validatedCreateData.ai_standardization_tags,
+                // ai_standardization_tags: validatedCreateData.ai_standardization_tags,
+                ai_prompt_config_ids: validatedCreateData.ai_prompt_config_ids,
                 schedule_id: validatedCreateData.schedule_id,
             };
-            console.log('Submitting Final Create Rule Payload to API:', JSON.stringify(createApiPayload, null, 2));
             createMutation.mutate(createApiPayload);
         }
     };
@@ -734,7 +737,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
     return (
         <Transition appear show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-20" onClose={() => {}}>
+            <Dialog as="div" className="relative z-20" onClose={() => { }}>
                 <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
                     <div
                         className="fixed inset-0 bg-black bg-opacity-30 dark:bg-opacity-60"
@@ -755,22 +758,22 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                 </Dialog.Title>
 
                                 <form onSubmit={handleSubmit} className="space-y-6 flex-grow overflow-y-auto p-6">
-                                     {(error && !Object.keys(validationErrors).length) && (
-                                         <Alert variant="destructive" className="mb-4">
-                                             <AlertCircle className="h-4 w-4" />
-                                             <AlertTitle>Error</AlertTitle>
-                                             <AlertDescription>{error}</AlertDescription>
-                                         </Alert>
-                                     )}
-                                     {(Object.keys(validationErrors).length > 0 && validationErrors['general']) && (
-                                          <Alert variant="destructive" className="mb-4">
-                                              <AlertCircle className="h-4 w-4" />
-                                              <AlertTitle>Validation Error</AlertTitle>
-                                              <AlertDescription>{validationErrors['general']}</AlertDescription>
-                                          </Alert>
-                                     )}
+                                    {(error && !Object.keys(validationErrors).length) && (
+                                        <Alert variant="destructive" className="mb-4">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertTitle>Error</AlertTitle>
+                                            <AlertDescription>{error}</AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {(Object.keys(validationErrors).length > 0 && validationErrors['general']) && (
+                                        <Alert variant="destructive" className="mb-4">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertTitle>Validation Error</AlertTitle>
+                                            <AlertDescription>{validationErrors['general']}</AlertDescription>
+                                        </Alert>
+                                    )}
 
-                                     <RuleFormBasicInfo
+                                    <RuleFormBasicInfo
                                         name={name} description={description ?? ''} priority={priority} isActive={isActive}
                                         onNameChange={handleNameChange}
                                         onDescriptionChange={handleDescriptionChange}
@@ -778,67 +781,67 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                                         onIsActiveChange={handleIsActiveChange}
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
                                     />
-                                     <RuleFormSources
+                                    <RuleFormSources
                                         selectedSources={selectedSources} availableSources={combinedSources}
                                         onSelectionChange={handleSourceSelectionChange}
                                         isLoading={overallIsLoading} sourcesLoading={sourcesLoading}
                                         validationErrors={validationErrors} normalInputStyles={normalInputStyles}
                                     />
-                                     <RuleFormSchedule
+                                    <RuleFormSchedule
                                         selectedScheduleId={selectedScheduleId} availableSchedules={availableSchedules ?? []}
                                         onScheduleChange={handleScheduleChange}
                                         isLoading={overallIsLoading} schedulesLoading={schedulesLoading} schedulesError={schedulesError}
-                                        validationErrors={validationErrors} 
+                                        validationErrors={validationErrors}
                                         // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
                                         // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
                                         containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
-                                     <RuleFormMatchCriteria
+                                    <RuleFormMatchCriteria
                                         matchCriteria={matchCriteria} updateMatchCriterion={updateMatchCriterion}
                                         addMatchCriterion={addMatchCriterion} removeMatchCriterion={removeMatchCriterion}
-                                        isLoading={overallIsLoading} validationErrors={validationErrors} 
+                                        isLoading={overallIsLoading} validationErrors={validationErrors}
                                         // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
                                         // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
                                         containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
-                                     <RuleFormAssociationCriteria
+                                    <RuleFormAssociationCriteria
                                         associationCriteria={associationCriteria} updateAssociationCriterion={updateAssociationCriterion}
                                         addAssociationCriterion={addAssociationCriterion} removeAssociationCriterion={removeAssociationCriterion}
-                                        isLoading={overallIsLoading} validationErrors={validationErrors} 
+                                        isLoading={overallIsLoading} validationErrors={validationErrors}
                                         // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop might expect RefObject<HTMLDivElement>.
                                         // Ideal fix: Child component prop type should be RefObject<HTMLDivElement | null>.
                                         containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
-                                     <RuleFormTagModifications
+                                    <RuleFormTagModifications
                                         tagModifications={tagModifications} updateTagModification={updateTagModification}
                                         addTagModification={addTagModification} removeTagModification={removeTagModification}
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
-                                        availableCrosswalkMaps={availableCrosswalkMaps} crosswalkMapsLoading={crosswalkMapsLoading} 
+                                        availableCrosswalkMaps={availableCrosswalkMaps} crosswalkMapsLoading={crosswalkMapsLoading}
                                         crosswalkMapsError={crosswalkMapsError ? crosswalkMapsError.message : undefined}
                                         // WORKAROUND: panelRef is RefObject<HTMLDivElement | null>, but child prop (containerRef) expects RefObject<HTMLDivElement>.
                                         // This assertion silences the TS error.
                                         // Ideal fix: Change RuleFormTagModificationsProps.containerRef to React.RefObject<HTMLDivElement | null>.
                                         containerRef={panelRef as React.RefObject<HTMLDivElement>}
                                     />
-                                     <RuleFormAiStandardization
-                                        tags={aiStandardizationTags}
-                                        onTagsChange={handleAiStandardizationTagsChange}
+                                    <RuleFormAiStandardization
+                                        selectedConfigIds={selectedAiPromptConfigIds}
+                                        onSelectedConfigIdsChange={handleAiPromptConfigIdsChange}
                                         isLoading={overallIsLoading}
                                         validationErrors={validationErrors}
                                     />
-                                     <RuleFormDestinations
+                                    <RuleFormDestinations
                                         selectedDestinationIds={selectedDestinationIds} availableDestinations={availableDestinations}
                                         onSelectionChange={handleDestinationChange}
                                         isLoading={overallIsLoading} validationErrors={validationErrors}
                                     />
 
-                                     <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                         <Button type="button" variant="outline" onClick={handleDialogClose} disabled={overallIsLoading}> Cancel </Button>
-                                         <Button type="submit" disabled={overallIsLoading}>
-                                             {overallIsLoading ? ( <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5"/> ) : null}
-                                             {isSubmitting ? 'Saving...' : (isDataLoading ? 'Loading Data...' : (existingRule ? 'Update Rule' : 'Create Rule'))}
-                                         </Button>
-                                     </div>
+                                    <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <Button type="button" variant="outline" onClick={handleDialogClose} disabled={overallIsLoading}> Cancel </Button>
+                                        <Button type="submit" disabled={overallIsLoading}>
+                                            {overallIsLoading ? (<Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />) : null}
+                                            {isSubmitting ? 'Saving...' : (isDataLoading ? 'Loading Data...' : (existingRule ? 'Update Rule' : 'Create Rule'))}
+                                        </Button>
+                                    </div>
                                 </form>
                             </Dialog.Panel>
                         </Transition.Child>

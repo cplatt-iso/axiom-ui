@@ -16,6 +16,7 @@ import RulesetDetailPage from './pages/RulesetDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import NotFoundPage from './pages/NotFoundPage';
+import AiPromptConfigsPage from './pages/AiPromptConfigsPage';
 
 // --- UPDATED: Rename ConfigurationPage import ---
 import RoutingConfigurationPage from './pages/RoutingConfigurationPage'; // Renamed from ConfigurationPage
@@ -47,13 +48,13 @@ import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesCo
 // --- END ADDED ---
 
 function AppContent() {
-  const auth = useAuth();
+    const auth = useAuth();
 
-  useEffect(() => {
-      setAuthContextRef(auth);
-  }, [auth]);
+    useEffect(() => {
+        setAuthContextRef(auth);
+    }, [auth]);
 
-  return (
+    return (
         <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginPage />} />
@@ -87,7 +88,7 @@ function AppContent() {
                                 <Route index element={<Navigate to="dicomweb" replace />} />
                                 <Route path="dicomweb" element={<DicomWebSourcesConfigPage />} />
                                 <Route path="dimse-qr" element={<DimseQrSourcesConfigPage />} />
-				<Route path="google-healthcare" element={<GoogleHealthcareSourcesConfigPage />} />
+                                <Route path="google-healthcare" element={<GoogleHealthcareSourcesConfigPage />} />
                             </Route>
 
                             {/* Listeners Sub-Section */}
@@ -121,7 +122,8 @@ function AppContent() {
                             <Route path="limits" element={<SysLimitsSettings />} />
                             <Route path="services" element={<SysExternalServices />} />
                             <Route path="admin-actions" element={<SysAdminActions />} />
-			</Route>
+                        </Route>
+                        <Route path="/settings/ai-prompts" element={<AiPromptConfigsPage />} />                                                
                     </Route> {/* End Admin Protected Route */}
 
                 </Route> {/* End Layout */}
@@ -130,11 +132,11 @@ function AppContent() {
             {/* Catch-all Not Found Route */}
             <Route path="*" element={<NotFoundPage />} />
         </Routes>
-  );
+    );
 }
 
 function App() {
-     return <AppContent />;
+    return <AppContent />;
 }
 
 export default App;

@@ -8,8 +8,7 @@ import { z } from 'zod';
 const dicomTagKeywordSchema = z.string()
     .min(1, "DICOM Tag Keyword cannot be empty.")
     .regex(/^[a-zA-Z][a-zA-Z0-9]*$/, "Must be a valid DICOM keyword (e.g., PatientName, StudyDescription). Starts with a letter, alphanumeric.")
-    .transform(val => val.trim()); // Keep as is, backend might normalize further if needed
-
+    .transform(val => val.trim()); // Keep trim, it's harmless. No complex replace needed.
 // Schema for Model Parameters (flexible JSON object)
 // For the form, we might want to represent this as a string that gets parsed.
 // For reading, it's an object.
@@ -44,6 +43,7 @@ export const AiPromptConfigBaseSchema = z.object({
     name: z.string().min(3, "Name must be at least 3 characters.").max(255),
     description: z.string().nullable().optional(),
     dicom_tag_keyword: dicomTagKeywordSchema,
+    is_enabled: z.boolean(),
     prompt_template: z.string().min(10, "Prompt template is required.").refine(
         (val) => val.includes("{value}"),
         "Prompt template must include the '{value}' placeholder."
@@ -71,11 +71,12 @@ export type AiPromptConfigCreatePayload = z.infer<typeof AiPromptConfigCreatePay
 export const AiPromptConfigUpdateFormDataSchema = AiPromptConfigBaseSchema.extend({
     name: AiPromptConfigBaseSchema.shape.name.optional(),
     description: AiPromptConfigBaseSchema.shape.description.optional(),
+    is_enabled: AiPromptConfigBaseSchema.shape.is_enabled.optional(), // <<< ENSURE THIS IS OPTIONAL
     dicom_tag_keyword: AiPromptConfigBaseSchema.shape.dicom_tag_keyword.optional(),
     prompt_template: AiPromptConfigBaseSchema.shape.prompt_template.optional(),
     model_identifier: AiPromptConfigBaseSchema.shape.model_identifier.optional(),
-    model_parameters: modelParametersStringSchema, // Use string version for form
-}).refine(obj => Object.values(obj).some(v => v !== undefined), {
+    model_parameters: modelParametersStringSchema,
+}).refine(obj => Object.values(obj).some(v => v !== undefined && v !== null), {
     message: "At least one field must be provided for update."
 });
 export type AiPromptConfigUpdateFormData = z.infer<typeof AiPromptConfigUpdateFormDataSchema>;
@@ -109,5 +110,6 @@ export const AiPromptConfigSummarySchema = z.object({
     name: z.string(),
     dicom_tag_keyword: z.string(),
     model_identifier: z.string(),
+    is_enabled: z.boolean(),
 });
 export type AiPromptConfigSummary = z.infer<typeof AiPromptConfigSummarySchema>;

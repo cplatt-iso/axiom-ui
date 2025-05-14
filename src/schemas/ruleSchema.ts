@@ -190,10 +190,9 @@ export const RuleFormFieldsSchema = z.object({
                            .optional(), // Allow null or empty array
     tag_modifications: z.array(TagModificationFormDataSchema)
                         .default([]), // Allow empty array
-    ai_standardization_tags: z.array(dicomTagStringSchema)
-                              .nullable()
-                              .optional() // Allow null or empty array
-                              .transform(tags => tags ? [...new Set(tags)] : tags), // Ensure uniqueness
+    ai_prompt_config_ids: z.array(z.number().int().positive("AI Prompt Config ID must be a positive number."))
+                            .nullable()
+                            .optional(), 
     applicable_sources: z.array(z.string().min(1, "Source cannot be empty"))
                            .nullable()
                            .optional() // Allow null or empty array
@@ -239,7 +238,8 @@ export const RuleSchema = z.object({
     tag_modifications: z.array(z.record(z.any())), // Ideally, use TagModificationFormDataSchema if backend matches
     association_criteria: z.array(z.record(z.any())).nullable().optional(),
     applicable_sources: z.array(z.string()).nullable().optional(),
-    ai_standardization_tags: z.array(z.string()).nullable().optional(), // Assuming backend returns simple strings
+    // ai_standardization_tags: z.array(z.string()).nullable().optional(), // Assuming backend returns simple strings
+    ai_prompt_config_ids: z.array(z.number().int().positive()).nullable().optional(),
     destinations: z.array(StorageBackendConfigSummarySchema), // Use summary schema for destinations
     schedule_id: z.number().int().positive().nullish(), // Include schedule_id if returned by backend
     schedule: ScheduleSummarySchema.nullish(), // MODIFIED: Added schedule object

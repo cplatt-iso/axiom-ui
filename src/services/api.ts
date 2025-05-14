@@ -431,9 +431,26 @@ export const deleteGoogleHealthcareSource = async (id: number): Promise<void> =>
 
 export const getAiPromptConfigs = (
     skip: number = 0,
-    limit: number = 100
+    limit: number = 100,
+    is_enabled?: boolean | null, // Optional filter - THIS IS THE THIRD ARGUMENT
+    dicom_tag_keyword?: string | null, // Optional filter
+    model_identifier?: string | null // Optional filter
 ): Promise<AiPromptConfigRead[]> => {
-    return apiClient<AiPromptConfigRead[]>('/config/ai-prompts', { params: { skip, limit } });
+    const params: Record<string, any> = { skip, limit }; // Start with skip and limit
+
+    // Conditionally add filters to the params object if they are provided
+    if (is_enabled !== undefined && is_enabled !== null) {
+        params.is_enabled = is_enabled;
+    }
+    if (dicom_tag_keyword) { 
+        params.dicom_tag_keyword = dicom_tag_keyword;
+    }
+    if (model_identifier) { 
+        params.model_identifier = model_identifier;
+    }
+    
+    // REMOVE TRAILING SLASH from endpoint string for consistency
+    return apiClient<AiPromptConfigRead[]>('/config/ai-prompts/', { params }); 
 };
 
 export const getAiPromptConfigById = (id: number): Promise<AiPromptConfigRead> => {
@@ -443,7 +460,7 @@ export const getAiPromptConfigById = (id: number): Promise<AiPromptConfigRead> =
 export const createAiPromptConfig = (
     data: AiPromptConfigCreatePayload
 ): Promise<AiPromptConfigRead> => {
-    return apiClient<AiPromptConfigRead>('/config/ai-prompts', {
+    return apiClient<AiPromptConfigRead>('/config/ai-prompts/', {
         method: 'POST',
         body: JSON.stringify(data),
     });
