@@ -174,37 +174,37 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
             // Populate type-specific fields
             switch (backend.backend_type as AllowedBackendType) {
                 case 'filesystem':
-                    base.path = backend.config.path ?? null;
+                    base.path = backend.config?.path ?? null;
                     break;
                 case 'cstore':
-                    base.remote_ae_title = backend.config.remote_ae_title ?? null;
-                    base.remote_host = backend.config.remote_host ?? null;
-                    base.remote_port = backend.config.remote_port ?? null;
-                    base.local_ae_title = backend.config.local_ae_title ?? null;
-                    base.tls_enabled = backend.config.tls_enabled ?? false;
-                    base.tls_ca_cert_secret_name = backend.config.tls_ca_cert_secret_name ?? null;
-                    base.tls_client_cert_secret_name = backend.config.tls_client_cert_secret_name ?? null;
-                    base.tls_client_key_secret_name = backend.config.tls_client_key_secret_name ?? null;
+                    base.remote_ae_title = backend.config?.remote_ae_title ?? null;
+                    base.remote_host = backend.config?.remote_host ?? null;
+                    base.remote_port = backend.config?.remote_port ?? null;
+                    base.local_ae_title = backend.config?.local_ae_title ?? null;
+                    base.tls_enabled = backend.config?.tls_enabled ?? false;
+                    base.tls_ca_cert_secret_name = backend.config?.tls_ca_cert_secret_name ?? null;
+                    base.tls_client_cert_secret_name = backend.config?.tls_client_cert_secret_name ?? null;
+                    base.tls_client_key_secret_name = backend.config?.tls_client_key_secret_name ?? null;
                     break;
                 case 'gcs':
-                    base.bucket = backend.config.bucket ?? null;
-                    base.prefix = backend.config.prefix ?? null;
+                    base.bucket = backend.config?.bucket ?? null;
+                    base.prefix = backend.config?.prefix ?? null;
                     break;
                 case 'google_healthcare':
-                    base.gcp_project_id = backend.config.gcp_project_id ?? null;
-                    base.gcp_location = backend.config.gcp_location ?? null;
-                    base.gcp_dataset_id = backend.config.gcp_dataset_id ?? null;
-                    base.gcp_dicom_store_id = backend.config.gcp_dicom_store_id ?? null;
+                    base.gcp_project_id = backend.config?.gcp_project_id ?? null;
+                    base.gcp_location = backend.config?.gcp_location ?? null;
+                    base.gcp_dataset_id = backend.config?.gcp_dataset_id ?? null;
+                    base.gcp_dicom_store_id = backend.config?.gcp_dicom_store_id ?? null;
                     break;
                 case 'stow_rs':
-                    base.base_url = backend.config.base_url ?? null;
+                    base.base_url = backend.config?.base_url ?? null;
                     break;
             }
             // Null out fields not relevant to this specific backend type
             return nullOutIrrelevantFields(base, backend.backend_type as AllowedBackendType);
         }
         return null;
-    }, [backend, isEditMode]);
+    }, [backend, isEditMode, form]);
 
 
     useEffect(() => {
