@@ -57,13 +57,7 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
         Error                                   // ←  error type (optional but nice)
     >({
         queryKey: ['googleHealthcareSources'], // Unique query key for this source type
-        queryFn: ({ queryKey }) => {
-            const [, { skip, limit }] = queryKey as [
-                string,
-                { skip?: number; limit?: number }
-            ];
-            return getGoogleHealthcareSources(skip, limit);
-        },
+        queryFn: () => getGoogleHealthcareSources(),
     });
 
     // Mutation for deleting a source

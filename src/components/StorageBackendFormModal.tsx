@@ -50,6 +50,7 @@ import {
     createStorageBackendConfig,
     updateStorageBackendConfig,
 } from '@/services/api';
+import { buildZodDefaults } from '@/utils/zodDefaults';
 
 interface StorageBackendFormModalProps {
     isOpen: boolean;
@@ -59,53 +60,6 @@ interface StorageBackendFormModalProps {
 
 type StorageBackendFormInput = z.input<typeof storageBackendFormSchema>;
 // type StorageBackendFormOutput = z.output<typeof storageBackendFormSchema>;
-
-// This helper function creates a fully-typed default object
-// that Zod itself would produce if parsing an empty object (after applying all .default() calls).
-// This ensures maximum compatibility with the resolver.
-const getZodDefaults = (
-    schema: typeof storageBackendFormSchema,
-    initialValues?: Partial<StorageBackendFormData>
-): StorageBackendFormData => {
-    // For Zod to apply defaults, it needs to parse.
-    // We provide a minimal object that would pass initial required checks if any,
-    // or an empty object if all fields are optional or have defaults.
-    // `name` and `backend_type` are crucial.
-    const baseForParsing: Partial<StorageBackendFormData> = {
-        name: '', // required by schema
-        backend_type: 'filesystem', // required by schema
-        ...initialValues,
-    };
-    const parseResult = schema.safeParse(baseForParsing);
-    if (parseResult.success) {
-        return parseResult.data;
-    }
-    // Fallback if something unexpected happens (should be rare with a good base)
-    console.error("Error generating Zod defaults:", parseResult.error.flatten().fieldErrors);
-    // Construct a manual default that matches StorageBackendFormData structure explicitly
-    return {
-        name: initialValues?.name || '',
-        backend_type: initialValues?.backend_type || 'filesystem',
-        is_enabled: initialValues?.is_enabled === undefined ? true : initialValues.is_enabled,
-        description: initialValues?.description === undefined ? null : initialValues.description,
-        path: initialValues?.path === undefined ? null : initialValues.path,
-        remote_ae_title: initialValues?.remote_ae_title === undefined ? null : initialValues.remote_ae_title,
-        remote_host: initialValues?.remote_host === undefined ? null : initialValues.remote_host,
-        remote_port: initialValues?.remote_port === undefined ? null : initialValues.remote_port,
-        local_ae_title: initialValues?.local_ae_title === undefined ? null : initialValues.local_ae_title,
-        tls_enabled: initialValues?.tls_enabled === undefined ? false : initialValues.tls_enabled,
-        tls_ca_cert_secret_name: initialValues?.tls_ca_cert_secret_name === undefined ? null : initialValues.tls_ca_cert_secret_name,
-        tls_client_cert_secret_name: initialValues?.tls_client_cert_secret_name === undefined ? null : initialValues.tls_client_cert_secret_name,
-        tls_client_key_secret_name: initialValues?.tls_client_key_secret_name === undefined ? null : initialValues.tls_client_key_secret_name,
-        bucket: initialValues?.bucket === undefined ? null : initialValues.bucket,
-        prefix: initialValues?.prefix === undefined ? null : initialValues.prefix,
-        gcp_project_id: initialValues?.gcp_project_id === undefined ? null : initialValues.gcp_project_id,
-        gcp_location: initialValues?.gcp_location === undefined ? null : initialValues.gcp_location,
-        gcp_dataset_id: initialValues?.gcp_dataset_id === undefined ? null : initialValues.gcp_dataset_id,
-        gcp_dicom_store_id: initialValues?.gcp_dicom_store_id === undefined ? null : initialValues.gcp_dicom_store_id,
-        base_url: initialValues?.base_url === undefined ? null : initialValues.base_url,
-    };
-};
 
 // Helper to null out fields not relevant to the current backend type
 const nullOutIrrelevantFields = (
@@ -153,8 +107,10 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
     // This ensures all fields RHF knows about have values consistent with Zod's .default()
     const form = useForm<StorageBackendFormInput>({
         resolver: zodResolver(storageBackendFormSchema),
-        defaultValues: getZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }),
-        mode: 'onBlur', // Consider 'onChange' for more immediate feedback or 'onSubmit'
+        mode: 'onBlur',
+        defaultValues: buildZodDefaults(storageBackendFormSchema, {
+            backend_type: 'filesystem',
+        }),
     });
 
     const watchedBackendType = form.watch('backend_type');
@@ -162,49 +118,26 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
 
     // Memoize the generation of default values for edit mode
     const initialEditData = useMemo((): StorageBackendFormData | null => {
-        if (isEditMode && backend) {
-            // Start with Zod defaults for the specific backend type
-            let base = getZodDefaults(storageBackendFormSchema, { backend_type: backend.backend_type as AllowedBackendType });
+        if (!isEditMode || !backend) return null;
 
-            // Override with actual values from the backend record
-            base.name = backend.name;
-            base.description = backend.description ?? null; // Already a Zod default
-            base.is_enabled = backend.is_enabled; // Already a Zod default
+        // 1. start with schema defaults for this backend type
+        console.log('[DEBUG] raw backend from query', backend);
+        const base = buildZodDefaults(storageBackendFormSchema, {
+            backend_type: backend.backend_type as AllowedBackendType,
+        });
 
-            // Populate type-specific fields
-            switch (backend.backend_type as AllowedBackendType) {
-                case 'filesystem':
-                    base.path = backend.config?.path ?? null;
-                    break;
-                case 'cstore':
-                    base.remote_ae_title = backend.config?.remote_ae_title ?? null;
-                    base.remote_host = backend.config?.remote_host ?? null;
-                    base.remote_port = backend.config?.remote_port ?? null;
-                    base.local_ae_title = backend.config?.local_ae_title ?? null;
-                    base.tls_enabled = backend.config?.tls_enabled ?? false;
-                    base.tls_ca_cert_secret_name = backend.config?.tls_ca_cert_secret_name ?? null;
-                    base.tls_client_cert_secret_name = backend.config?.tls_client_cert_secret_name ?? null;
-                    base.tls_client_key_secret_name = backend.config?.tls_client_key_secret_name ?? null;
-                    break;
-                case 'gcs':
-                    base.bucket = backend.config?.bucket ?? null;
-                    base.prefix = backend.config?.prefix ?? null;
-                    break;
-                case 'google_healthcare':
-                    base.gcp_project_id = backend.config?.gcp_project_id ?? null;
-                    base.gcp_location = backend.config?.gcp_location ?? null;
-                    base.gcp_dataset_id = backend.config?.gcp_dataset_id ?? null;
-                    base.gcp_dicom_store_id = backend.config?.gcp_dicom_store_id ?? null;
-                    break;
-                case 'stow_rs':
-                    base.base_url = backend.config?.base_url ?? null;
-                    break;
-            }
-            // Null out fields not relevant to this specific backend type
-            return nullOutIrrelevantFields(base, backend.backend_type as AllowedBackendType);
-        }
-        return null;
-    }, [backend, isEditMode, form]);
+        // 2. copy the common DB columns
+        base.name = backend.name;
+        base.description = backend.description ?? null;
+        base.is_enabled = backend.is_enabled;
+
+        // 3. merge every key that lives under backend.config straight in
+        Object.assign(base, backend.config ?? {}, backend);
+
+        // 4. wipe fields that don’t belong to this type
+        return nullOutIrrelevantFields(base, backend.backend_type as AllowedBackendType);
+    }, [backend, isEditMode]);
+
 
 
     useEffect(() => {
@@ -216,7 +149,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                 // For CREATE mode, start with Zod defaults for 'filesystem'
                 // then null out fields not relevant to 'filesystem'.
                 const createDefaults = nullOutIrrelevantFields(
-                    getZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }),
+                    buildZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }),
                     'filesystem'
                 );
                 console.log("Resetting form for CREATE (filesystem) with:", createDefaults);
@@ -237,7 +170,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
             };
 
             // Get Zod defaults for the new type
-            let newTypeBaseDefaults = getZodDefaults(storageBackendFormSchema, { backend_type: watchedBackendType });
+            let newTypeBaseDefaults = buildZodDefaults(storageBackendFormSchema, { backend_type: watchedBackendType });
             // Null out fields not relevant for this new type
             newTypeBaseDefaults = nullOutIrrelevantFields(newTypeBaseDefaults, watchedBackendType);
 
@@ -261,7 +194,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
             queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
             onClose();
             // Reset to clean 'filesystem' state for next potential create
-            const resetValues = nullOutIrrelevantFields(getZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }), 'filesystem');
+            const resetValues = nullOutIrrelevantFields(buildZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }), 'filesystem');
             form.reset(resetValues);
         },
         onError: (error: any) => {

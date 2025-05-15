@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import {
     Form,
- //   FormControl, // Keep FormControl for Select wrapper if needed, but not direct child
+    //   FormControl, // Keep FormControl for Select wrapper if needed, but not direct child
     FormField,
     FormItem,
     FormLabel,
@@ -40,7 +40,7 @@ import {
     AlertCircle,
     ClipboardCopyIcon,
     DatabaseZap,
-//   Loader2
+    //   Loader2
 } from 'lucide-react';
 import {
     Alert,
@@ -50,7 +50,7 @@ import {
 
 import {
     CrosswalkDataSourceRead,
-//    CrosswalkDataSourceCreatePayload,
+    //    CrosswalkDataSourceCreatePayload,
     CrosswalkDataSourceUpdatePayload
 } from '@/schemas';
 import {
@@ -126,8 +126,8 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
     const form = useForm<CrosswalkDataSourceRawFormData>({
         resolver: zodResolver(crosswalkDataSourceFormSchema),
         defaultValues: {
-             ...initialFormDefaults,
-             connection_details: json5.stringify({ host: "", port: dbTypePlaceholders['POSTGRES'], user: "", password_secret: "", dbname: "" }, null, 2),
+            ...initialFormDefaults,
+            connection_details: json5.stringify({ host: "", port: dbTypePlaceholders['POSTGRES'], user: "", password_secret: "", dbname: "" }, null, 2),
         },
         mode: 'onBlur',
     });
@@ -239,7 +239,7 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
         try {
             const result = await testCrosswalkDataSourceConnection(dataSource.id);
             setTestResult(result);
-            if(result.success) {
+            if (result.success) {
                 toast.success("Connection Test Successful!");
             } else {
                 toast.error("Connection Test Failed", { description: result.message });
@@ -255,7 +255,12 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
 
     const onSubmit: SubmitHandler<CrosswalkDataSourceRawFormData> = useCallback((rawValues) => {
         try {
-            const parsed = crosswalkDataSourceFormSchema.parse(rawValues);
+            const parsed = crosswalkDataSourceFormSchema.parse({
+                ...rawValues,
+                connection_details: typeof rawValues.connection_details === 'string'
+                    ? rawValues.connection_details
+                    : json5.stringify(rawValues.connection_details, null, 2),
+            });
 
             const payload = {
                 ...parsed,
@@ -275,22 +280,24 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                 description: error.message || "Please check the form inputs.",
             });
         }
-}, [isEditMode, dataSource, createMutation, updateMutation]);
+    }, [isEditMode, dataSource, createMutation, updateMutation]);
 
 
-     const handleCopyExample = useCallback(() => {
-         const exampleJson = json5.stringify(configExamples[watchedDbType] || {}, null, 2);
-         navigator.clipboard.writeText(exampleJson).then(() => {
-             setShowCopied(true);
-             if (copiedTimeout) { clearTimeout(copiedTimeout); }
-             const timeoutId = setTimeout(() => setShowCopied(false), 1500);
-             setCopiedTimeout(timeoutId);
-             toast.success(`Default JSON for '${watchedDbType}' copied!`);
-         }).catch(err => {
-             toast.error('Failed to copy JSON to clipboard.');
-             console.error('Clipboard copy failed:', err);
-         });
-     }, [watchedDbType, copiedTimeout]);
+
+
+    const handleCopyExample = useCallback(() => {
+        const exampleJson = json5.stringify(configExamples[watchedDbType] || {}, null, 2);
+        navigator.clipboard.writeText(exampleJson).then(() => {
+            setShowCopied(true);
+            if (copiedTimeout) { clearTimeout(copiedTimeout); }
+            const timeoutId = setTimeout(() => setShowCopied(false), 1500);
+            setCopiedTimeout(timeoutId);
+            toast.success(`Default JSON for '${watchedDbType}' copied!`);
+        }).catch(err => {
+            toast.error('Failed to copy JSON to clipboard.');
+            console.error('Clipboard copy failed:', err);
+        });
+    }, [watchedDbType, copiedTimeout]);
 
     const isLoading = createMutation.isPending || updateMutation.isPending;
 
@@ -355,7 +362,7 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                                 </FormItem>
                             )}
                         />
-                         {/* === End Modified DB Type Select === */}
+                        {/* === End Modified DB Type Select === */}
 
                         {/* Description using custom FormTextarea */}
                         <FormField
@@ -412,7 +419,7 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                             )}
                         />
 
-                         {/* Target Table using custom FormInput */}
+                        {/* Target Table using custom FormInput */}
                         <FormField
                             control={form.control}
                             name="target_table"
@@ -429,7 +436,7 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                             )}
                         />
 
-                         {/* Sync Interval using custom FormInput */}
+                        {/* Sync Interval using custom FormInput */}
                         <FormField
                             control={form.control}
                             name="sync_interval_seconds"
@@ -500,22 +507,22 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                         />
 
                         <DialogFooter className="pt-4">
-                             <DialogClose>
-                                 <Button
-                                     type="button"
-                                     variant="outline"
-                                     onClick={onClose}
-                                     disabled={isLoading}
-                                 >
-                                     Cancel
-                                 </Button>
-                             </DialogClose>
-                             <Button
-                                 type="submit"
-                                 disabled={isLoading || isTesting}
-                             >
+                            <DialogClose>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onClose}
+                                    disabled={isLoading}
+                                >
+                                    Cancel
+                                </Button>
+                            </DialogClose>
+                            <Button
+                                type="submit"
+                                disabled={isLoading || isTesting}
+                            >
                                 {isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Data Source')}
-                             </Button>
+                            </Button>
                         </DialogFooter>
                     </form>
                 </Form>

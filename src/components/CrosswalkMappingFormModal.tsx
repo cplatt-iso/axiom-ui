@@ -81,7 +81,7 @@ export function CrosswalkMappingFormModal({
                 replacement_mapping: json5.stringify(existingMap.replacement_mapping || [], null, 2),
                 cache_ttl_seconds: existingMap.cache_ttl_seconds ?? null,
                 on_cache_miss: existingMap.on_cache_miss,
-              }
+            }
             : getDefaultCrosswalkMapRawFormData(),
         mode: "onChange", // Or "onBlur"
     });
@@ -100,7 +100,7 @@ export function CrosswalkMappingFormModal({
                         replacement_mapping: json5.stringify(existingMap.replacement_mapping || [], null, 2),
                         cache_ttl_seconds: existingMap.cache_ttl_seconds ?? null,
                         on_cache_miss: existingMap.on_cache_miss,
-                      }
+                    }
                     : getDefaultCrosswalkMapRawFormData()
             );
         }
@@ -108,7 +108,19 @@ export function CrosswalkMappingFormModal({
 
     const onSubmit: SubmitHandler<CrosswalkMapRawFormData> = async (rawData) => {
         try {
-            const parsedData = crosswalkMapFormSchema.parse(rawData);
+            const parsedData = crosswalkMapFormSchema.parse({
+                ...rawData,
+                match_columns: typeof rawData.match_columns === 'string'
+                    ? rawData.match_columns
+                    : json5.stringify(rawData.match_columns ?? [], null, 2),
+                cache_key_columns: typeof rawData.cache_key_columns === 'string'
+                    ? rawData.cache_key_columns
+                    : json5.stringify(rawData.cache_key_columns ?? [], null, 2),
+                replacement_mapping: typeof rawData.replacement_mapping === 'string'
+                    ? rawData.replacement_mapping
+                    : json5.stringify(rawData.replacement_mapping ?? [], null, 2),
+            });
+
 
             let result: CrosswalkMapRead;
             if (existingMap && existingMap.id) {
@@ -209,7 +221,7 @@ export function CrosswalkMappingFormModal({
                         <Controller
                             name="cache_key_columns"
                             control={form.control}
-                            render={({ field }) => <Textarea id="cache_key_columns" {...field} className="col-span-3 min-h-[60px] font-mono" placeholder='["mrn", "accession_number"]'/>}
+                            render={({ field }) => <Textarea id="cache_key_columns" {...field} className="col-span-3 min-h-[60px] font-mono" placeholder='["mrn", "accession_number"]' />}
                         />
                         {form.formState.errors.cache_key_columns && <p className="col-span-4 text-red-500 text-sm">{form.formState.errors.cache_key_columns.message}</p>}
                     </div>
@@ -220,7 +232,7 @@ export function CrosswalkMappingFormModal({
                         <Controller
                             name="replacement_mapping"
                             control={form.control}
-                            render={({ field }) => <Textarea id="replacement_mapping" {...field} className="col-span-3 min-h-[100px] font-mono" placeholder='[{"source_column": "new_mrn", "dicom_tag": "0010,0020", "dicom_vr": "LO"}]'/>}
+                            render={({ field }) => <Textarea id="replacement_mapping" {...field} className="col-span-3 min-h-[100px] font-mono" placeholder='[{"source_column": "new_mrn", "dicom_tag": "0010,0020", "dicom_vr": "LO"}]' />}
                         />
                         {form.formState.errors.replacement_mapping && <p className="col-span-4 text-red-500 text-sm">{form.formState.errors.replacement_mapping.message}</p>}
                     </div>
@@ -265,7 +277,7 @@ export function CrosswalkMappingFormModal({
                                 </Select>
                             )}
                         />
-                         {form.formState.errors.on_cache_miss && <p className="col-span-4 text-red-500 text-sm">{form.formState.errors.on_cache_miss.message}</p>}
+                        {form.formState.errors.on_cache_miss && <p className="col-span-4 text-red-500 text-sm">{form.formState.errors.on_cache_miss.message}</p>}
                     </div>
 
                     {/* Is Enabled */}
