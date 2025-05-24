@@ -59,7 +59,7 @@ import {
     // From storageBackendSchema.ts (via index.ts)
     StorageBackendConfigRead,
     StorageBackendConfigCreatePayload,
-    StorageBackendConfigUpdatePayload,
+    StorageBackendConfigUpdateApiPayload,
 
     // From scheduleSchema.ts (via index.ts) - CRITICAL CHANGE HERE
     Schedule, // RENAME: This is what you likely mean by 'Schedule' for reading
@@ -339,7 +339,7 @@ export const getStorageBackendConfigs = (skip: number = 0, limit: number = 100):
 export const createStorageBackendConfig = (data: StorageBackendConfigCreatePayload): Promise<StorageBackendConfigRead> => {
     return apiClient<StorageBackendConfigRead>('/config/storage-backends', { method: 'POST', body: JSON.stringify(data) });
 };
-export const updateStorageBackendConfig = (id: number, data: StorageBackendConfigUpdatePayload): Promise<StorageBackendConfigRead> => {
+export const updateStorageBackendConfig = (id: number, data: StorageBackendConfigUpdateApiPayload): Promise<StorageBackendConfigRead> => {
     return apiClient<StorageBackendConfigRead>(`/config/storage-backends/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 };
 export const deleteStorageBackendConfig = (id: number): Promise<StorageBackendConfigRead> => {
@@ -524,7 +524,7 @@ export type {
     // DimseListenerStatus, // If needed
     StorageBackendConfigRead,
     StorageBackendConfigCreatePayload,
-    StorageBackendConfigUpdatePayload,
+    StorageBackendConfigUpdateApiPayload,
     Schedule, // Use the corrected name
     ScheduleCreate,
     ScheduleUpdate,

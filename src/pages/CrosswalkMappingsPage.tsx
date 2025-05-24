@@ -2,7 +2,9 @@
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusCircle, Map } from 'lucide-react'; // Use Map icon
-import { CrosswalkMapFormData, CrosswalkMapRead } from '@/schemas'; // Import schema type
+import { 
+    // CrosswalkMapFormData, 
+    CrosswalkMapRead } from '@/schemas'; // Import schema type
 import { getCrosswalkMaps } from '@/services/api'; // Import API function
 import CrosswalkMappingTable from '@/components/CrosswalkMappingTable'; // Import the table component (we created this)
 import { CrosswalkMappingFormModal } from '@/components/CrosswalkMappingFormModal'

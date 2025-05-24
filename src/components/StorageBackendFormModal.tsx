@@ -1,51 +1,39 @@
 // frontend/src/components/StorageBackendFormModal.tsx
-import React, { useEffect, useMemo } from 'react';
-import { useForm, SubmitHandler, SubmitErrorHandler } from 'react-hook-form';
+import React, { useEffect } from 'react';
+import { useForm, SubmitHandler, SubmitErrorHandler, FieldPath } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { z } from "zod";
+// import { z } from "zod";
+
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogClose,
+    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog';
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-    FormDescription,
+    Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from "@/components/ui/textarea";
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 import {
     StorageBackendConfigRead,
     AllowedBackendType,
-    StorageBackendApiPayload, // This is used for submission, not directly for form defaults
-} from '@/schemas'; // Assuming index.ts re-exports from storageBackendSchema
-import {
-    storageBackendFormSchema,
-    StorageBackendFormData,
+    StowRsAuthType,
     StorageBackendConfigCreatePayload,
+    StorageBackendConfigCreatePayloadSchema, // Assuming this is your Zod discriminated union for create
+    StorageBackendConfigUpdateApiPayload,   // Assuming this is your Zod flat partial schema for update
+    StorageBackendConfigUpdateApiPayloadSchema, // And its schema
+    storageBackendFormSchema,               // Flat Zod schema for RHF
+    StorageBackendFormData,                 // Type for RHF
 } from '@/schemas/storageBackendSchema';
+
 import {
     createStorageBackendConfig,
     updateStorageBackendConfig,
@@ -58,292 +46,343 @@ interface StorageBackendFormModalProps {
     backend: StorageBackendConfigRead | null;
 }
 
-type StorageBackendFormInput = z.input<typeof storageBackendFormSchema>;
-// type StorageBackendFormOutput = z.output<typeof storageBackendFormSchema>;
-
-// Helper to null out fields not relevant to the current backend type
-const nullOutIrrelevantFields = (
-    data: StorageBackendFormData,
-    type: AllowedBackendType
+// Helper to prepare clean form data based on types
+const getCleanedFormDataForType = (
+    currentData: Partial<StorageBackendFormData>,
+    newBackendType: AllowedBackendType,
+    newStowAuthType?: StowRsAuthType | null
 ): StorageBackendFormData => {
-    const relevantData = { ...data }; // Make a copy
-
-    const allPossibleConfigFields: Array<keyof StorageBackendFormData> = [
-        'path', 'remote_ae_title', 'remote_host', 'remote_port', 'local_ae_title',
-        'tls_enabled', 'tls_ca_cert_secret_name', 'tls_client_cert_secret_name',
-        'tls_client_key_secret_name', 'bucket', 'prefix', 'gcp_project_id',
-        'gcp_location', 'gcp_dataset_id', 'gcp_dicom_store_id', 'base_url'
-    ];
-
-    let relevantToType: Array<keyof StorageBackendFormData> = [];
-    switch (type) {
-        case 'filesystem': relevantToType = ['path']; break;
-        case 'cstore': relevantToType = ['remote_ae_title', 'remote_host', 'remote_port', 'local_ae_title', 'tls_enabled', 'tls_ca_cert_secret_name', 'tls_client_cert_secret_name', 'tls_client_key_secret_name']; break;
-        case 'gcs': relevantToType = ['bucket', 'prefix']; break;
-        case 'google_healthcare': relevantToType = ['gcp_project_id', 'gcp_location', 'gcp_dataset_id', 'gcp_dicom_store_id']; break;
-        case 'stow_rs': relevantToType = ['base_url']; break;
-    }
-
-    allPossibleConfigFields.forEach(fieldKey => {
-        if (!relevantToType.includes(fieldKey)) {
-            // If the field is tls_enabled and not relevant, Zod default (false) should apply.
-            // Other fields are mostly nullable in the schema.
-            if (fieldKey === 'tls_enabled') {
-                (relevantData as any)[fieldKey] = false; // Reset to its Zod default if not relevant
-            } else {
-                (relevantData as any)[fieldKey] = null; // Null out if schema allows (most do)
-            }
-        }
+    const baseDefaults = buildZodDefaults(storageBackendFormSchema, {
+        backend_type: newBackendType,
+        stow_auth_type: newBackendType === 'stow_rs' ? (newStowAuthType || 'none') : 'none',
     });
-    return relevantData;
-};
 
+    let cleanedData: StorageBackendFormData = {
+        ...baseDefaults,
+        name: currentData.name || baseDefaults.name,
+        description: currentData.description !== undefined ? currentData.description : baseDefaults.description,
+        is_enabled: currentData.is_enabled !== undefined ? currentData.is_enabled : baseDefaults.is_enabled,
+        backend_type: newBackendType,
+    };
+
+    switch (newBackendType) {
+        case 'filesystem':
+            cleanedData.path = currentData.path !== undefined ? currentData.path : baseDefaults.path;
+            break;
+        case 'cstore':
+            cleanedData.remote_ae_title = currentData.remote_ae_title !== undefined ? currentData.remote_ae_title : baseDefaults.remote_ae_title;
+            cleanedData.remote_host = currentData.remote_host !== undefined ? currentData.remote_host : baseDefaults.remote_host;
+            cleanedData.remote_port = currentData.remote_port !== undefined ? currentData.remote_port : baseDefaults.remote_port;
+            cleanedData.local_ae_title = currentData.local_ae_title !== undefined ? currentData.local_ae_title : baseDefaults.local_ae_title;
+            cleanedData.tls_enabled = currentData.tls_enabled !== undefined ? currentData.tls_enabled : baseDefaults.tls_enabled;
+            cleanedData.tls_ca_cert_secret_name = currentData.tls_ca_cert_secret_name !== undefined ? currentData.tls_ca_cert_secret_name : baseDefaults.tls_ca_cert_secret_name;
+            cleanedData.tls_client_cert_secret_name = currentData.tls_client_cert_secret_name !== undefined ? currentData.tls_client_cert_secret_name : baseDefaults.tls_client_cert_secret_name;
+            cleanedData.tls_client_key_secret_name = currentData.tls_client_key_secret_name !== undefined ? currentData.tls_client_key_secret_name : baseDefaults.tls_client_key_secret_name;
+            break;
+        case 'gcs':
+            cleanedData.bucket = currentData.bucket !== undefined ? currentData.bucket : baseDefaults.bucket;
+            cleanedData.prefix = currentData.prefix !== undefined ? currentData.prefix : baseDefaults.prefix;
+            break;
+        case 'google_healthcare':
+            cleanedData.gcp_project_id = currentData.gcp_project_id !== undefined ? currentData.gcp_project_id : baseDefaults.gcp_project_id;
+            cleanedData.gcp_location = currentData.gcp_location !== undefined ? currentData.gcp_location : baseDefaults.gcp_location;
+            cleanedData.gcp_dataset_id = currentData.gcp_dataset_id !== undefined ? currentData.gcp_dataset_id : baseDefaults.gcp_dataset_id;
+            cleanedData.gcp_dicom_store_id = currentData.gcp_dicom_store_id !== undefined ? currentData.gcp_dicom_store_id : baseDefaults.gcp_dicom_store_id;
+            break;
+        case 'stow_rs':
+            cleanedData.base_url = currentData.base_url !== undefined ? currentData.base_url : baseDefaults.base_url;
+            cleanedData.stow_auth_type = newStowAuthType || (currentData.stow_auth_type !== undefined ? currentData.stow_auth_type : baseDefaults.stow_auth_type);
+            cleanedData.tls_ca_cert_secret_name = currentData.tls_ca_cert_secret_name !== undefined ? currentData.tls_ca_cert_secret_name : baseDefaults.tls_ca_cert_secret_name;
+
+            if (cleanedData.stow_auth_type === 'basic') {
+                cleanedData.stow_basic_auth_username_secret_name = currentData.stow_basic_auth_username_secret_name !== undefined ? currentData.stow_basic_auth_username_secret_name : baseDefaults.stow_basic_auth_username_secret_name;
+                cleanedData.stow_basic_auth_password_secret_name = currentData.stow_basic_auth_password_secret_name !== undefined ? currentData.stow_basic_auth_password_secret_name : baseDefaults.stow_basic_auth_password_secret_name;
+            } else if (cleanedData.stow_auth_type === 'bearer') {
+                cleanedData.stow_bearer_token_secret_name = currentData.stow_bearer_token_secret_name !== undefined ? currentData.stow_bearer_token_secret_name : baseDefaults.stow_bearer_token_secret_name;
+            } else if (cleanedData.stow_auth_type === 'apikey') {
+                cleanedData.stow_api_key_secret_name = currentData.stow_api_key_secret_name !== undefined ? currentData.stow_api_key_secret_name : baseDefaults.stow_api_key_secret_name;
+                cleanedData.stow_api_key_header_name_override = currentData.stow_api_key_header_name_override !== undefined ? currentData.stow_api_key_header_name_override : baseDefaults.stow_api_key_header_name_override;
+            }
+            break;
+        default:
+            // Optional: handle exhaustive check for type safety if new types are added
+            // const _exhaustiveCheck: never = newBackendType;
+            break;
+    }
+    return cleanedData;
+};
 
 const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpen, onClose, backend }) => {
     const queryClient = useQueryClient();
     const isEditMode = !!backend;
 
-    // Initialize form with Zod-derived defaults for a base type.
-    // This ensures all fields RHF knows about have values consistent with Zod's .default()
-    const form = useForm<StorageBackendFormInput>({
+    const form = useForm<StorageBackendFormData>({
         resolver: zodResolver(storageBackendFormSchema),
         mode: 'onBlur',
-        defaultValues: buildZodDefaults(storageBackendFormSchema, {
-            backend_type: 'filesystem',
-        }),
+        defaultValues: { // BE SUPER DUPER EXPLICIT HERE:
+            name: "", // Must have a value
+            backend_type: "filesystem", // Must have a value
+            is_enabled: true, // Must have a value, can't be undefined
+            description: null,
+            path: null,
+            remote_ae_title: null,
+            remote_host: null,
+            remote_port: null, // Or a default number if your schema demands it, but null for optional number
+            local_ae_title: null,
+            tls_enabled: false, // Explicitly false, matching Zod default
+            tls_ca_cert_secret_name: null,
+            tls_client_cert_secret_name: null,
+            tls_client_key_secret_name: null,
+            bucket: null,
+            prefix: null,
+            gcp_project_id: null,
+            gcp_location: null,
+            gcp_dataset_id: null,
+            gcp_dicom_store_id: null,
+            base_url: null,
+            stow_auth_type: "none", // Must have a value, matching Zod default
+            stow_basic_auth_username_secret_name: null,
+            stow_basic_auth_password_secret_name: null,
+            stow_bearer_token_secret_name: null,
+            stow_api_key_secret_name: null,
+            stow_api_key_header_name_override: null,
+        } satisfies StorageBackendFormData,
     });
 
     const watchedBackendType = form.watch('backend_type');
-    const watchedCStoreTlsEnabled = form.watch('tls_enabled'); // `false` default from schema is fine
+    const watchedStowAuthType = form.watch('stow_auth_type');
+    const watchedCStoreTlsEnabled = form.watch('tls_enabled');
 
-    // Memoize the generation of default values for edit mode
-    const initialEditData = useMemo((): StorageBackendFormData | null => {
-        if (!isEditMode || !backend) return null;
-
-        // 1. start with schema defaults for this backend type
-        console.log('[DEBUG] raw backend from query', backend);
-        const base = buildZodDefaults(storageBackendFormSchema, {
-            backend_type: backend.backend_type as AllowedBackendType,
-        });
-
-        // 2. copy the common DB columns
-        base.name = backend.name;
-        base.description = backend.description ?? null;
-        base.is_enabled = backend.is_enabled;
-
-        // 3. merge every key that lives under backend.config straight in
-        Object.assign(base, backend.config ?? {}, backend);
-
-        // 4. wipe fields that don’t belong to this type
-        return nullOutIrrelevantFields(base, backend.backend_type as AllowedBackendType);
-    }, [backend, isEditMode]);
-
-
-
+    // Effect to reset form when opening or for edit mode
     useEffect(() => {
         if (isOpen) {
-            if (isEditMode && initialEditData) {
-                console.log("Resetting form for EDIT with:", initialEditData);
-                form.reset(initialEditData);
-            } else {
-                // For CREATE mode, start with Zod defaults for 'filesystem'
-                // then null out fields not relevant to 'filesystem'.
-                const createDefaults = nullOutIrrelevantFields(
-                    buildZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }),
-                    'filesystem'
-                );
-                console.log("Resetting form for CREATE (filesystem) with:", createDefaults);
+            if (isEditMode && backend) {
+                let initialFormData: Partial<StorageBackendFormData> = {
+                    name: backend.name,
+                    description: backend.description,
+                    is_enabled: backend.is_enabled,
+                    backend_type: backend.backend_type,
+                };
+                switch (backend.backend_type) {
+                    case "filesystem": initialFormData.path = backend.path; break;
+                    case "cstore": // CStore fields are flat on StorageBackendConfigRead_CStore
+                        initialFormData = { ...initialFormData, ...backend }; break;
+                    case "gcs":
+                        initialFormData.bucket = backend.bucket;
+                        initialFormData.prefix = backend.prefix;
+                        break;
+                    case "google_healthcare": // GHC fields are flat on StorageBackendConfigRead_GoogleHealthcare
+                        initialFormData = { ...initialFormData, ...backend }; break;
+                    case "stow_rs": // STOW-RS fields are flat on StorageBackendConfigRead_StowRs
+                        initialFormData = {
+                            ...initialFormData,
+                            base_url: backend.base_url,
+                            stow_auth_type: backend.auth_type, // map API 'auth_type' to form 'stow_auth_type'
+                            stow_basic_auth_username_secret_name: backend.basic_auth_username_secret_name,
+                            stow_basic_auth_password_secret_name: backend.basic_auth_password_secret_name,
+                            stow_bearer_token_secret_name: backend.bearer_token_secret_name,
+                            stow_api_key_secret_name: backend.api_key_secret_name,
+                            stow_api_key_header_name_override: backend.api_key_header_name_override,
+                            tls_ca_cert_secret_name: backend.tls_ca_cert_secret_name,
+                        };
+                        break;
+                }
+                const cleanedEditData = getCleanedFormDataForType(initialFormData, backend.backend_type, backend.backend_type === 'stow_rs' ? backend.auth_type : undefined);
+                console.log("[EFFECT Init/Edit] Resetting form for EDIT with:", cleanedEditData);
+                form.reset(cleanedEditData);
+            } else if (!isEditMode) { // Only for CREATE mode
+                const createDefaults = getCleanedFormDataForType({}, 'filesystem');
+                console.log("[EFFECT Init/Create] Resetting form for CREATE (filesystem) with:", createDefaults);
                 form.reset(createDefaults);
             }
             form.clearErrors();
         }
-    }, [isOpen, form, isEditMode, initialEditData]);
+    }, [isOpen, isEditMode, backend, form]); // form added to dependency array
 
 
+    // Effect to handle changing backend_type or stow_auth_type
     useEffect(() => {
-        // This effect handles changing the backend_type in CREATE mode
-        if (isOpen && !isEditMode) {
-            const currentCommonValues = {
-                name: form.getValues('name'),
-                description: form.getValues('description'),
-                is_enabled: form.getValues('is_enabled'),
-            };
+        if (!isOpen) return;
 
-            // Get Zod defaults for the new type
-            let newTypeBaseDefaults = buildZodDefaults(storageBackendFormSchema, { backend_type: watchedBackendType });
-            // Null out fields not relevant for this new type
-            newTypeBaseDefaults = nullOutIrrelevantFields(newTypeBaseDefaults, watchedBackendType);
+        const currentValues = form.getValues();
+        let newStowAuthTypeForReset: StowRsAuthType | null | undefined = currentValues.stow_auth_type;
 
-            const newValues = {
-                ...newTypeBaseDefaults,
-                name: currentCommonValues.name, // Preserve user input for common fields
-                description: currentCommonValues.description,
-                is_enabled: currentCommonValues.is_enabled,
-            };
-            console.log(`Backend type changed to ${watchedBackendType} in CREATE mode. Resetting with:`, newValues);
-            form.reset(newValues);
-            form.clearErrors(); // Clear errors after type change
+        // If backend_type field itself was changed by the user
+        if (form.formState.dirtyFields.backend_type) {
+            newStowAuthTypeForReset = 'none'; // When main type changes, reset sub-type
+            const cleanedValues = getCleanedFormDataForType(currentValues, watchedBackendType, newStowAuthTypeForReset);
+            console.log(`[EFFECT TypeChange] Backend_type changed to ${watchedBackendType}. Resetting with:`, cleanedValues);
+            form.reset(cleanedValues, { keepDirtyValues: true, keepErrors: false });
+            form.clearErrors();
         }
-    }, [watchedBackendType, isOpen, isEditMode, form]);
+        // Else if backend_type is STOW-RS AND stow_auth_type field was changed
+        else if (watchedBackendType === 'stow_rs' && form.formState.dirtyFields.stow_auth_type) {
+            const cleanedValues = getCleanedFormDataForType(currentValues, 'stow_rs', watchedStowAuthType);
+            console.log(`[EFFECT TypeChange] STOW-RS auth_type changed to ${watchedStowAuthType}. Resetting STOW-RS fields with:`, cleanedValues);
+            form.reset(cleanedValues, { keepDirtyValues: true, keepErrors: false });
+            form.clearErrors();
+        }
+    }, [watchedBackendType, watchedStowAuthType, isOpen, form, isEditMode]); // isEditMode added
+    const mutationConfig = {
+        onSuccess: (data: StorageBackendConfigRead) => {
+            toast.success(`Storage Backend "${data.name}" ${isEditMode ? 'updated' : 'created'} successfully.`);
+            queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
+            if (isEditMode && data.id) {
+                queryClient.invalidateQueries({ queryKey: ['storageBackendConfig', data.id] });
+            }
+            onClose();
+            if (!isEditMode) {
+                form.reset(getCleanedFormDataForType({}, 'filesystem'));
+            }
+        },
+        onError: (error: any, variables: any) => {
+            const operation = isEditMode ? 'update' : 'creation';
+            const idContext = isEditMode ? `for ID ${(variables as { id: number }).id}` : '';
 
+            let specificError = `Failed to ${operation} backend config ${idContext}.`;
+            const errorDetailSource = error?.response?.data?.detail || error?.detail;
+
+            if (errorDetailSource) {
+                if (Array.isArray(errorDetailSource) && errorDetailSource[0]) {
+                    const errDetail = errorDetailSource[0];
+                    const fieldPath = errDetail.loc && Array.isArray(errDetail.loc) ? errDetail.loc.slice(1).join('.') as FieldPath<StorageBackendFormData> : 'root.serverError';
+                    specificError = `Validation Error on field '${fieldPath}': ${errDetail.msg}`;
+                    form.setError(fieldPath, { type: 'manual', message: errDetail.msg });
+                } else if (typeof errorDetailSource === 'string') {
+                    specificError = errorDetailSource;
+                    form.setError("root.serverError", { type: "manual", message: specificError });
+                }
+            } else if (error.message) {
+                specificError = error.message;
+                form.setError("root.serverError", { type: "manual", message: specificError });
+            }
+            toast.error(`${operation.charAt(0).toUpperCase() + operation.slice(1)} failed: ${specificError}`);
+            console.error(`${operation} error details ${idContext}:`, errorDetailSource || error);
+        },
+    };
 
     const createMutation = useMutation({
         mutationFn: (payload: StorageBackendConfigCreatePayload) => createStorageBackendConfig(payload),
-        onSuccess: (data) => {
-            toast.success(`Storage Backend "${data.name}" created successfully.`);
-            queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
-            onClose();
-            // Reset to clean 'filesystem' state for next potential create
-            const resetValues = nullOutIrrelevantFields(buildZodDefaults(storageBackendFormSchema, { backend_type: 'filesystem' }), 'filesystem');
-            form.reset(resetValues);
-        },
-        onError: (error: any) => {
-            let specificError = "Failed to create backend config.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
-                const errDetail = error.detail[0];
-                const fieldPath = errDetail.loc && Array.isArray(errDetail.loc) ? errDetail.loc.slice(1).join('.') : 'input';
-                specificError = `Validation Error on field '${fieldPath}': ${errDetail.msg}`;
-                if (fieldPath && typeof fieldPath === 'string' && (form.control as any)._fields[fieldPath]) { // Check if field exists
-                    form.setError(fieldPath as keyof StorageBackendFormData, { type: 'manual', message: errDetail.msg });
-                } else {
-                    form.setError("root.serverError", { type: "manual", message: specificError });
-                }
-            } else if (error?.detail) {
-                specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-                form.setError("root.serverError", { type: "manual", message: specificError });
-            } else {
-                specificError = error.message || specificError;
-                form.setError("root.serverError", { type: "manual", message: specificError });
-            }
-            toast.error(`Creation failed: ${specificError}`);
-            console.error("Create error details:", error?.detail || error);
-        },
+        ...mutationConfig,
     });
 
     const updateMutation = useMutation({
-        mutationFn: (payload: { id: number, data: Partial<StorageBackendApiPayload> }) =>
+        mutationFn: (payload: { id: number, data: StorageBackendConfigUpdateApiPayload }) =>
             updateStorageBackendConfig(payload.id, payload.data),
-        onSuccess: (data) => {
-            toast.success(`Storage Backend "${data.name}" updated successfully.`);
-            queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
-            queryClient.invalidateQueries({ queryKey: ['storageBackendConfig', data.id] }); // If you fetch individual ones
-            onClose();
-        },
-        onError: (error: any, variables) => {
-            let specificError = "Failed to update backend config.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) {
-                const errDetail = error.detail[0];
-                const fieldPath = errDetail.loc && Array.isArray(errDetail.loc) ? errDetail.loc.slice(1).join('.') : 'input';
-                specificError = `Validation Error on field '${fieldPath}': ${errDetail.msg}`;
-                if (fieldPath && typeof fieldPath === 'string' && (form.control as any)._fields[fieldPath]) { // Check if field exists
-                    form.setError(fieldPath as keyof StorageBackendFormData, { type: 'manual', message: errDetail.msg });
-                } else {
-                    form.setError("root.serverError", { type: "manual", message: specificError });
-                }
-            } else if (error?.detail) {
-                specificError = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
-                form.setError("root.serverError", { type: "manual", message: specificError });
-            } else {
-                specificError = error.message || specificError;
-                form.setError("root.serverError", { type: "manual", message: specificError });
-            }
-            toast.error(`Update failed for ID ${variables.id}: ${specificError}`);
-            console.error(`Update error details for ID ${variables.id}:`, error?.detail || error);
-        },
+        ...mutationConfig,
     });
 
-    const onSubmit: SubmitHandler<StorageBackendFormInput> = (raw) => {
-        const values = storageBackendFormSchema.parse(raw);
-        console.log("Form submitted with validated values:", values);
+    const onSubmit: SubmitHandler<StorageBackendFormData> = (formData) => {
+        console.log("Form submitted with RHF validated values (StorageBackendFormData):", formData);
 
-        // ─── 1. Common fields ────────────────────────────────────────────────────────
-        const common: Omit<StorageBackendConfigCreatePayload, "config"> = {
-            name: values.name,
-            description: values.description?.trim() || null,
-            backend_type: values.backend_type,
-            is_enabled: values.is_enabled,
+        const commonApiData = {
+            name: formData.name,
+            description: formData.description || null,
+            is_enabled: formData.is_enabled,
         };
 
-        // ─── 2. backend-specific `config` blob ───────────────────────────────────────
-        let config: Record<string, any>;
-
-        switch (values.backend_type) {
-            case "filesystem":
-                config = { path: values.path! };
-                break;
-
-            case "cstore":
-                config = {
-                    remote_ae_title: values.remote_ae_title!,
-                    remote_host: values.remote_host!,
-                    remote_port: values.remote_port!,
-                    local_ae_title: values.local_ae_title?.trim() || null,
-                    tls_enabled: values.tls_enabled ?? false,
-                    tls_ca_cert_secret_name: values.tls_enabled && values.tls_ca_cert_secret_name?.trim() ? values.tls_ca_cert_secret_name.trim() : null,
-                    tls_client_cert_secret_name: values.tls_enabled && values.tls_client_cert_secret_name?.trim() ? values.tls_client_cert_secret_name.trim() : null,
-                    tls_client_key_secret_name: values.tls_enabled && values.tls_client_key_secret_name?.trim() ? values.tls_client_key_secret_name.trim() : null,
-                };
-                break;
-
-            case "gcs":
-                config = {
-                    bucket: values.bucket!,
-                    prefix: values.prefix?.trim() || null,
-                };
-                break;
-
-            case "google_healthcare":
-                config = {
-                    gcp_project_id: values.gcp_project_id!,
-                    gcp_location: values.gcp_location!,
-                    gcp_dataset_id: values.gcp_dataset_id!,
-                    gcp_dicom_store_id: values.gcp_dicom_store_id!,
-                };
-                break;
-
-            case "stow_rs":
-                config = { base_url: values.base_url! };
-                break;
-
-            default:
-                toast.error("Internal Error: Unknown backend type.");
-                console.error("Unknown backend type:", values.backend_type);
-                return;
-        }
-
-        // ─── 3. Final payload ────────────────────────────────────────────────────────
-        const finalPayload: StorageBackendConfigCreatePayload = { ...common, config };
-
-        console.log("Submitting API payload:", finalPayload);
+        let apiPayloadToSend: StorageBackendConfigCreatePayload | StorageBackendConfigUpdateApiPayload;
 
         try {
-            // Optional: validate against Zod before send
-            // StorageBackendConfigCreatePayloadSchema.parse(finalPayload);
+            switch (formData.backend_type) {
+                case "filesystem":
+                    apiPayloadToSend = { ...commonApiData, backend_type: "filesystem", path: formData.path! };
+                    break;
+                case "cstore":
+                    apiPayloadToSend = {
+                        ...commonApiData, backend_type: "cstore",
+                        remote_ae_title: formData.remote_ae_title!,
+                        remote_host: formData.remote_host!,
+                        remote_port: formData.remote_port!,
+                        local_ae_title: formData.local_ae_title || null,
+                        tls_enabled: formData.tls_enabled ?? false,
+                        tls_ca_cert_secret_name: (formData.tls_enabled && formData.tls_ca_cert_secret_name?.trim()) ? formData.tls_ca_cert_secret_name.trim() : null,
+                        tls_client_cert_secret_name: (formData.tls_enabled && formData.tls_client_cert_secret_name?.trim()) ? formData.tls_client_cert_secret_name.trim() : null,
+                        tls_client_key_secret_name: (formData.tls_enabled && formData.tls_client_key_secret_name?.trim()) ? formData.tls_client_key_secret_name.trim() : null,
+                    };
+                    break;
+                case "gcs":
+                    apiPayloadToSend = { ...commonApiData, backend_type: "gcs", bucket: formData.bucket!, prefix: formData.prefix || null };
+                    break;
+                case "google_healthcare":
+                    apiPayloadToSend = {
+                        ...commonApiData, backend_type: "google_healthcare",
+                        gcp_project_id: formData.gcp_project_id!,
+                        gcp_location: formData.gcp_location!,
+                        gcp_dataset_id: formData.gcp_dataset_id!,
+                        gcp_dicom_store_id: formData.gcp_dicom_store_id!,
+                    };
+                    break;
+                case "stow_rs":
+                    apiPayloadToSend = {
+                        ...commonApiData, backend_type: "stow_rs",
+                        base_url: formData.base_url!,
+                        auth_type: formData.stow_auth_type || "none",
+                        basic_auth_username_secret_name: formData.stow_auth_type === 'basic' ? formData.stow_basic_auth_username_secret_name?.trim() || null : null,
+                        basic_auth_password_secret_name: formData.stow_auth_type === 'basic' ? formData.stow_basic_auth_password_secret_name?.trim() || null : null,
+                        bearer_token_secret_name: formData.stow_auth_type === 'bearer' ? formData.stow_bearer_token_secret_name?.trim() || null : null,
+                        api_key_secret_name: formData.stow_auth_type === 'apikey' ? formData.stow_api_key_secret_name?.trim() || null : null,
+                        api_key_header_name_override: formData.stow_auth_type === 'apikey' ? formData.stow_api_key_header_name_override?.trim() || null : null,
+                        tls_ca_cert_secret_name: formData.tls_ca_cert_secret_name?.trim() || null,
+                    };
+                    break;
+                default:
+                    const _exhaustiveCheck: never = formData.backend_type;
+                    toast.error("Internal Error: Unhandled backend type during payload construction.");
+                    console.error("Unhandled backend type in onSubmit:", formData.backend_type, _exhaustiveCheck);
+                    return;
+            }
 
             if (isEditMode && backend) {
-                updateMutation.mutate({ id: backend.id, data: finalPayload });
+                // Construct a truly partial payload for PATCH
+                let patchData: Partial<StorageBackendConfigUpdateApiPayload> = {};
+                const dirtyFields = form.formState.dirtyFields;
+
+                (Object.keys(dirtyFields) as Array<keyof StorageBackendFormData>).forEach(dirtyFieldKey => {
+                    // Map form field names to API payload field names if they differ
+                    // For now, assuming they are mostly the same or handled by the spread
+                    if (dirtyFieldKey in apiPayloadToSend) { // Check if the dirty field is part of the constructed full payload for this type
+                        (patchData as any)[dirtyFieldKey] = (apiPayloadToSend as any)[dirtyFieldKey];
+                    }
+                });
+
+                // Always include name if it was dirty, or if no other fields are dirty (to allow name-only update)
+                if (dirtyFields.name || Object.keys(patchData).length === 0) {
+                    patchData.name = formData.name;
+                }
+                // Ensure essential identifiers/discriminators are part of the patch if needed,
+                // though backend_type shouldn't be changed.
+                // The backend CRUD's update method should handle not changing backend_type.
+
+                console.log("Submitting UPDATE API payload (PATCH data):", patchData);
+                StorageBackendConfigUpdateApiPayloadSchema.parse(patchData); // Validate partial payload
+                updateMutation.mutate({ id: backend.id, data: patchData });
             } else {
-                createMutation.mutate(finalPayload);
+                console.log("Submitting CREATE API payload:", apiPayloadToSend);
+                StorageBackendConfigCreatePayloadSchema.parse(apiPayloadToSend as StorageBackendConfigCreatePayload);
+                createMutation.mutate(apiPayloadToSend as StorageBackendConfigCreatePayload);
             }
-        } catch (e: any) {
-            console.error("Payload validation failed:", e);
-            toast.error(`Internal Error: API payload construction failed. ${e.message || ""}`);
+
+        } catch (validationError: any) {
+            console.error("Zod validation error for API payload construction or submission:", validationError);
+            toast.error(`Data submission error: ${validationError.errors?.[0]?.message || validationError.message || "Invalid data"}`);
         }
+    };
+
+    const onErrorRHF: SubmitErrorHandler<StorageBackendFormData> = (errors) => {
+        console.error("React Hook Form validation errors:", errors);
+        const firstErrorField = Object.keys(errors)[0] as FieldPath<StorageBackendFormData> | undefined;
+        let errorMessage = "Form validation failed. Please check the highlighted fields.";
+        if (firstErrorField && errors[firstErrorField]?.message) {
+            const fieldLabel = firstErrorField.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Basic formatting
+            errorMessage = `Error in '${fieldLabel}': ${errors[firstErrorField]!.message}`;
+        }
+        toast.error(errorMessage);
     };
 
     const isLoading = createMutation.isPending || updateMutation.isPending;
-
-    const onErrorRHF: SubmitErrorHandler<StorageBackendFormInput> = (errors) => {
-        console.error("React Hook Form validation errors:", errors);
-        const firstField = Object.keys(errors)[0] as keyof typeof errors | undefined;
-        const msg = firstField && errors[firstField]?.message
-            ? `Error in '${String(firstField)}': ${errors[firstField]!.message}`
-            : "Form validation failed!";
-        toast.error(msg);
-    };
-
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isLoading) onClose(); }}>
             <DialogContent className="sm:max-w-[750px]">
                 <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit Storage Backend' : 'Add Storage Backend'}</DialogTitle>
@@ -358,9 +397,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                             <Alert variant="destructive">
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertTitle>Server Error</AlertTitle>
-                                <AlertDescription>
-                                    {form.formState.errors.root.serverError.message}
-                                </AlertDescription>
+                                <AlertDescription>{form.formState.errors.root.serverError.message}</AlertDescription>
                             </Alert>
                         )}
                         <FormField
@@ -369,9 +406,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Name*</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="e.g., Main Archive Filesystem" {...field} />
-                                    </FormControl>
+                                    <FormControl><Input placeholder="e.g., Main Archive Filesystem" {...field} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -382,14 +417,8 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Backend Type*</FormLabel>
-                                    <Select
-                                        onValueChange={field.onChange}
-                                        value={field.value}
-                                        disabled={isEditMode || isLoading} // Disable while loading too
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select backend type" />
-                                        </SelectTrigger>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={isEditMode || isLoading}>
+                                        <FormControl><SelectTrigger><SelectValue placeholder="Select backend type" /></SelectTrigger></FormControl>
                                         <SelectContent>
                                             <SelectItem value="filesystem">Filesystem</SelectItem>
                                             <SelectItem value="cstore">DICOM C-STORE</SelectItem>
@@ -409,256 +438,69 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Description</FormLabel>
-                                    <FormControl>
-                                        <Textarea placeholder="Optional description of this backend" {...field} value={field.value ?? ''} rows={2} />
-                                    </FormControl>
+                                    <FormControl><Textarea placeholder="Optional description" {...field} value={field.value ?? ''} rows={2} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
                         />
 
                         <div className="space-y-4 pt-4 border-t border-border mt-4">
-                            <h3 className="text-sm font-medium text-muted-foreground">{watchedBackendType?.toUpperCase()} Specific Configuration</h3>
+                            <h3 className="text-sm font-medium text-muted-foreground">
+                                {watchedBackendType?.toUpperCase().replace("_", " ")} Specific Configuration
+                            </h3>
 
+                            {/* Filesystem Fields */}
                             {watchedBackendType === 'filesystem' && (
                                 <>
-                                    <FormField
-                                        control={form.control}
-                                        name="path"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Filesystem Path*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="/dicom_data/processed/my_archive" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormDescription>Absolute path *inside the container* where DICOM files will be stored.</FormDescription>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={form.control} name="path" render={({ field }) => (<FormItem> <FormLabel>Filesystem Path*</FormLabel> <FormControl><Input placeholder="/dicom_data/processed/my_archive" {...field} value={field.value ?? ''} /></FormControl> <FormDescription>Absolute path *inside the container* where DICOM files will be stored.</FormDescription> <FormMessage /> </FormItem>)} />
                                     <Alert variant="default" className="bg-amber-50 border-amber-300 dark:bg-amber-900/30 dark:border-amber-700">
                                         <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                                         <AlertTitle className="text-amber-700 dark:text-amber-300 text-sm">Container Path Required</AlertTitle>
-                                        <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs">
-                                            Ensure this path exists within the container and you have appropriate volume mapping set up in your Docker configuration.
-                                        </AlertDescription>
+                                        <AlertDescription className="text-amber-600 dark:text-amber-400 text-xs">Ensure this path exists within the container and you have appropriate volume mapping set up in your Docker configuration.</AlertDescription>
                                     </Alert>
                                 </>
                             )}
 
+                            {/* CStore Fields */}
                             {watchedBackendType === 'cstore' && (
                                 <div className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="remote_ae_title"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Remote AE Title*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="REMOTE_PACS_AE" {...field} value={field.value ?? ''} maxLength={16} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={form.control} name="remote_ae_title" render={({ field }) => (<FormItem> <FormLabel>Remote AE Title*</FormLabel> <FormControl><Input placeholder="REMOTE_PACS_AE" {...field} value={field.value ?? ''} maxLength={16} /></FormControl> <FormMessage /> </FormItem>)} />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="remote_host"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Remote Host*</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="pacs.example.com or IP" {...field} value={field.value ?? ''} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="remote_port"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Remote Port*</FormLabel>
-                                                    <FormControl>
-                                                        <Input type="number" min="1" max="65535" step="1" {...field} value={field.value ?? ''} onChange={event => field.onChange(event.target.value === '' ? null : +event.target.value)} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        <FormField control={form.control} name="remote_host" render={({ field }) => (<FormItem> <FormLabel>Remote Host*</FormLabel> <FormControl><Input placeholder="pacs.example.com or IP" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                        <FormField control={form.control} name="remote_port" render={({ field }) => (<FormItem> <FormLabel>Remote Port*</FormLabel> <FormControl><Input type="number" min="1" max="65535" step="1" {...field} value={field.value ?? ''} onChange={event => field.onChange(event.target.value === '' ? null : +event.target.value)} /></FormControl> <FormMessage /> </FormItem>)} />
                                     </div>
-                                    <FormField
-                                        control={form.control}
-                                        name="local_ae_title"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Local AE Title (Optional)</FormLabel>
-                                                <FormDescription>AE Title this system will use to connect. Defaults if blank.</FormDescription>
-                                                <FormControl>
-                                                    <Input placeholder="AXIOM_STORE_SCU" {...field} value={field.value ?? ''} maxLength={16} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={form.control} name="local_ae_title" render={({ field }) => (<FormItem> <FormLabel>Local AE Title (Optional)</FormLabel> <FormDescription>AE Title this system will use to connect. Defaults if blank.</FormDescription> <FormControl><Input placeholder="AXIOM_STORE_SCU" {...field} value={field.value ?? ''} maxLength={16} /></FormControl> <FormMessage /> </FormItem>)} />
                                     <div className="space-y-4 rounded-md border p-4 shadow-sm">
-                                        <FormField
-                                            control={form.control}
-                                            name="tls_enabled"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
-                                                    <FormControl>
-                                                        <Switch id="cstore_tls_enabled" checked={!!field.value} onCheckedChange={field.onChange} ref={field.ref} />
-                                                    </FormControl>
-                                                    <div className="space-y-1 leading-none">
-                                                        <FormLabel htmlFor="cstore_tls_enabled">Enable TLS</FormLabel>
-                                                        <FormDescription>Use secure TLS for the outgoing C-STORE connection.</FormDescription>
-                                                    </div>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        {watchedCStoreTlsEnabled && ( // Use the watched value here
+                                        <FormField control={form.control} name="tls_enabled" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0"> <FormControl><Switch id="cstore_tls_enabled" checked={!!field.value} onCheckedChange={field.onChange} ref={field.ref} /></FormControl> <div className="space-y-1 leading-none"> <FormLabel htmlFor="cstore_tls_enabled">Enable TLS</FormLabel> <FormDescription>Use secure TLS for the outgoing C-STORE connection.</FormDescription> </div> <FormMessage /> </FormItem>)} />
+                                        {watchedCStoreTlsEnabled && (
                                             <div className="space-y-4 pl-8 pt-2 border-l ml-2">
-                                                <FormField
-                                                    control={form.control}
-                                                    name="tls_ca_cert_secret_name"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>CA Certificate Secret Name*</FormLabel>
-                                                            <FormDescription>GCP Secret Manager resource name for the CA certificate needed to verify the remote server.</FormDescription>
-                                                            <FormControl>
-                                                                <Input placeholder="projects/.../secrets/remote-pacs-ca/versions/latest" {...field} value={field.value ?? ''} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={form.control}
-                                                    name="tls_client_cert_secret_name"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Client Certificate Secret Name (mTLS)</FormLabel>
-                                                            <FormDescription>Optional (for mutual TLS): GCP Secret resource name for *this system's* client certificate.</FormDescription>
-                                                            <FormControl>
-                                                                <Input placeholder="projects/.../secrets/axiom-client-cert/versions/latest" {...field} value={field.value ?? ''} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={form.control}
-                                                    name="tls_client_key_secret_name"
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Client Private Key Secret Name (mTLS)</FormLabel>
-                                                            <FormDescription>Optional (for mutual TLS): GCP Secret resource name for *this system's* client private key.</FormDescription>
-                                                            <FormControl>
-                                                                <Input placeholder="projects/.../secrets/axiom-client-key/versions/latest" {...field} value={field.value ?? ''} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
+                                                <FormField control={form.control} name="tls_ca_cert_secret_name" render={({ field }) => (<FormItem> <FormLabel>CA Certificate Secret Name*</FormLabel> <FormDescription>GCP Secret ID for CA cert to verify remote server.</FormDescription> <FormControl><Input placeholder="gcp-secret-for-remote-ca" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                                <FormField control={form.control} name="tls_client_cert_secret_name" render={({ field }) => (<FormItem> <FormLabel>Client Certificate Secret Name (mTLS)</FormLabel> <FormDescription>Optional: GCP Secret ID for *this system's* client cert.</FormDescription> <FormControl><Input placeholder="gcp-secret-for-axiom-client-cert" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                                <FormField control={form.control} name="tls_client_key_secret_name" render={({ field }) => (<FormItem> <FormLabel>Client Private Key Secret Name (mTLS)</FormLabel> <FormDescription>Optional: GCP Secret ID for *this system's* client key.</FormDescription> <FormControl><Input placeholder="gcp-secret-for-axiom-client-key" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             )}
 
+                            {/* GCS Fields */}
                             {watchedBackendType === 'gcs' && (
                                 <div className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="bucket"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>GCS Bucket Name*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="my-dicom-archive-bucket" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="prefix"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Object Prefix (Optional)</FormLabel>
-                                                <FormDescription>Path prefix within the bucket (e.g., `incoming/` or `site_a/processed/`). Do not start with `/`.</FormDescription>
-                                                <FormControl>
-                                                    <Input placeholder="optional/folder/structure/" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={form.control} name="bucket" render={({ field }) => (<FormItem> <FormLabel>GCS Bucket Name*</FormLabel> <FormControl><Input placeholder="my-dicom-archive-bucket" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                    <FormField control={form.control} name="prefix" render={({ field }) => (<FormItem> <FormLabel>Object Prefix (Optional)</FormLabel> <FormDescription>Path prefix in bucket (e.g., `incoming/`). No leading `/`.</FormDescription> <FormControl><Input placeholder="optional/folder/structure/" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
                                 </div>
                             )}
 
+                            {/* Google Healthcare Fields */}
                             {watchedBackendType === 'google_healthcare' && (
                                 <div className="space-y-4">
-                                    <FormField
-                                        control={form.control}
-                                        name="gcp_project_id"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>GCP Project ID*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="my-gcp-project-id" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="gcp_location"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>GCP Location*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="us-central1" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="gcp_dataset_id"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Healthcare Dataset ID*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="my-dicom-dataset" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={form.control}
-                                        name="gcp_dicom_store_id"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>DICOM Store ID*</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="my-dicom-store" {...field} value={field.value ?? ''} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={form.control} name="gcp_project_id" render={({ field }) => (<FormItem> <FormLabel>GCP Project ID*</FormLabel> <FormControl><Input placeholder="my-gcp-project-id" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                    <FormField control={form.control} name="gcp_location" render={({ field }) => (<FormItem> <FormLabel>GCP Location*</FormLabel> <FormControl><Input placeholder="us-central1" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                    <FormField control={form.control} name="gcp_dataset_id" render={({ field }) => (<FormItem> <FormLabel>Healthcare Dataset ID*</FormLabel> <FormControl><Input placeholder="my-dicom-dataset" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                    <FormField control={form.control} name="gcp_dicom_store_id" render={({ field }) => (<FormItem> <FormLabel>DICOM Store ID*</FormLabel> <FormControl><Input placeholder="my-dicom-store" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
                                 </div>
                             )}
-
+                            {/* --- STOW-RS Specific Fields --- */}
                             {watchedBackendType === 'stow_rs' && (
                                 <div className="space-y-4">
                                     <FormField
@@ -668,27 +510,83 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                                             <FormItem>
                                                 <FormLabel>DICOMweb Base URL*</FormLabel>
                                                 <FormDescription>The base URL for the STOW-RS service (e.g., `https://dicom.server.com/dicom-web`).</FormDescription>
-                                                <FormControl>
-                                                    <Input type="url" placeholder="https://dicom.example.com/dicom-web" {...field} value={field.value ?? ''} />
-                                                </FormControl>
+                                                <FormControl><Input type="url" placeholder="https://host/path/dicom-web" {...field} value={field.value ?? ''} /></FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
+
+                                    <div className="space-y-2 rounded-md border p-4 shadow-sm">
+                                        <h4 className="text-xs font-semibold text-muted-foreground mb-2">STOW-RS Authentication</h4>
+                                        <FormField
+                                            control={form.control}
+                                            name="stow_auth_type" // Form field for STOW-RS auth type
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Authentication Type</FormLabel>
+                                                    <Select
+                                                        onValueChange={field.onChange}
+                                                        value={field.value ?? 'none'} // Default to 'none' in UI if undefined
+                                                    >
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select auth type" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">None</SelectItem>
+                                                            <SelectItem value="basic">Basic Authentication</SelectItem>
+                                                            <SelectItem value="bearer">Bearer Token</SelectItem>
+                                                            <SelectItem value="apikey">API Key (Header)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+
+                                        {watchedStowAuthType === 'basic' && (
+                                            <div className="space-y-4 pl-4 pt-2 border-l ml-2 mt-2">
+                                                <FormField control={form.control} name="stow_basic_auth_username_secret_name" render={({ field }) => (<FormItem> <FormLabel>Username Secret Name*</FormLabel> <FormDescription>GCP Secret ID for Basic Auth username.</FormDescription> <FormControl><Input placeholder="gcp-secret-id-for-username" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                                <FormField control={form.control} name="stow_basic_auth_password_secret_name" render={({ field }) => (<FormItem> <FormLabel>Password Secret Name*</FormLabel> <FormDescription>GCP Secret ID for Basic Auth password.</FormDescription> <FormControl><Input placeholder="gcp-secret-id-for-password" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                            </div>
+                                        )}
+                                        {watchedStowAuthType === 'bearer' && (
+                                            <div className="space-y-4 pl-4 pt-2 border-l ml-2 mt-2">
+                                                <FormField control={form.control} name="stow_bearer_token_secret_name" render={({ field }) => (<FormItem> <FormLabel>Bearer Token Secret Name*</FormLabel> <FormDescription>GCP Secret ID for the Bearer token.</FormDescription> <FormControl><Input placeholder="gcp-secret-id-for-bearer-token" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                            </div>
+                                        )}
+                                        {watchedStowAuthType === 'apikey' && (
+                                            <div className="space-y-4 pl-4 pt-2 border-l ml-2 mt-2">
+                                                <FormField control={form.control} name="stow_api_key_secret_name" render={({ field }) => (<FormItem> <FormLabel>API Key Secret Name*</FormLabel> <FormDescription>GCP Secret ID for the API key value.</FormDescription> <FormControl><Input placeholder="gcp-secret-id-for-api-key" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                                <FormField control={form.control} name="stow_api_key_header_name_override" render={({ field }) => (<FormItem> <FormLabel>API Key Header Name*</FormLabel> <FormDescription>HTTP header for the API key (e.g., X-API-Key).</FormDescription> <FormControl><Input placeholder="X-API-Key" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 rounded-md border p-4 shadow-sm">
+                                        <h4 className="text-xs font-semibold text-muted-foreground mb-2">STOW-RS TLS Configuration</h4>
+                                        <FormField
+                                            control={form.control}
+                                            name="tls_ca_cert_secret_name" // Shared field, used by STOW-RS for its custom CA
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Custom CA Certificate Secret Name (Optional)</FormLabel>
+                                                    <FormDescription>GCP Secret ID for a custom CA certificate (PEM) to verify the STOW-RS server.</FormDescription>
+                                                    <FormControl><Input placeholder="gcp-secret-id-for-custom-ca" {...field} value={field.value ?? ''} /></FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </div>
                                 </div>
                             )}
-                        </div>
+                        </div> {/* End of type-specific configuration section */}
 
                         <FormField
                             control={form.control}
                             name="is_enabled"
                             render={({ field }) => (
                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm mt-6">
-                                    <FormControl>
-                                        <Switch id={`is_enabled_switch`} checked={!!field.value} onCheckedChange={field.onChange} ref={field.ref} />
-                                    </FormControl>
+                                    <FormControl><Switch id="is_enabled_switch" checked={!!field.value} onCheckedChange={field.onChange} ref={field.ref} /></FormControl>
                                     <div className="space-y-1 leading-none">
-                                        <FormLabel htmlFor={`is_enabled_switch`}>Enable Backend</FormLabel>
+                                        <FormLabel htmlFor="is_enabled_switch">Enable Backend</FormLabel>
                                         <FormDescription>If checked, this backend can be used in rule destinations.</FormDescription>
                                     </div>
                                     <FormMessage />
@@ -697,12 +595,8 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                         />
 
                         <DialogFooter className="pt-4">
-                            <DialogClose asChild>
-                                <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
-                            </DialogClose>
-                            <Button type="submit" disabled={isLoading}>
-                                {isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Backend')}
-                            </Button>
+                            <DialogClose asChild><Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button></DialogClose>
+                            <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Create Backend')}</Button>
                         </DialogFooter>
                     </form>
                 </Form>
