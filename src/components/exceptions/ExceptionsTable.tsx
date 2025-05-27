@@ -15,14 +15,18 @@ import {
     ChevronDown, 
     ChevronRight, 
     Eye,
-    RefreshCw,
+    RefreshCw,      // SOP Re-queue
     Edit3,
     Info, 
     ListChecks, 
     AlertTriangle, 
-    Loader2 
+    Loader2,
+    Archive,        // For Bulk Archive (Example)
+    RefreshCcwDot,  // For Bulk Re-queue (Example)
+    Settings2       // Generic cog for more actions dropdown
 } from 'lucide-react';
-import QuickUpdateStatusPopover from '@/components/QuickUpdateStatusPopover'; // Ensure this import is correct
+// Assuming QuickUpdateStatusPopover is in the same directory or adjust path
+import QuickUpdateStatusPopover from '@/components/QuickUpdateStatusPopover'; 
 import { 
     HierarchicalExceptionData,
     StudyLevelExceptionItem, 
@@ -31,6 +35,15 @@ import {
 } from '@/types/exceptions';
 import { ExceptionStatus, ExceptionStatusEnum } from '@/schemas/dicomExceptionEnums';
 import { format } from 'date-fns';
+import { // Import DropdownMenu components from Shadcn
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 interface ExceptionsTableProps {
   data: HierarchicalExceptionData;
@@ -38,7 +51,11 @@ interface ExceptionsTableProps {
   onViewDetails: (exceptionUuid: string) => void;
   onRequeueForRetry: (exceptionUuid: string) => void;
   onUpdateStatus: (exceptionUuid: string, status: ExceptionStatus, notes?: string) => void;
-  isRowUpdating?: (uuid: string) => boolean; // Function to check if a specific row is updating
+  // For individual SOP row updates (passed to QuickUpdateStatusPopover)
+  isSopInstanceUpdating?: (uuid: string) => boolean; 
+  // For bulk actions (to disable buttons, show loading on parent, etc.)
+  onBulkAction: (identifier: string, level: 'study' | 'series', action: 'ARCHIVE' | 'REQUEUE_RETRYABLE' | 'SET_STATUS_MANUAL_REVIEW', newStatus?: ExceptionStatus, notes?: string) => void;
+  isBulkUpdating?: boolean; // General flag if any bulk update is happening
 }
 
 const formatDate = (date?: Date | string): string => {
@@ -55,15 +72,12 @@ const formatDate = (date?: Date | string): string => {
 type TableDisplayItem = StudyLevelExceptionItem | SeriesLevelExceptionItem | SopLevelExceptionItem;
 
 const getColumns = (
-  onViewDetails: ExceptionsTableProps['onViewDetails'],
-  onRequeueForRetry: ExceptionsTableProps['onRequeueForRetry'],
-  onUpdateStatus: ExceptionsTableProps['onUpdateStatus'],
-  isRowUpdating?: (uuid: string) => boolean // Accept the function here
+  props: Omit<ExceptionsTableProps, 'data' | 'isLoading'> // Pass all action handlers and flags
 ): ColumnDef<TableDisplayItem>[] => [
   {
     id: 'expander',
     header: () => null,
-    cell: ({ row }: { row: Row<TableDisplayItem> }) => {
+    cell: ({ row }: { row: Row<TableDisplayItem> }) => { /* ... no change ... */
       const canExpand = row.getCanExpand();
       return canExpand ? (
         <Button variant="ghost" size="sm" onClick={row.getToggleExpandedHandler()} className="px-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-sm">
@@ -76,35 +90,25 @@ const getColumns = (
     size: 45,
   },
   {
-    accessorFn: (row: TableDisplayItem): string => {
-        // Relies on itemType and specific UID fields existing
+    accessorFn: (row: TableDisplayItem): string => { /* ... no change ... */
         if (row.itemType === 'study') return row.studyInstanceUid;
         if (row.itemType === 'series') return row.seriesInstanceUid;
-        if (row.itemType === 'sop') return row.sop_instance_uid || row.id; // Fallback to id if sop_instance_uid is missing
-        // Should be unreachable if types are correct
-        console.error("Unhandled itemType in identifier accessorFn:", row);
-        return (row as any).id || "unknown-id"; // Last resort fallback
+        if (row.itemType === 'sop') return row.sop_instance_uid || row.id;
+        return (row as any).id || "unknown-id";
     },
     id: 'identifier',
     header: 'Study UID / Series UID / SOP UID',
-    cell: ({ row }) => { // Removed getValue as we directly use original with itemType
+    cell: ({ row }) => { /* ... no change ... */
         const original = row.original as TableDisplayItem;
         const depth = row.depth;
-
-        if (depth === 0) { // Study
-            return <span className="font-semibold text-sky-700 dark:text-sky-400">{(original as StudyLevelExceptionItem).studyInstanceUid}</span>;
-        }
-        if (depth === 1) { // Series
-            return <span className="pl-4 text-indigo-600 dark:text-indigo-400">{(original as SeriesLevelExceptionItem).seriesInstanceUid}</span>;
-        }
-        if (depth === 2) { // SOP
-            return <span className="pl-8 text-slate-500 dark:text-slate-400">{(original as SopLevelExceptionItem).sop_instance_uid}</span>;
-        }
-        return null; // Should not happen
+        if (depth === 0) { return <span className="font-semibold text-sky-700 dark:text-sky-400">{(original as StudyLevelExceptionItem).studyInstanceUid}</span>; }
+        if (depth === 1) { return <span className="pl-4 text-indigo-600 dark:text-indigo-400">{(original as SeriesLevelExceptionItem).seriesInstanceUid}</span>; }
+        if (depth === 2) { return <span className="pl-8 text-slate-500 dark:text-slate-400">{(original as SopLevelExceptionItem).sop_instance_uid}</span>; }
+        return null;
     },
     size: 350,
   },
-  {
+  { /* ... patientInfo column - no change ... */ 
     id: 'patientInfo',
     header: 'Patient (ID / Name)',
     accessorFn: (row: TableDisplayItem) => {
@@ -125,7 +129,7 @@ const getColumns = (
     },
     size: 200,
   },
-  {
+  { /* ... accessionNumber column - no change ... */
     id: 'accessionNumber',
     header: 'Accession #',
     accessorFn: (row: TableDisplayItem) => (row.itemType === 'study' ? row.accessionNumber : undefined),
@@ -138,7 +142,7 @@ const getColumns = (
     },
     size: 120,
   },
-  {
+  { /* ... detailsAndCounts column - no change ... */
     id: 'detailsAndCounts',
     header: 'Details',
     cell: ({ row }) => {
@@ -158,36 +162,20 @@ const getColumns = (
     },
     size: 150,
   },
-  {
-    id: 'statusAndTimestamps', // This column was patched in the previous step, ensure it's correct
+  { /* ... statusAndTimestamps column - no change from your last working version ... */
+    id: 'statusAndTimestamps',
     header: 'Status / Timestamps',
     cell: ({ row }) => {
-        const original = row.original as TableDisplayItem; // original is the union type
-
-        if (original.itemType === 'study') { /* ... your existing study display ... */ 
+        const original = row.original as TableDisplayItem;
+        if (original.itemType === 'study') {
             const study = original as StudyLevelExceptionItem;
             const hasNew = study.statusSummary.includes("New");
             const hasFailed = study.statusSummary.includes("Failed");
-            return (
-              <div className="text-xs">
-                <Badge variant={hasFailed ? "destructive" : (hasNew ? "secondary" : "outline")} className="mb-1 text-xxs break-all whitespace-normal">
-                    {hasFailed && <AlertTriangle className="inline h-3 w-3 mr-1"/>}
-                    {study.statusSummary || "No SOPs"}
-                </Badge>
-                <div>First Err: {formatDate(study.earliestFailure)}</div>
-                <div>Last Err: {formatDate(study.latestFailure)}</div>
-              </div>
-            );
+            return ( <div className="text-xs"> <Badge variant={hasFailed ? "destructive" : (hasNew ? "secondary" : "outline")} className="mb-1 text-xxs break-all whitespace-normal"> {hasFailed && <AlertTriangle className="inline h-3 w-3 mr-1"/>} {study.statusSummary || "No SOPs"} </Badge> <div>First Err: {formatDate(study.earliestFailure)}</div> <div>Last Err: {formatDate(study.latestFailure)}</div> </div> );
         }
-        if (original.itemType === 'series') { /* ... your existing series display ... */
+        if (original.itemType === 'series') {
              const series = original as SeriesLevelExceptionItem;
-             return (
-                <div className="pl-4 text-xs">
-                    <Badge variant="outline" className="text-xxs break-all whitespace-normal">
-                        {series.statusSummary}
-                    </Badge>
-                </div>
-             );
+             return ( <div className="pl-4 text-xs"> <Badge variant="outline" className="text-xxs break-all whitespace-normal"> {series.statusSummary} </Badge> </div> );
         }
         if (original.itemType === 'sop') {
             const sop = original as SopLevelExceptionItem;
@@ -202,14 +190,7 @@ const getColumns = (
                 case ExceptionStatusEnum.Enum.ARCHIVED: badgeVariant = "outline"; textColorClass = "text-slate-500 border-slate-400 dark:text-slate-400 dark:border-slate-500"; break;
                 default: badgeVariant = "default"; textColorClass = "text-primary-foreground dark:text-primary-foreground"; 
             }
-            return (
-                <div className="pl-8 text-xs">
-                    <Badge variant={badgeVariant} className={`text-xxs whitespace-nowrap px-1.5 py-0.5 ${textColorClass}`}>
-                        {sop.status.replace(/_/g, ' ')}
-                    </Badge>
-                    <div className="text-gray-500 dark:text-gray-400 pt-0.5">{formatDate(sop.failure_timestamp)}</div>
-                </div>
-            );
+            return ( <div className="pl-8 text-xs"> <Badge variant={badgeVariant} className={`text-xxs whitespace-nowrap px-1.5 py-0.5 ${textColorClass}`}> {sop.status.replace(/_/g, ' ')} </Badge> <div className="text-gray-500 dark:text-gray-400 pt-0.5">{formatDate(sop.failure_timestamp)}</div> </div> );
         }
         return null;
     },
@@ -220,45 +201,133 @@ const getColumns = (
     header: () => <div className="text-right">Actions</div>,
     cell: ({ row }) => {
         const original = row.original as TableDisplayItem;
+        const isBulkUpdating = props.isBulkUpdating; // Use the general bulk updating flag
+
+        // Study Level Actions
+        if (original.itemType === 'study') {
+            const study = original as StudyLevelExceptionItem;
+            return (
+                <div className="flex space-x-1 justify-end">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" disabled={isBulkUpdating} className="h-8 w-8 p-0 data-[state=open]:bg-muted">
+                                <Settings2 size={14}/>
+                                <span className="sr-only">Study Actions</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel className="text-xs">Study: ...{study.studyInstanceUid.slice(-12)}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                                className="text-xs"
+                                onClick={() => props.onBulkAction(study.id, 'study', 'REQUEUE_RETRYABLE')}
+                                disabled={isBulkUpdating}
+                            >
+                                <RefreshCcwDot size={14} className="mr-2" /> Re-queue All Retryable
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                                className="text-xs"
+                                onClick={() => props.onBulkAction(study.id, 'study', 'ARCHIVE', ExceptionStatusEnum.Enum.ARCHIVED, 'Bulk archived (study level)')}
+                                disabled={isBulkUpdating}
+                            >
+                                <Archive size={14} className="mr-2" /> Archive All
+                            </DropdownMenuItem>
+                            {/* Add more actions like "Set all to Manual Review" */}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            );
+        }
+        // Series Level Actions
+        if (original.itemType === 'series') {
+            const series = original as SeriesLevelExceptionItem;
+            return (
+                <div className="flex space-x-1 justify-end pl-4">
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" disabled={isBulkUpdating} className="h-8 w-8 p-0 data-[state=open]:bg-muted">
+                                <Settings2 size={14}/>
+                                <span className="sr-only">Series Actions</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel className="text-xs">Series: ...{series.seriesInstanceUid.slice(-12)}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                                className="text-xs"
+                                onClick={() => props.onBulkAction(series.id, 'series', 'REQUEUE_RETRYABLE')}
+                                disabled={isBulkUpdating}
+                            >
+                                <RefreshCcwDot size={14} className="mr-2" /> Re-queue All Retryable
+                            </DropdownMenuItem>
+                             <DropdownMenuItem 
+                                className="text-xs"
+                                onClick={() => props.onBulkAction(series.id, 'series', 'ARCHIVE', ExceptionStatusEnum.Enum.ARCHIVED, 'Bulk archived (series level)')}
+                                disabled={isBulkUpdating}
+                            >
+                                <Archive size={14} className="mr-2" /> Archive All
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            );
+        }
+        // SOP Level Actions
         if (original.itemType === 'sop') {
             const sop = original as SopLevelExceptionItem;
-            const currentlyUpdating = isRowUpdating ? isRowUpdating(sop.exception_uuid) : false;
+            // Use the more specific isSopInstanceUpdating if available, otherwise fallback to general isBulkUpdating
+            const currentlyUpdatingThisSop = props.isSopInstanceUpdating ? props.isSopInstanceUpdating(sop.exception_uuid) : isBulkUpdating;
             return (
               <div className="flex space-x-1 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => onViewDetails(sop.exception_uuid)} title="View Details" disabled={currentlyUpdating}>
+                <Button variant="ghost" size="sm" onClick={() => props.onViewDetails(sop.exception_uuid)} title="View Details" disabled={currentlyUpdatingThisSop}>
                     <Eye size={14}/>
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => onRequeueForRetry(sop.exception_uuid)} title="Re-queue for Retry" disabled={currentlyUpdating}>
+                <Button variant="ghost" size="sm" onClick={() => props.onRequeueForRetry(sop.exception_uuid)} title="Re-queue for Retry" disabled={currentlyUpdatingThisSop}>
                     <RefreshCw size={14}/>
                 </Button>
                 <QuickUpdateStatusPopover
                   exceptionLog={sop}
-                  onUpdateStatus={onUpdateStatus}
-                  isUpdating={currentlyUpdating}
+                  onUpdateStatus={props.onUpdateStatus}
+                  isUpdating={currentlyUpdatingThisSop} 
                 >
-                  <Button variant="ghost" size="sm" title="Quick Update Status" disabled={currentlyUpdating}>
+                  <Button variant="ghost" size="sm" title="Quick Update Status" disabled={currentlyUpdatingThisSop}>
                     <Edit3 size={14}/>
                   </Button>
                 </QuickUpdateStatusPopover>
               </div>
             );
         }
-        return <div className="h-[36px]"></div>;
+        return <div className="h-[36px]"></div>; // Maintain row height for empty actions
     },
     size: 130,
   }
 ];
 
-const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
-  data,
-  isLoading,
-  onViewDetails,
-  onRequeueForRetry,
-  onUpdateStatus,
-  isRowUpdating, // Accept the new prop
-}) => {
-  // Pass isRowUpdating to getColumns
-  const columns = useMemo(() => getColumns(onViewDetails, onRequeueForRetry, onUpdateStatus, isRowUpdating), [onViewDetails, onRequeueForRetry, onUpdateStatus, isRowUpdating]);
+const ExceptionsTable: React.FC<ExceptionsTableProps> = (props) => {
+  const {
+    data,
+    isLoading,
+    // Destructure all action handlers and flags from props to pass to getColumns
+    onViewDetails,
+    onRequeueForRetry,
+    onUpdateStatus,
+    isSopInstanceUpdating,
+    onBulkAction,
+    isBulkUpdating
+  } = props;
+
+  // Pass all necessary props to getColumns
+  const columns = useMemo(() => getColumns({ 
+      onViewDetails, 
+      onRequeueForRetry, 
+      onUpdateStatus, 
+      isSopInstanceUpdating,
+      onBulkAction,
+      isBulkUpdating
+    }), 
+    // Add all dependencies that getColumns relies on
+    [onViewDetails, onRequeueForRetry, onUpdateStatus, isSopInstanceUpdating, onBulkAction, isBulkUpdating]
+  );
 
   const tableData = useMemo(() => data as TableDisplayItem[] ?? [], [data]);
 
@@ -268,12 +337,12 @@ const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     getSubRows: (originalRow: TableDisplayItem) => {
-        if ('subRows' in originalRow && Array.isArray(originalRow.subRows)) {
+        if ('subRows' in originalRow && Array.isArray(originalRow.subRows) && originalRow.subRows.length > 0) {
             return originalRow.subRows as TableDisplayItem[];
         }
-        return undefined;
+        return undefined; // Important: return undefined if no subrows, not empty array, for getCanExpand
     },
-    getRowId: (originalRow: TableDisplayItem): string => String(originalRow.id),
+    getRowId: (originalRow: TableDisplayItem): string => String(originalRow.id), // Ensure ID is always string
     debugTable: process.env.NODE_ENV === 'development',
   });
 
@@ -282,8 +351,6 @@ const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
   }
 
   return (
-    // ... rest of your table rendering (Table, TableHeader, TableBody, etc.) ...
-    // This part should be mostly unchanged from your last working version
     <div className="rounded-md border bg-card text-card-foreground shadow-sm">
       <Table>
         <TableHeader>

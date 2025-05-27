@@ -5,9 +5,24 @@ import {
   DicomExceptionLogRead,
   DicomExceptionLogUpdate,
   dicomExceptionLogListResponseSchema,
-  dicomExceptionLogReadSchema
+  dicomExceptionLogReadSchema,
+  DicomExceptionBulkActionRequest, 
+  BulkActionResponse,              
+  bulkActionResponseSchema
 } from '@/schemas/dicomExceptionSchema';
 import { ExceptionStatus } from '@/schemas/dicomExceptionEnums';
+
+interface TriggerRetryCycleResponse {
+  message: string;
+  celery_task_id: string;
+}
+
+export const triggerExceptionRetryCycle = async (): Promise<TriggerRetryCycleResponse> => {
+  const responseData = await api<TriggerRetryCycleResponse>('/exceptions/trigger-retry-cycle', { method: 'POST' });
+  // Assuming your backend returns JSON matching TriggerRetryCycleResponse
+  // You might want a Zod schema for this response too for validation
+  return responseData as TriggerRetryCycleResponse; // Assuming api returns parsed data directly
+};
 
 // Define filter params type based on backend API
 export interface ListExceptionsParams {
@@ -33,6 +48,17 @@ export interface ListExceptionsParams {
   sortOrder?: 'asc' | 'desc';
   [key: string]: any; // Add index signature
 }
+
+export const performBulkExceptionAction = async (
+  request: DicomExceptionBulkActionRequest
+): Promise<BulkActionResponse> => {
+  const responseData = await api<BulkActionResponse>('/exceptions/bulk-actions', {
+    method: 'POST',
+    body: JSON.stringify(request) // Ensure body is stringified
+  });
+  // Assuming your api function returns parsed data directly
+  return bulkActionResponseSchema.parse(responseData); 
+};
 
 export const listExceptions = async (params: ListExceptionsParams): Promise<DicomExceptionLogListResponse> => {
   // MODIFIED: Call api (apiClient) directly, specifying the method in options

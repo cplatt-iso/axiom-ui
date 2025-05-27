@@ -1,10 +1,10 @@
-// frontend/src/schemas/dicomExceptionSchema.ts (or a similar name, I don't care, just be consistent for once)
+// frontend/src/schemas/dicomExceptionSchema.ts
 import { z } from 'zod';
 import {
   ProcessedStudySourceTypeEnum,
   ExceptionProcessingStageEnum,
   ExceptionStatusEnum
-} from './dicomExceptionEnums'; // Adjust path if you put it somewhere else, dummy
+} from './dicomExceptionEnums';
 
 // Helper for nullable datetime strings transforming to Date or null
 const NullableDateTimeString = z.string().datetime({ offset: true }).nullish().transform(val => val ? new Date(val) : null);
@@ -38,17 +38,15 @@ export const dicomExceptionLogReadSchema = z.object({
   celery_task_id: z.string().max(255).nullish(),
 
   // Fields added in DicomExceptionLogRead (system-generated)
-  id: z.number().int(),
+  id: z.number().int(), // This is the original integer ID
   exception_uuid: z.string().uuid(),
-  failure_timestamp: DateTimeString, // This is server_default=func.now(), so should always exist
-  created_at: DateTimeString,        // Inherited from Base, non-nullable
-  updated_at: DateTimeString         // Inherited from Base, non-nullable
+  failure_timestamp: DateTimeString,
+  created_at: DateTimeString,
+  updated_at: DateTimeString
 });
 
 export type DicomExceptionLogRead = z.infer<typeof dicomExceptionLogReadSchema>;
 
-// And here's the schema for the list response, you cretin.
-// It's simple, so if you mess this up, there's no hope for you.
 export const dicomExceptionLogListResponseSchema = z.object({
   total: z.number().int(),
   items: z.array(dicomExceptionLogReadSchema)
@@ -56,18 +54,77 @@ export const dicomExceptionLogListResponseSchema = z.object({
 
 export type DicomExceptionLogListResponse = z.infer<typeof dicomExceptionLogListResponseSchema>;
 
-// While we're at it, because I know you'll need it and are too slow to ask:
-// Schema for PATCH /api/v1/exceptions/{exception_uuid}
-// Based on DicomExceptionLogUpdate from the backend
 export const dicomExceptionLogUpdateSchema = z.object({
   status: ExceptionStatusEnum.nullish(),
-  retry_count: z.number().int().nonnegative().nullish(), // ge=0 means non-negative
-  next_retry_attempt_at: z.string().datetime({ offset: true }).nullish(), // Keep as string for sending, or transform to Date if form uses Date objects
+  retry_count: z.number().int().nonnegative().nullish(),
+  next_retry_attempt_at: z.string().datetime({ offset: true }).nullish(),
   resolved_at: z.string().datetime({ offset: true }).nullish(),
-  // resolved_by_user_id is typically set by the backend based on the current_user.
-  // If you want to allow admins to set it manually, add:
-  // resolved_by_user_id: z.number().int().nullish(),
   resolution_notes: z.string().nullish(),
-}).partial(); // .partial() makes all fields optional, which is good for PATCH
+}).partial();
 
 export type DicomExceptionLogUpdate = z.infer<typeof dicomExceptionLogUpdateSchema>;
+
+
+// --- NEW ZOD SCHEMAS FOR BULK ACTIONS ---
+
+export const BulkActionScopeSchema = z.object({
+  study_instance_uid: z.string().max(128).nullish(),
+  series_instance_uid: z.string().max(128).nullish(),
+  exception_uuids: z.array(z.string().uuid()).nullish(), // Assuming UUIDs are strings on frontend
+}).refine(
+    (data) => data.study_instance_uid || data.series_instance_uid || (data.exception_uuids && data.exception_uuids.length > 0),
+    { message: "At least one scope (study_instance_uid, series_instance_uid, or exception_uuids) must be provided." }
+);
+export type BulkActionScope = z.infer<typeof BulkActionScopeSchema>;
+
+
+export const BulkActionSetStatusPayloadSchema = z.object({
+  new_status: ExceptionStatusEnum, // Use the Zod enum directly
+  resolution_notes: z.string().nullish(),
+  clear_next_retry_attempt_at: z.boolean().default(false).nullish(),
+});
+export type BulkActionSetStatusPayload = z.infer<typeof BulkActionSetStatusPayloadSchema>;
+
+
+export const BulkActionRequeueRetryablePayloadSchema = z.object({
+  // Currently no specific fields, but define for structure and future extension
+  // example_filter_flag: z.boolean().nullish(), 
+}).strict(); // Use .strict() if it should ONLY contain defined fields (or be empty)
+export type BulkActionRequeueRetryablePayload = z.infer<typeof BulkActionRequeueRetryablePayloadSchema>;
+
+
+// Using discriminated union for the request payload based on action_type
+export const DicomExceptionBulkActionRequestSchema = z.discriminatedUnion("action_type", [
+  z.object({
+    action_type: z.literal("SET_STATUS"),
+    scope: BulkActionScopeSchema,
+    payload: BulkActionSetStatusPayloadSchema,
+  }),
+  z.object({
+    action_type: z.literal("REQUEUE_RETRYABLE"),
+    scope: BulkActionScopeSchema,
+    // Payload can be optional or a specific (possibly empty) schema for REQUEUE_RETRYABLE
+    payload: BulkActionRequeueRetryablePayloadSchema.nullish(), 
+  }),
+  // Add other action types here if needed in the future, e.g.:
+  // z.object({
+  //   action_type: z.literal("DELETE_LOGS"),
+  //   scope: BulkActionScopeSchema,
+  //   // No payload needed for delete, or an empty one
+  //   payload: z.object({}).strict().nullish(), 
+  // }),
+]);
+export type DicomExceptionBulkActionRequest = z.infer<typeof DicomExceptionBulkActionRequestSchema>;
+
+
+export const bulkActionResponseSchema = z.object({
+  action_type: z.string(),
+  processed_count: z.number().int(),
+  successful_count: z.number().int(),
+  failed_count: z.number().int(),
+  message: z.string(),
+  details: z.array(z.string()).nullish(),
+});
+export type BulkActionResponse = z.infer<typeof bulkActionResponseSchema>;
+
+// --- END NEW ZOD SCHEMAS ---
