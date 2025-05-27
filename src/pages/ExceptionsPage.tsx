@@ -32,72 +32,167 @@ import ExceptionsTable from '@/components/exceptions/ExceptionsTable';
 import ExceptionFilters from '@/components/exceptions/ExceptionFilters';
 import ExceptionDetailModal from '@/components/exceptions/ExceptionDetailModal';
 
+const RESOLVED_OR_ARCHIVED_STATUSES: ExceptionStatus[] = [
+  ExceptionStatusEnum.Enum.RESOLVED_BY_RETRY,
+  ExceptionStatusEnum.Enum.RESOLVED_MANUALLY,
+  ExceptionStatusEnum.Enum.ARCHIVED,
+];
+
+
 // --- transformExceptionsToHierarchy function (no changes from your last version) ---
 const transformExceptionsToHierarchy = (flatLogs: DicomExceptionLogRead[]): HierarchicalExceptionData => {
     if (!flatLogs || flatLogs.length === 0) return [];
     const studiesMap = new Map<string, StudyLevelExceptionItem>();
 
+    // --- First pass: Group logs into studies, series, and SOPs, and collect basic counts/info ---
     for (const log of flatLogs) {
         if (!log.study_instance_uid) {
             console.warn("Log without study_instance_uid, cannot group:", log);
             continue;
         }
+
+        // Ensure study entry exists in the map
         if (!studiesMap.has(log.study_instance_uid)) {
             studiesMap.set(log.study_instance_uid, {
-                id: log.study_instance_uid, itemType: 'study', studyInstanceUid: log.study_instance_uid,
-                patientName: log.patient_name, patientId: log.patient_id, accessionNumber: log.accession_number,
-                seriesCount: 0, totalSopInstanceCount: 0, statusSummary: '',
-                earliestFailure: log.failure_timestamp, latestFailure: log.failure_timestamp, subRows: [],
+                id: log.study_instance_uid, 
+                itemType: 'study', 
+                studyInstanceUid: log.study_instance_uid,
+                patientName: log.patient_name, 
+                patientId: log.patient_id, 
+                accessionNumber: log.accession_number,
+                seriesCount: 0,       // Will be calculated based on actual series subRows
+                totalSopInstanceCount: 0, // Will be incremented
+                statusSummary: '',    // Will be calculated in the second pass
+                earliestFailure: log.failure_timestamp, // Initialize
+                latestFailure: log.failure_timestamp,   // Initialize
+                subRows: [],          // To hold SeriesLevelExceptionItem[]
             });
         }
+
         const studyItem = studiesMap.get(log.study_instance_uid)!;
-        studyItem.totalSopInstanceCount++;
+        studyItem.totalSopInstanceCount++; // Increment total SOPs for the study
+
+        // Update study-level aggregated info (timestamps, patient details if missing)
         if (log.failure_timestamp < studyItem.earliestFailure!) studyItem.earliestFailure = log.failure_timestamp;
         if (log.failure_timestamp > studyItem.latestFailure!) studyItem.latestFailure = log.failure_timestamp;
         if (!studyItem.patientName && log.patient_name) studyItem.patientName = log.patient_name;
         if (!studyItem.patientId && log.patient_id) studyItem.patientId = log.patient_id;
         if (!studyItem.accessionNumber && log.accession_number) studyItem.accessionNumber = log.accession_number;
 
+        // Group by Series
         if (log.series_instance_uid) {
             let seriesItem = studyItem.subRows?.find(s => s.seriesInstanceUid === log.series_instance_uid);
             if (!seriesItem) {
                 seriesItem = {
-                    id: `${log.study_instance_uid}_${log.series_instance_uid}`, itemType: 'series',
-                    studyInstanceUid: log.study_instance_uid, seriesInstanceUid: log.series_instance_uid,
-                    modality: log.modality, sopInstanceCount: 0, statusSummary: '', subRows: [],
+                    id: `${log.study_instance_uid}_${log.series_instance_uid}`, 
+                    itemType: 'series',
+                    studyInstanceUid: log.study_instance_uid, 
+                    seriesInstanceUid: log.series_instance_uid,
+                    modality: log.modality, 
+                    sopInstanceCount: 0,    // Will be incremented
+                    statusSummary: '',      // Will be calculated in the second pass
+                    subRows: [],            // To hold SopLevelExceptionItem[]
                 };
                 studyItem.subRows!.push(seriesItem);
             }
-            seriesItem.sopInstanceCount++;
+            seriesItem.sopInstanceCount++; // Increment SOPs for this series
+
+            // Create and push the SOP item
             const sopItemData: SopLevelExceptionItem = {
-                ...log, id: `sop_${log.id}`, itemType: 'sop',
+                ...log, // Spread DicomExceptionLogRead (which includes original id: number, exception_uuid: string)
+                id: `sop_${log.id}`, // Override with a unique string ID for table keying consistency
+                itemType: 'sop',
             };
             seriesItem.subRows!.push(sopItemData);
         } else {
-            console.warn("Log found under study but without series_instance_uid:", log);
+            // Handle logs that have a study_instance_uid but no series_instance_uid
+            // These could be "study-level" exceptions or malformed data.
+            // For now, we log a warning. You might decide to create a special "series-less" group.
+            console.warn("Log found under study but without series_instance_uid:", log.id, log.exception_uuid, log.study_instance_uid);
         }
-    }
+    } // End of first pass (grouping)
 
+    // --- Second pass: Calculate status summaries for series and studies ---
     studiesMap.forEach(study => {
-        study.seriesCount = study.subRows?.length || 0;
-        const studySopStatuses: ExceptionStatus[] = [];
+        study.seriesCount = study.subRows?.length || 0; // Correct series count
+        const allSopStatusesInStudy: ExceptionStatus[] = [];
+        let allSopsInStudyAreResolvedOrArchived = study.totalSopInstanceCount > 0; // Start true, disprove
+
         study.subRows?.forEach(series => {
-            const seriesSopStatuses: ExceptionStatus[] = [];
+            const sopStatusesInSeries: ExceptionStatus[] = [];
+            let allSopsInSeriesAreResolvedOrArchived = series.sopInstanceCount > 0;
+
             series.subRows?.forEach(sop => {
-                seriesSopStatuses.push(sop.status);
-                studySopStatuses.push(sop.status);
+                sopStatusesInSeries.push(sop.status);
+                allSopStatusesInStudy.push(sop.status); // Collect all SOP statuses for study summary
+                if (!RESOLVED_OR_ARCHIVED_STATUSES.includes(sop.status)) {
+                    allSopsInSeriesAreResolvedOrArchived = false;
+                }
             });
-            const newSeriesCount = seriesSopStatuses.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
-            const failedSeriesCount = seriesSopStatuses.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
-            series.statusSummary = `${seriesSopStatuses.length} SOPs (${newSeriesCount} New, ${failedSeriesCount} Failed)`;
-        });
-        const newStudyCount = studySopStatuses.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
-        const failedStudyCount = studySopStatuses.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
-        study.statusSummary = `${studySopStatuses.length} Total SOPs (${newStudyCount} New, ${failedStudyCount} Failed)`;
-    });
+
+            // Calculate Series Status Summary
+            if (series.sopInstanceCount === 0) {
+                series.statusSummary = "0 SOPs";
+            } else if (allSopsInSeriesAreResolvedOrArchived) {
+                series.statusSummary = `${series.sopInstanceCount} SOPs (All Resolved/Archived)`;
+            } else {
+                const newCount = sopStatusesInSeries.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
+                const failedCount = sopStatusesInSeries.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
+                const manualReviewCount = sopStatusesInSeries.filter(s => s === ExceptionStatusEnum.Enum.MANUAL_REVIEW_REQUIRED).length;
+                const retryCount = sopStatusesInSeries.filter(s => 
+                    s === ExceptionStatusEnum.Enum.RETRY_PENDING || s === ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS
+                ).length;
+                
+                let summaryParts: string[] = [];
+                if (newCount > 0) summaryParts.push(`${newCount} New`);
+                if (manualReviewCount > 0) summaryParts.push(`${manualReviewCount} Review`);
+                if (retryCount > 0) summaryParts.push(`${retryCount} Retry`);
+                if (failedCount > 0) summaryParts.push(`${failedCount} Failed`);
+                
+                if (summaryParts.length > 0) {
+                    series.statusSummary = `${series.sopInstanceCount} SOPs (${summaryParts.join(', ')})`;
+                } else {
+                    // If no specific "problem" counts, but not all are resolved/archived.
+                    series.statusSummary = `${series.sopInstanceCount} SOPs (Mixed Status)`;
+                }
+            }
+
+            // Update study-level "all resolved" flag
+            if (!allSopsInSeriesAreResolvedOrArchived) {
+                allSopsInStudyAreResolvedOrArchived = false;
+            }
+        }); // End of series loop for a study
+
+        // Calculate Study Status Summary
+        if (study.totalSopInstanceCount === 0) {
+            study.statusSummary = "0 Total SOPs";
+        } else if (allSopsInStudyAreResolvedOrArchived) {
+            study.statusSummary = `${study.totalSopInstanceCount} Total SOPs (All Resolved/Archived)`;
+        } else {
+            // Use allSopStatusesInStudy collected from all series within this study
+            const newCount = allSopStatusesInStudy.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
+            const failedCount = allSopStatusesInStudy.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
+            const manualReviewCount = allSopStatusesInStudy.filter(s => s === ExceptionStatusEnum.Enum.MANUAL_REVIEW_REQUIRED).length;
+            const retryCount = allSopStatusesInStudy.filter(s => 
+                s === ExceptionStatusEnum.Enum.RETRY_PENDING || s === ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS
+            ).length;
+
+            let summaryParts: string[] = [];
+            if (newCount > 0) summaryParts.push(`${newCount} New`);
+            if (manualReviewCount > 0) summaryParts.push(`${manualReviewCount} Review`);
+            if (retryCount > 0) summaryParts.push(`${retryCount} Retry`);
+            if (failedCount > 0) summaryParts.push(`${failedCount} Failed`);
+
+            if (summaryParts.length > 0) {
+                study.statusSummary = `${study.totalSopInstanceCount} Total SOPs (${summaryParts.join(', ')})`;
+            } else {
+                study.statusSummary = `${study.totalSopInstanceCount} Total SOPs (Mixed Status)`;
+            }
+        }
+    }); // End of studiesMap.forEach for summary calculation
+
     return Array.from(studiesMap.values());
 };
-// --- END transformExceptionsToHierarchy function ---
 
 
 const ExceptionsPage: React.FC = () => {
