@@ -5,25 +5,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ListX, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-// MODIFIED: Import directly from the service file
-import { listExceptions, updateException } from '@/services/exceptionService';
-import type { ListExceptionsParams } from '@/services/exceptionService'; // Import type
+import { listExceptions, updateException } from '@/services/exceptionService'; // Corrected import
+import type { ListExceptionsParams } from '@/services/exceptionService';
 
 import { DicomExceptionLogRead, DicomExceptionLogUpdate } from '@/schemas/dicomExceptionSchema';
-import { ExceptionStatus, ExceptionStatusEnum } from '@/schemas/dicomExceptionEnums'; // Import type ExceptionStatus
-import { HierarchicalExceptionData, StudyLevelExceptionItem, /* SeriesLevelExceptionItem, */ SopLevelExceptionItem } from '@/types/exceptions'; // SeriesLevelExceptionItem might be unused
+import { ExceptionStatus, ExceptionStatusEnum } from '@/schemas/dicomExceptionEnums';
+import { 
+    HierarchicalExceptionData, 
+    StudyLevelExceptionItem, 
+    SeriesLevelExceptionItem, // Keep if used in transform logic, even if not directly in props
+    SopLevelExceptionItem 
+} from '@/types/exceptions';
 
-// MODIFIED: Ensure these paths are correct and components are default exported
-// If these files don't exist, you'll need to create them.
 import ExceptionsTable from '@/components/exceptions/ExceptionsTable';
 import ExceptionFilters from '@/components/exceptions/ExceptionFilters';
 import ExceptionDetailModal from '@/components/exceptions/ExceptionDetailModal';
 
-
-// FUCKING DATA TRANSFORMATION LOGIC - THIS IS THE CRUX, YOU IMBECILE
 const transformExceptionsToHierarchy = (flatLogs: DicomExceptionLogRead[]): HierarchicalExceptionData => {
   if (!flatLogs || flatLogs.length === 0) return [];
-
   const studiesMap = new Map<string, StudyLevelExceptionItem>();
 
   for (const log of flatLogs) {
@@ -31,90 +30,75 @@ const transformExceptionsToHierarchy = (flatLogs: DicomExceptionLogRead[]): Hier
       console.warn("Log without study_instance_uid, cannot group:", log);
       continue;
     }
-
-    // Ensure study entry exists
     if (!studiesMap.has(log.study_instance_uid)) {
       studiesMap.set(log.study_instance_uid, {
-        id: log.study_instance_uid, // Use study UID as the unique ID for the table row
+        id: log.study_instance_uid,
         itemType: 'study',
         studyInstanceUid: log.study_instance_uid,
-        patientName: log.patient_name, // Simplistic: first one wins.
+        patientName: log.patient_name,
         patientId: log.patient_id,
         accessionNumber: log.accession_number,
         seriesCount: 0,
         totalSopInstanceCount: 0,
-        statusSummary: '', // Will be calculated later
-        earliestFailure: log.failure_timestamp, // Initialize with the first log's timestamp
-        latestFailure: log.failure_timestamp,   // Initialize
-        subRows: [], // This will hold SeriesLevelExceptionItem[]
+        statusSummary: '',
+        earliestFailure: log.failure_timestamp,
+        latestFailure: log.failure_timestamp,
+        subRows: [],
       });
     }
-
     const studyItem = studiesMap.get(log.study_instance_uid)!;
     studyItem.totalSopInstanceCount++;
-
-    // Update earliest/latest failure timestamps for the study
-    if (log.failure_timestamp < studyItem.earliestFailure!) {
-      studyItem.earliestFailure = log.failure_timestamp;
-    }
-    if (log.failure_timestamp > studyItem.latestFailure!) {
-      studyItem.latestFailure = log.failure_timestamp;
-    }
-    // Update patient/accession if current ones are null/empty and new log has them
+    if (log.failure_timestamp < studyItem.earliestFailure!) studyItem.earliestFailure = log.failure_timestamp;
+    if (log.failure_timestamp > studyItem.latestFailure!) studyItem.latestFailure = log.failure_timestamp;
     if (!studyItem.patientName && log.patient_name) studyItem.patientName = log.patient_name;
     if (!studyItem.patientId && log.patient_id) studyItem.patientId = log.patient_id;
     if (!studyItem.accessionNumber && log.accession_number) studyItem.accessionNumber = log.accession_number;
 
-
-    // Group by Series
     if (log.series_instance_uid) {
       let seriesItem = studyItem.subRows?.find(s => s.seriesInstanceUid === log.series_instance_uid);
       if (!seriesItem) {
         seriesItem = {
-          id: `${log.study_instance_uid}_${log.series_instance_uid}`, // Composite ID for series row
+          id: `${log.study_instance_uid}_${log.series_instance_uid}`,
           itemType: 'series',
           studyInstanceUid: log.study_instance_uid,
           seriesInstanceUid: log.series_instance_uid,
-          modality: log.modality, // First log's modality for the series
+          modality: log.modality,
           sopInstanceCount: 0,
-          statusSummary: '', // Will be calculated later
-          subRows: [], // This will hold SopLevelExceptionItem[] (which are DicomExceptionLogRead)
+          statusSummary: '',
+          subRows: [],
         };
         studyItem.subRows!.push(seriesItem);
       }
       seriesItem.sopInstanceCount++;
-      seriesItem.subRows!.push({ ...log, itemType: 'sop', id: log.id } as SopLevelExceptionItem); // Ensure itemType: 'sop' is added
+      // Ensure the pushed SOP item conforms to SopLevelExceptionItem (with string id and itemType)
+      const sopItemData: SopLevelExceptionItem = {
+          ...log, // DicomExceptionLogRead
+          id: `sop_${log.id}`, // String ID
+          itemType: 'sop',
+      };
+      seriesItem.subRows!.push(sopItemData);
     } else {
-      // Handle logs without series_instance_uid:
-      // Option 1: Create a "Series Not Specified" group under the study
-      // Option 2: Add them to a direct list of SOPs in the study (if your table design allows mixed subRow types)
-      // For now, we'll assume most will have series. If not, this part needs more thought.
       console.warn("Log found under study but without series_instance_uid:", log);
     }
   }
 
-  // Calculate summaries and update series counts
   studiesMap.forEach(study => {
     study.seriesCount = study.subRows?.length || 0;
     const studySopStatuses: ExceptionStatus[] = [];
-
     study.subRows?.forEach(series => {
       const seriesSopStatuses: ExceptionStatus[] = [];
       series.subRows?.forEach(sop => {
         seriesSopStatuses.push(sop.status);
         studySopStatuses.push(sop.status);
       });
-      // Simple status summary for series (e.g., count of NEW)
       const newSeriesCount = seriesSopStatuses.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
       const failedSeriesCount = seriesSopStatuses.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
       series.statusSummary = `${seriesSopStatuses.length} SOPs (${newSeriesCount} New, ${failedSeriesCount} Failed)`;
     });
-    // Simple status summary for study
     const newStudyCount = studySopStatuses.filter(s => s === ExceptionStatusEnum.Enum.NEW).length;
     const failedStudyCount = studySopStatuses.filter(s => s === ExceptionStatusEnum.Enum.FAILED_PERMANENTLY).length;
     study.statusSummary = `${studySopStatuses.length} Total SOPs (${newStudyCount} New, ${failedStudyCount} Failed)`;
   });
-
   return Array.from(studiesMap.values());
 };
 
@@ -123,11 +107,15 @@ const ExceptionsPage: React.FC = () => {
   const [filters, setFilters] = useState<ListExceptionsParams>({ limit: 50, sortBy: 'failure_timestamp', sortOrder: 'desc' });
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedExceptionUuidForDetail, setSelectedExceptionUuidForDetail] = useState<string | null>(null);
+  
+  // State to track the UUID of the SOP instance being updated via popover
+  const [updatingPopoverUuid, setUpdatingPopoverUuid] = useState<string | null>(null);
 
-  const { data: exceptionsResponse, isLoading, isError, error } = useQuery({
+
+  const { data: exceptionsResponse, isLoading, isError, error, isFetching } = useQuery({
     queryKey: ['exceptions', filters],
     queryFn: () => listExceptions(filters),
-    placeholderData: (previousData) => previousData, // MODIFIED: TanStack Query v5 syntax
+    placeholderData: (previousData) => previousData,
   });
 
   const hierarchicalData = useMemo(() => {
@@ -135,20 +123,31 @@ const ExceptionsPage: React.FC = () => {
   }, [exceptionsResponse?.items]);
 
   const updateExceptionMutation = useMutation({
-    mutationFn: ({ uuid, data }: { uuid: string; data: DicomExceptionLogUpdate }) => updateException(uuid, data),
-    onSuccess: (updatedLog: DicomExceptionLogRead) => { // MODIFIED: Add type to updatedLog
+    mutationFn: ({ uuid, data }: { uuid: string; data: DicomExceptionLogUpdate }) => {
+      // If this mutation is triggered from the popover, set its UUID
+      // This assumes the popover calls this mutation.
+      // If detail modal also calls it, this simple tracking might not be enough.
+      setUpdatingPopoverUuid(uuid); 
+      return updateException(uuid, data);
+    },
+    onSuccess: (updatedLog: DicomExceptionLogRead) => {
       toast.success(`Exception ${updatedLog.exception_uuid} updated.`);
-      queryClient.invalidateQueries({ queryKey: ['exceptions'] }); // Refetch list
-      queryClient.invalidateQueries({ queryKey: ['exceptionDetail', updatedLog.exception_uuid] }); // Refetch detail if open
-      setIsDetailModalOpen(false); // Close modal on success
+      queryClient.invalidateQueries({ queryKey: ['exceptions'] });
+      queryClient.invalidateQueries({ queryKey: ['exceptionDetail', updatedLog.exception_uuid] });
+      if (selectedExceptionUuidForDetail === updatedLog.exception_uuid) { // Only close if it was the detail modal's update
+          setIsDetailModalOpen(false);
+      }
     },
-    onError: (err: any) => {
-      toast.error(`Failed to update exception: ${err.message || 'Unknown error'}`);
+    onError: (err: any, variables) => {
+      toast.error(`Failed to update exception ${variables.uuid}: ${err.message || 'Unknown error'}`);
     },
+    onSettled: () => {
+      setUpdatingPopoverUuid(null); // Clear the popover updating UUID
+    }
   });
 
   const handleFiltersChange = useCallback((newFilters: Partial<ListExceptionsParams>) => {
-    setFilters((prev: ListExceptionsParams) => ({ ...prev, ...newFilters, skip: 0 })); // MODIFIED: Add type to prev
+    setFilters((prev: ListExceptionsParams) => ({ ...prev, ...newFilters, skip: 0 }));
   }, []);
 
   const handleViewDetails = useCallback((exceptionUuid: string) => {
@@ -157,17 +156,14 @@ const ExceptionsPage: React.FC = () => {
   }, []);
 
   const handleRequeueForRetry = useCallback((exceptionUuid: string) => {
-    // This is just a status update
     updateExceptionMutation.mutate({
       uuid: exceptionUuid,
-      data: { status: 'RETRY_PENDING' as ExceptionStatus, next_retry_attempt_at: null } // MODIFIED: Use string literal
+      data: { status: ExceptionStatusEnum.Enum.RETRY_PENDING, next_retry_attempt_at: null }
     });
   }, [updateExceptionMutation]);
+  
+  const isEffectiveLoading = isLoading || (isFetching && (!exceptionsResponse || exceptionsResponse.items.length === 0));
 
-  // ... other handlers for pagination, sorting (passed to table)
-
-  if (isLoading && !exceptionsResponse) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /> Loading exceptions...</div>;
-  if (isError) return <div className="text-red-600">Error fetching exceptions: {error?.message || 'Unknown error'}</div>;
 
   return (
     <div className="space-y-6">
@@ -178,28 +174,37 @@ const ExceptionsPage: React.FC = () => {
           <CardDescription>Filter and sort the exceptions list.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ExceptionFilters currentFilters={filters} onFiltersChange={handleFiltersChange} disabled={isLoading || updateExceptionMutation.isPending} />
+          <ExceptionFilters 
+            currentFilters={filters} 
+            onFiltersChange={handleFiltersChange} 
+            disabled={isEffectiveLoading || updateExceptionMutation.isPending} 
+          />
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Exceptions List</CardTitle>
-          <CardDescription>Found {exceptionsResponse?.total || 0} total exception logs. Displaying in a study-centric view.</CardDescription>
+          <CardDescription>
+            Found {exceptionsResponse?.total || 0} total exception logs. 
+            {isFetching && exceptionsResponse?.items && <Loader2 className="ml-2 h-4 w-4 animate-spin inline-block" />}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ExceptionsTable
             data={hierarchicalData}
-            isLoading={isLoading} // Or more granular loading state
-            // Pass pagination/sorting state and handlers if table itself doesn't manage them via filters
+            isLoading={isEffectiveLoading}
             onViewDetails={handleViewDetails}
             onRequeueForRetry={handleRequeueForRetry}
-            onUpdateStatus={(uuid: string, status: ExceptionStatus, notes?: string) => updateExceptionMutation.mutate({uuid, data: {status, resolution_notes: notes}})} // MODIFIED: Add types
+            onUpdateStatus={(uuid: string, status: ExceptionStatus, notes?: string) => {
+              updateExceptionMutation.mutate({ uuid, data: { status, resolution_notes: notes } });
+            }}
+            // Pass a function to check if a specific row's popover should be in loading state
+            isRowUpdating={(uuid: string) => updatingPopoverUuid === uuid && updateExceptionMutation.isPending}
           />
-           {/* Basic Pagination Example - you'll want something better */}
           <div className="mt-4 flex justify-between items-center">
             <span>Total items: {exceptionsResponse?.total ?? 0}</span>
-            {/* Add actual pagination controls here that modify 'skip' in filters */}
+            {/* Pagination controls would go here */}
           </div>
         </CardContent>
       </Card>
@@ -207,10 +212,15 @@ const ExceptionsPage: React.FC = () => {
       {selectedExceptionUuidForDetail && (
         <ExceptionDetailModal
           isOpen={isDetailModalOpen}
-          onClose={() => setIsDetailModalOpen(false)}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedExceptionUuidForDetail(null); // Clear selected UUID when closing
+          }}
           exceptionUuid={selectedExceptionUuidForDetail}
-          onUpdate={(uuid: string, data: DicomExceptionLogUpdate) => updateExceptionMutation.mutate({ uuid, data })} // MODIFIED: Add types
-          isUpdating={updateExceptionMutation.isPending}
+          onUpdate={(uuid: string, data: DicomExceptionLogUpdate) => {
+            updateExceptionMutation.mutate({ uuid, data });
+          }}
+          isUpdating={updateExceptionMutation.isPending && selectedExceptionUuidForDetail === updateExceptionMutation.variables?.uuid}
         />
       )}
   </div>

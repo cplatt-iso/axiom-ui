@@ -9,7 +9,7 @@ import {
   Row,
 } from "@tanstack/react-table";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button"; // Assuming button.tsx is correct
+import { Button } from "@/components/ui/button";
 import { Badge } from '@/components/ui/badge';
 import { 
     ChevronDown, 
@@ -22,8 +22,9 @@ import {
     AlertTriangle, 
     Loader2 
 } from 'lucide-react';
+import QuickUpdateStatusPopover from '@/components/QuickUpdateStatusPopover'; // Ensure this import is correct
 import { 
-    HierarchicalExceptionData, // This is StudyLevelExceptionItem[]
+    HierarchicalExceptionData,
     StudyLevelExceptionItem, 
     SeriesLevelExceptionItem, 
     SopLevelExceptionItem 
@@ -32,11 +33,12 @@ import { ExceptionStatus, ExceptionStatusEnum } from '@/schemas/dicomExceptionEn
 import { format } from 'date-fns';
 
 interface ExceptionsTableProps {
-  data: HierarchicalExceptionData; // This is StudyLevelExceptionItem[]
+  data: HierarchicalExceptionData;
   isLoading: boolean;
   onViewDetails: (exceptionUuid: string) => void;
   onRequeueForRetry: (exceptionUuid: string) => void;
   onUpdateStatus: (exceptionUuid: string, status: ExceptionStatus, notes?: string) => void;
+  isRowUpdating?: (uuid: string) => boolean; // Function to check if a specific row is updating
 }
 
 const formatDate = (date?: Date | string): string => {
@@ -55,14 +57,14 @@ type TableDisplayItem = StudyLevelExceptionItem | SeriesLevelExceptionItem | Sop
 const getColumns = (
   onViewDetails: ExceptionsTableProps['onViewDetails'],
   onRequeueForRetry: ExceptionsTableProps['onRequeueForRetry'],
-  onUpdateStatus: ExceptionsTableProps['onUpdateStatus']
-): ColumnDef<TableDisplayItem>[] => [ // <<<< Changed to the union type
+  onUpdateStatus: ExceptionsTableProps['onUpdateStatus'],
+  isRowUpdating?: (uuid: string) => boolean // Accept the function here
+): ColumnDef<TableDisplayItem>[] => [
   {
     id: 'expander',
     header: () => null,
-    // `row` here will be Row<TableDisplayItem>
     cell: ({ row }: { row: Row<TableDisplayItem> }) => {
-      const canExpand = row.getCanExpand(); // This should work if getSubRows is correct
+      const canExpand = row.getCanExpand();
       return canExpand ? (
         <Button variant="ghost" size="sm" onClick={row.getToggleExpandedHandler()} className="px-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-sm">
           {row.getIsExpanded() ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -74,58 +76,40 @@ const getColumns = (
     size: 45,
   },
   {
-    // Accessor needs to handle the union or target a common field like 'id'
     accessorFn: (row: TableDisplayItem): string => {
-        if (row.itemType === 'study') {
-            return row.studyInstanceUid;
-        } else if (row.itemType === 'series') {
-            return row.seriesInstanceUid;
-        } else if (row.itemType === 'sop') {
-            // Assuming SopLevelExceptionItem is now a valid type with 'id' and 'sop_instance_uid'
-            if (!row.id) { // Add a check for id, though it should always exist
-                console.error("SOP Level Item is missing an ID:", row);
-                return row.sop_instance_uid || "sop-missing-id";
-            }
-            return row.sop_instance_uid || `sop-log-id-${row.id}`;
-        }
-        // This block is reached if `row.itemType` is none of the above,
-        // which should be impossible if TableDisplayItem is correctly defined and data is clean.
-        // `row` is `never` here due to exhaustive checks.
-        const _exhaustiveCheck: never = row;
-        console.error("Unreachable code: Unhandled itemType in accessorFn for 'identifier'", _exhaustiveCheck);
-        // Fallback or throw, as this indicates a typing or data issue.
-        // Throwing an error is often better for "impossible" states.
-        throw new Error(`Unhandled itemType in accessorFn: ${(_exhaustiveCheck as any)?.itemType}`);
-        // Or, if you must return a string:
-        // return "unknown-identifier";
+        // Relies on itemType and specific UID fields existing
+        if (row.itemType === 'study') return row.studyInstanceUid;
+        if (row.itemType === 'series') return row.seriesInstanceUid;
+        if (row.itemType === 'sop') return row.sop_instance_uid || row.id; // Fallback to id if sop_instance_uid is missing
+        // Should be unreachable if types are correct
+        console.error("Unhandled itemType in identifier accessorFn:", row);
+        return (row as any).id || "unknown-id"; // Last resort fallback
     },
     id: 'identifier',
     header: 'Study UID / Series UID / SOP UID',
-    cell: ({ row, getValue }) => {
+    cell: ({ row }) => { // Removed getValue as we directly use original with itemType
         const original = row.original as TableDisplayItem;
-        const depth = row.depth; // depth is available on Row<T>
+        const depth = row.depth;
 
-        if (depth === 0) {
+        if (depth === 0) { // Study
             return <span className="font-semibold text-sky-700 dark:text-sky-400">{(original as StudyLevelExceptionItem).studyInstanceUid}</span>;
         }
-        if (depth === 1) {
+        if (depth === 1) { // Series
             return <span className="pl-4 text-indigo-600 dark:text-indigo-400">{(original as SeriesLevelExceptionItem).seriesInstanceUid}</span>;
         }
-        if (depth === 2) {
+        if (depth === 2) { // SOP
             return <span className="pl-8 text-slate-500 dark:text-slate-400">{(original as SopLevelExceptionItem).sop_instance_uid}</span>;
         }
-        return getValue<string>();
+        return null; // Should not happen
     },
     size: 350,
   },
   {
     id: 'patientInfo',
     header: 'Patient (ID / Name)',
-    // AccessorFn should ideally return a value available for all items in TableDisplayItem,
-    // or the column should only be relevant for a subset (handled in `cell`)
-    accessorFn: (row) => {
+    accessorFn: (row: TableDisplayItem) => {
         if (row.itemType === 'study') return { patientId: row.patientId, patientName: row.patientName };
-        return null; // Or some default
+        return null;
     },
     cell: ({ row }) => {
       const original = row.original as TableDisplayItem;
@@ -144,7 +128,7 @@ const getColumns = (
   {
     id: 'accessionNumber',
     header: 'Accession #',
-    accessorFn: (row) => (row.itemType === 'study' ? row.accessionNumber : undefined),
+    accessorFn: (row: TableDisplayItem) => (row.itemType === 'study' ? row.accessionNumber : undefined),
     cell: ({ row, getValue }) => {
         const original = row.original as TableDisplayItem;
         if (original.itemType === 'study') {
@@ -175,14 +159,13 @@ const getColumns = (
     size: 150,
   },
   {
-    id: 'statusAndTimestamps',
+    id: 'statusAndTimestamps', // This column was patched in the previous step, ensure it's correct
     header: 'Status / Timestamps',
     cell: ({ row }) => {
         const original = row.original as TableDisplayItem; // original is the union type
 
-        // Study Level Display
-        if (original.itemType === 'study') {
-            const study = original as StudyLevelExceptionItem; // More specific type for this block
+        if (original.itemType === 'study') { /* ... your existing study display ... */ 
+            const study = original as StudyLevelExceptionItem;
             const hasNew = study.statusSummary.includes("New");
             const hasFailed = study.statusSummary.includes("Failed");
             return (
@@ -196,10 +179,8 @@ const getColumns = (
               </div>
             );
         }
-
-        // Series Level Display
-        if (original.itemType === 'series') {
-             const series = original as SeriesLevelExceptionItem; // More specific type
+        if (original.itemType === 'series') { /* ... your existing series display ... */
+             const series = original as SeriesLevelExceptionItem;
              return (
                 <div className="pl-4 text-xs">
                     <Badge variant="outline" className="text-xxs break-all whitespace-normal">
@@ -208,71 +189,31 @@ const getColumns = (
                 </div>
              );
         }
-
-        // SOP Instance Level Display - THIS IS THE PATCHED PART
         if (original.itemType === 'sop') {
-            const sop = original as SopLevelExceptionItem; // More specific type
+            const sop = original as SopLevelExceptionItem;
             let badgeVariant: "default" | "destructive" | "secondary" | "outline" = "default";
-            let textColorClass = ""; // For additional text color control
-
-            // Determine badge style based on SOP status
+            let textColorClass = "";
             switch (sop.status) {
-                case ExceptionStatusEnum.Enum.FAILED_PERMANENTLY:
-                    badgeVariant = "destructive";
-                    break;
-                case ExceptionStatusEnum.Enum.NEW:
-                    badgeVariant = "secondary";
-                    // Ensure good contrast for secondary badge in dark mode if its background is dark
-                    // textColorClass = "dark:text-slate-100"; // Example, adjust as needed
-                    break;
-                case ExceptionStatusEnum.Enum.MANUAL_REVIEW_REQUIRED:
-                    badgeVariant = "outline";
-                    // Using Tailwind classes for yellow-ish warning, adjust to your theme
-                    textColorClass = "text-yellow-600 border-yellow-500 dark:text-yellow-400 dark:border-yellow-600";
-                    break;
-                case ExceptionStatusEnum.Enum.RESOLVED_BY_RETRY:
-                case ExceptionStatusEnum.Enum.RESOLVED_MANUALLY:
-                    badgeVariant = "outline";
-                    // Using Tailwind classes for green-ish success
-                    textColorClass = "text-green-600 border-green-500 dark:text-green-400 dark:border-green-600";
-                    break;
-                case ExceptionStatusEnum.Enum.RETRY_PENDING:
-                case ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS:
-                    badgeVariant = "default"; // Or "secondary"
-                     // Using Tailwind classes for blue-ish info
-                    textColorClass = "text-blue-600 border-blue-500 dark:text-blue-400 dark:border-blue-600";
-                    if (badgeVariant === "default") { // Default usually has primary bg, ensure text is visible
-                        textColorClass += " text-primary-foreground dark:text-primary-foreground";
-                    }
-                    break;
-                case ExceptionStatusEnum.Enum.ARCHIVED:
-                    badgeVariant = "outline";
-                    textColorClass = "text-slate-500 border-slate-400 dark:text-slate-400 dark:border-slate-500";
-                    break;
-                default:
-                    badgeVariant = "default";
-                    // Ensure default has good contrast if not covered above
-                    textColorClass = "text-primary-foreground dark:text-primary-foreground"; 
+                case ExceptionStatusEnum.Enum.FAILED_PERMANENTLY: badgeVariant = "destructive"; break;
+                case ExceptionStatusEnum.Enum.NEW: badgeVariant = "secondary"; break;
+                case ExceptionStatusEnum.Enum.MANUAL_REVIEW_REQUIRED: badgeVariant = "outline"; textColorClass = "text-yellow-600 border-yellow-500 dark:text-yellow-400 dark:border-yellow-600"; break;
+                case ExceptionStatusEnum.Enum.RESOLVED_BY_RETRY: case ExceptionStatusEnum.Enum.RESOLVED_MANUALLY: badgeVariant = "outline"; textColorClass = "text-green-600 border-green-500 dark:text-green-400 dark:border-green-600"; break;
+                case ExceptionStatusEnum.Enum.RETRY_PENDING: case ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS: badgeVariant = "default"; textColorClass = "text-blue-600 border-blue-500 dark:text-blue-400 dark:border-blue-600"; if (badgeVariant === "default") { textColorClass += " text-primary-foreground dark:text-primary-foreground"; } break;
+                case ExceptionStatusEnum.Enum.ARCHIVED: badgeVariant = "outline"; textColorClass = "text-slate-500 border-slate-400 dark:text-slate-400 dark:border-slate-500"; break;
+                default: badgeVariant = "default"; textColorClass = "text-primary-foreground dark:text-primary-foreground"; 
             }
-
             return (
-                <div className="pl-8 text-xs"> {/* Keep existing SOP item layout */}
-                    <Badge 
-                        variant={badgeVariant}
-                        // Apply computed textColorClass and ensure badge text doesn't break weirdly
-                        className={`text-xxs whitespace-nowrap px-1.5 py-0.5 ${textColorClass}`} 
-                    >
-                        {/* Replace underscores with spaces for display */}
+                <div className="pl-8 text-xs">
+                    <Badge variant={badgeVariant} className={`text-xxs whitespace-nowrap px-1.5 py-0.5 ${textColorClass}`}>
                         {sop.status.replace(/_/g, ' ')}
                     </Badge>
                     <div className="text-gray-500 dark:text-gray-400 pt-0.5">{formatDate(sop.failure_timestamp)}</div>
                 </div>
             );
         }
-        // Fallback if itemType is somehow not covered (shouldn't happen with proper types)
         return null;
     },
-    size: 220, // Keep your existing size or adjust as needed
+    size: 220,
   },
   {
     id: 'actions',
@@ -280,61 +221,59 @@ const getColumns = (
     cell: ({ row }) => {
         const original = row.original as TableDisplayItem;
         if (original.itemType === 'sop') {
+            const sop = original as SopLevelExceptionItem;
+            const currentlyUpdating = isRowUpdating ? isRowUpdating(sop.exception_uuid) : false;
             return (
               <div className="flex space-x-1 justify-end">
-                <Button variant="ghost" size="sm" onClick={() => onViewDetails(original.exception_uuid)} title="View Details"><Eye size={14}/></Button>
-                <Button variant="ghost" size="sm" onClick={() => onRequeueForRetry(original.exception_uuid)} title="Re-queue for Retry"><RefreshCw size={14}/></Button>
-                <Button variant="ghost" size="sm" onClick={() => {
-                     const newStatusStr = prompt("New status (e.g., RESOLVED_MANUALLY, ARCHIVED):");
-                     if (newStatusStr) {
-                        const newStatus = newStatusStr as ExceptionStatus;
-                        if (Object.values(ExceptionStatusEnum.Enum).includes(newStatus)) {
-                            const notes = prompt("Resolution notes:");
-                            onUpdateStatus(original.exception_uuid, newStatus, notes || undefined);
-                        } else {
-                            alert("Invalid status value entered.");
-                        }
-                     }
-                }} title="Quick Update Status"><Edit3 size={14}/></Button>
+                <Button variant="ghost" size="sm" onClick={() => onViewDetails(sop.exception_uuid)} title="View Details" disabled={currentlyUpdating}>
+                    <Eye size={14}/>
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => onRequeueForRetry(sop.exception_uuid)} title="Re-queue for Retry" disabled={currentlyUpdating}>
+                    <RefreshCw size={14}/>
+                </Button>
+                <QuickUpdateStatusPopover
+                  exceptionLog={sop}
+                  onUpdateStatus={onUpdateStatus}
+                  isUpdating={currentlyUpdating}
+                >
+                  <Button variant="ghost" size="sm" title="Quick Update Status" disabled={currentlyUpdating}>
+                    <Edit3 size={14}/>
+                  </Button>
+                </QuickUpdateStatusPopover>
               </div>
             );
         }
-        return <div className="h-[36px]"></div>; // Maintain row height, 36px for "sm" button
+        return <div className="h-[36px]"></div>;
     },
     size: 130,
   }
 ];
 
 const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
-  data, // HierarchicalExceptionData which is StudyLevelExceptionItem[]
+  data,
   isLoading,
   onViewDetails,
   onRequeueForRetry,
   onUpdateStatus,
+  isRowUpdating, // Accept the new prop
 }) => {
-  const columns = useMemo(() => getColumns(onViewDetails, onRequeueForRetry, onUpdateStatus), [onViewDetails, onRequeueForRetry, onUpdateStatus]);
+  // Pass isRowUpdating to getColumns
+  const columns = useMemo(() => getColumns(onViewDetails, onRequeueForRetry, onUpdateStatus, isRowUpdating), [onViewDetails, onRequeueForRetry, onUpdateStatus, isRowUpdating]);
 
-  // Cast the initial data to the broader union type for the table's generic.
-  // TanStack Table will then use getSubRows to find children.
   const tableData = useMemo(() => data as TableDisplayItem[] ?? [], [data]);
 
-  const table = useReactTable<TableDisplayItem>({ // <<<< EXPLICIT GENERIC FOR THE UNION TYPE
+  const table = useReactTable<TableDisplayItem>({
     data: tableData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
-    getSubRows: (originalRow: TableDisplayItem) => { // originalRow is now the union type
-        // Check if subRows exists and is an array.
+    getSubRows: (originalRow: TableDisplayItem) => {
         if ('subRows' in originalRow && Array.isArray(originalRow.subRows)) {
-            return originalRow.subRows as TableDisplayItem[]; // Cast subRows to the union type as well
+            return originalRow.subRows as TableDisplayItem[];
         }
-        return undefined; // No sub-rows
+        return undefined;
     },
-    getRowId: (originalRow: TableDisplayItem): string => {
-        // originalRow.id can be string (for Study/Series) or number (for SOP).
-        // Convert to string to satisfy TanStack Table's expectation.
-        return String(originalRow.id);
-    },
+    getRowId: (originalRow: TableDisplayItem): string => String(originalRow.id),
     debugTable: process.env.NODE_ENV === 'development',
   });
 
@@ -343,6 +282,8 @@ const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
   }
 
   return (
+    // ... rest of your table rendering (Table, TableHeader, TableBody, etc.) ...
+    // This part should be mostly unchanged from your last working version
     <div className="rounded-md border bg-card text-card-foreground shadow-sm">
       <Table>
         <TableHeader>
@@ -358,7 +299,7 @@ const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
         </TableHeader>
         <TableBody>
           {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map(row => ( // row is Row<TableDisplayItem>
+            table.getRowModel().rows.map(row => (
               <TableRow 
                 key={row.id} 
                 data-state={row.getIsSelected() && "selected"}
@@ -368,7 +309,7 @@ const ExceptionsTable: React.FC<ExceptionsTableProps> = ({
                   : "hover:bg-slate-50 dark:hover:bg-slate-700/30"
                 }
               >
-                {row.getVisibleCells().map(cell => ( // cell is Cell<TableDisplayItem, unknown>
+                {row.getVisibleCells().map(cell => (
                   <TableCell 
                     key={cell.id} 
                     style={{ 

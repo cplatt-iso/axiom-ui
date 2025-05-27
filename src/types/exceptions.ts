@@ -1,7 +1,8 @@
 // frontend/src/types/exceptions.ts (or wherever you want to shove these)
 import { DicomExceptionLogRead } from '@/schemas/dicomExceptionSchema'; // Your Zod schema
 
-export interface SopLevelExceptionItem extends DicomExceptionLogRead {
+export interface SopLevelExceptionItem extends Omit<DicomExceptionLogRead, 'id'> {
+  id: string;
   itemType: 'sop'; // This is a new field to help identify the type of item
   // No new fields needed, it's just the log itself at this level
   // We might add a 'type: "sop"' or similar if it helps distinguish in generic components later
