@@ -14,6 +14,11 @@ import {
 } from '@/schemas/crosswalkMappingSchema'
 
 import {
+    OrdersApiResponse,
+} from '@/schemas/orderSchema';
+
+
+import {
     // From ruleSchema.ts (assuming index.ts re-exports them correctly)
     RulesetCreate,
     RulesetUpdate,
@@ -101,6 +106,48 @@ let authContextRef: AuthContextType | null = null;
 export function setAuthContextRef(context: AuthContextType): void {
     authContextRef = context;
 }
+
+export const getOrders = (params: {
+  pageIndex: number;
+  pageSize: number;
+  search?: string;
+  modalities?: string[];
+  dateRange?: { from?: Date; to?: Date };
+}): Promise<OrdersApiResponse> => {
+  const { pageIndex, pageSize, search, modalities, dateRange } = params;
+  
+  // Our generic apiClient is a simple little bitch and can't handle array params,
+  // so we have to build the query string by hand like some kind of goddamn ANIMAL.
+  const queryParams = new URLSearchParams({
+    skip: String(pageIndex * pageSize),
+    limit: String(pageSize),
+  });
+
+  if (search) {
+    queryParams.append('search', search);
+  }
+
+  // Convert dates to YYYY-MM-DD format, which the backend expects.
+  // Fucking timezones, man. Using toISOString and slicing is the safest bet.
+  if (dateRange?.from) {
+    queryParams.append('start_date', dateRange.from.toISOString().split('T')[0]);
+  }
+  if (dateRange?.to) {
+    queryParams.append('end_date', dateRange.to.toISOString().split('T')[0]);
+  }
+
+  // This is the important part where we manually append each modality,
+  // because the main apiClient would shit the bed trying to do this.
+  if (modalities && modalities.length > 0) {
+    modalities.forEach(mod => queryParams.append('modalities', mod));
+  }
+
+  const endpoint = `/orders/?${queryParams.toString()}`;
+
+  // We pass the fully formed endpoint and let apiClient handle the base URL and auth.
+  // We pointedly DO NOT use its 'params' option because it is garbage.
+  return apiClient<OrdersApiResponse>(endpoint);
+};
 
 const determineApiBaseUrl = (): string => {
     const envUrl: string | undefined = import.meta.env.VITE_API_BASE_URL;
@@ -558,7 +605,8 @@ export type {
     RulesetCreate, 
     RulesetUpdate, 
     RuleCreate, 
-    RuleUpdate
+    RuleUpdate,
+    OrdersApiResponse,
 };
 
 export default apiClient;

@@ -9,6 +9,7 @@ import {
     TableCellsIcon, // For Data Browser
     ArchiveBoxIcon, // For Inventory Tool
     ExclamationTriangleIcon,
+    ClipboardDocumentListIcon, // <-- I HAVE ARRIVED.
     // --- ADDED Icons for Reorganization ---
     AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
     WrenchScrewdriverIcon // For System Config
@@ -38,6 +39,8 @@ const Layout: React.FC = () => {
     // --- Navigation Definitions ---
     const navigation: NavItem[] = [
         { name: 'Dashboard', href: '/', icon: SquaresPlusIcon },
+        // --- LOOK AT ME. I AM THE NAVIGATION NOW. ---
+        { name: 'Orders', href: '/orders', icon: ClipboardDocumentListIcon },
         { name: 'Rulesets', href: '/rulesets', icon: CircleStackIcon },
         { name: 'Data Browser', href: '/data-browser', icon: TableCellsIcon },
         { name: 'Inventory Tool', href: '/inventory-tool', icon: ArchiveBoxIcon },
@@ -183,6 +186,7 @@ const Layout: React.FC = () => {
                                     <div className="space-y-1">
                                         {adminNavigation.map((item) => renderNavLink(item, false))}
                                     </div>
+
                                 </div>
                             )}
                         </nav>

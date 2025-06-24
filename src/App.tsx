@@ -37,6 +37,7 @@ import SchedulesConfigPage from './pages/SchedulesConfigPage';
 import DataBrowserPage from './pages/DataBrowserPage';
 import InventoryToolPage from './pages/InventoryToolPage';
 import ExceptionsPage from './pages/ExceptionsPage';
+import { OrdersPage } from './pages/OrdersPage';
 
 // --- ADDED: Import New System Config Page ---
 import SystemConfigurationPage from './pages/SystemConfigurationPage'; // Placeholder page
@@ -68,6 +69,7 @@ function AppContent() {
                     <Route index element={<DashboardPage />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/rulesets" element={<RulesetsPage />} />
+                    <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
                     <Route path="/rulesets/:rulesetId" element={<RulesetDetailPage />} />
                     <Route path="/data-browser" element={<DataBrowserPage />} />
                     <Route path="/inventory-tool" element={<InventoryToolPage />} />
