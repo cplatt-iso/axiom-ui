@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useState } from "react";
+import { CopyIcon, CheckIcon } from "lucide-react";
 
 interface OrderDetailModalProps {
   order: ImagingOrder;
@@ -29,6 +31,16 @@ const DetailRow = ({ label, children }: { label: string; children: React.ReactNo
 
 export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
   if (!order) return null;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.preventDefault(); // prevent details from toggling
+    if (order.raw_hl7_message) {
+      navigator.clipboard.writeText(order.raw_hl7_message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -86,8 +98,18 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
           {/* Raw HL7 - For the freaks */}
           {order.raw_hl7_message && (
             <details>
-              <summary className="cursor-pointer font-semibold text-lg">Raw HL7 Message</summary>
-              <pre className="mt-2 p-2 border rounded-md bg-slate-50 text-xs overflow-x-auto">
+              <summary className="cursor-pointer font-semibold text-lg flex justify-between items-center">
+                <span>Raw HL7 Message</span>
+                 <Button variant="ghost" size="sm" onClick={handleCopy}>
+                  {copied ? (
+                    <CheckIcon className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <CopyIcon className="h-4 w-4" />
+                  )}
+                  <span className="ml-2">{copied ? "Copied!" : "Copy"}</span>
+                </Button>
+              </summary>
+              <pre className="mt-2 p-2 border rounded-md bg-slate-100 dark:bg-slate-800 text-xs overflow-x-auto">
                 {order.raw_hl7_message}
               </pre>
             </details>

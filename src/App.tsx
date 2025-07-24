@@ -51,15 +51,40 @@ import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesCo
 
 function AppContent() {
     const auth = useAuth();
+    const { isAuthenticated, isLoading } = auth;
 
     useEffect(() => {
         setAuthContextRef(auth);
     }, [auth]);
 
+    // Show loading state while authentication is being checked
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="p-4 text-center text-gray-600 dark:text-gray-300">
+                    Loading session...
+                </div>
+            </div>
+        );
+    }
+
+    // If not authenticated, only show login and unauthorized routes
+    if (!isAuthenticated) {
+        return (
+            <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/unauthorized" element={<UnauthorizedPage />} />
+                {/* Redirect all other routes to login */}
+                <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+        );
+    }
+
+    // If authenticated, show the full app
     return (
         <Routes>
-            {/* Public Routes */}
-            <Route path="/login" element={<LoginPage />} />
+            {/* Public Routes (still accessible when authenticated) */}
+            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             {/* Protected Routes */}

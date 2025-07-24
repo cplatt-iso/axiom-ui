@@ -1,6 +1,6 @@
-// frontend/src/services/api.ts
 // import json5 from 'json5';
 import { AuthContextType } from '../context/AuthContext';
+import { format } from 'date-fns';
 import { 
     CrosswalkDataSourceUpdatePayload,
     CrosswalkDataSourceRead,
@@ -13,7 +13,7 @@ import {
     CrosswalkMapUpdatePayload,
 } from '@/schemas/crosswalkMappingSchema'
 
-import {
+import { 
     OrdersApiResponse,
 } from '@/schemas/orderSchema';
 
@@ -101,6 +101,14 @@ import {
     DataBrowserQueryResponse
 } from '../schemas/data_browser';
 
+// --- API Configuration ---
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+
+interface ApiOptions extends RequestInit {
+    params?: Record<string, any>;
+    useAuth?: boolean;
+}
+
 let authContextRef: AuthContextType | null = null;
 
 export function setAuthContextRef(context: AuthContextType): void {
@@ -112,98 +120,34 @@ export const getOrders = (params: {
   pageSize: number;
   search?: string;
   modalities?: string[];
+  statuses?: string[];
   dateRange?: { from?: Date; to?: Date };
 }): Promise<OrdersApiResponse> => {
-  const { pageIndex, pageSize, search, modalities, dateRange } = params;
+  const { pageIndex, pageSize, search, modalities, statuses, dateRange } = params;
   
-  // Our generic apiClient is a simple little bitch and can't handle array params,
-  // so we have to build the query string by hand like some kind of goddamn ANIMAL.
-  const queryParams = new URLSearchParams({
-    skip: String(pageIndex * pageSize),
-    limit: String(pageSize),
-  });
+  const apiParams: Record<string, any> = {
+    skip: pageIndex * pageSize,
+    limit: pageSize,
+  };
 
   if (search) {
-    queryParams.append('search', search);
+    apiParams.search = search;
   }
-
-  // Convert dates to YYYY-MM-DD format, which the backend expects.
-  // Fucking timezones, man. Using toISOString and slicing is the safest bet.
+  if (modalities && modalities.length > 0) {
+    apiParams.modalities = modalities;
+  }
+  if (statuses && statuses.length > 0) {
+    apiParams.statuses = statuses;
+  }
   if (dateRange?.from) {
-    queryParams.append('start_date', dateRange.from.toISOString().split('T')[0]);
+    apiParams.start_date = format(dateRange.from, "yyyy-MM-dd");
   }
   if (dateRange?.to) {
-    queryParams.append('end_date', dateRange.to.toISOString().split('T')[0]);
+    apiParams.end_date = format(dateRange.to, "yyyy-MM-dd");
   }
 
-  // This is the important part where we manually append each modality,
-  // because the main apiClient would shit the bed trying to do this.
-  if (modalities && modalities.length > 0) {
-    modalities.forEach(mod => queryParams.append('modalities', mod));
-  }
-
-  const endpoint = `/orders/?${queryParams.toString()}`;
-
-  // We pass the fully formed endpoint and let apiClient handle the base URL and auth.
-  // We pointedly DO NOT use its 'params' option because it is garbage.
-  return apiClient<OrdersApiResponse>(endpoint);
+  return apiClient('/orders/', { params: apiParams });
 };
-
-const determineApiBaseUrl = (): string => {
-    const envUrl: string | undefined = import.meta.env.VITE_API_BASE_URL;
-    const apiPrefix: string = '/api/v1';
-
-    let origin: string = '';
- //   let protocol: string = 'https';
-
-    if (typeof window !== 'undefined') {
-        origin = window.location.origin;
- //       protocol = window.location.protocol.replace(':', '');
-    } else {
-        console.warn("Cannot determine window origin, API calls might fail if relative path doesn't work.");
-    }
-
-    if (envUrl) {
-        let baseUrl: string = envUrl.trim();
-        if (baseUrl.endsWith('/')) {
-            baseUrl = baseUrl.slice(0, -1);
-        }
-
-        if (baseUrl.includes('://')) {
-            if (baseUrl.startsWith('http://')) {
-                console.warn("VITE_API_BASE_URL starts with http://. Forcing HTTPS for API calls.");
-                baseUrl = baseUrl.replace(/^http:/, 'https:');
-            } else if (!baseUrl.startsWith('https://')) {
-                 console.error(`VITE_API_BASE_URL (${baseUrl}) has unexpected protocol. Forcing HTTPS.`);
-                 const domainPart: string = baseUrl.split('://')[1] || baseUrl;
-                 baseUrl = `https://${domainPart}`;
-            }
-        } else {
-            console.warn(`VITE_API_BASE_URL (${baseUrl}) seems relative or domain-only. Prepending origin: ${origin}`);
-            if (baseUrl.startsWith('/')) {
-                baseUrl = baseUrl.substring(1);
-            }
-            baseUrl = `${origin}/${baseUrl}`.replace(/([^:]\/)\/+/g, "$1");
-        }
-         return `${baseUrl}${apiPrefix}`;
-
-    } else {
-        if (!origin) {
-             console.error("Cannot determine API base URL: No VITE_API_BASE_URL and no window origin.");
-             return apiPrefix;
-        }
-        return `${origin}${apiPrefix}`;
-    }
-};
-
-const API_BASE_URL: string = determineApiBaseUrl();
-
-console.log(`API Service: Using base URL: ${API_BASE_URL}`);
-
-interface ApiOptions extends RequestInit {
-    params?: Record<string, string | number | boolean | null | undefined>;
-    useAuth?: boolean;
-}
 
 export const apiClient = async <T>(
     endpoint: string,
@@ -211,25 +155,41 @@ export const apiClient = async <T>(
 ): Promise<T> => {
     const { params, useAuth = true, ...fetchOptions } = options;
 
-    let cleanEndpoint: string = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-
-    // --- TRAILING SLASH WORKAROUND REMOVED ---
-
-    let url: string = `${API_BASE_URL}${cleanEndpoint}`; // Construct URL directly
+    // Construct the full URL
+    // Ensure the endpoint starts with a slash
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    
+    // Check if API_BASE_URL already ends with /api/v1 and if the endpoint starts with it.
+    // This is to avoid duplication like /api/v1/api/v1/
+    let url: string;
+    if (API_BASE_URL.endsWith('/api/v1') && cleanEndpoint.startsWith('/api/v1')) {
+        url = `${API_BASE_URL.replace(/\/api\/v1$/, '')}${cleanEndpoint}`;
+    } else if (!cleanEndpoint.startsWith('/api/v1') && !API_BASE_URL.endsWith('/api/v1')) {
+        // If neither has /api/v1, and we are not hitting the root, add it.
+        // The VITE_API_BASE_URL should ideally contain the /api/v1 path.
+        // This logic is a fallback.
+        const basePath = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+        url = `${basePath}/api/v1${cleanEndpoint}`;
+    }
+    else {
+        url = `${API_BASE_URL}${cleanEndpoint}`;
+    }
 
     if (params) {
-        const filteredParams: Record<string, string> = {};
+        const queryParams = new URLSearchParams();
         for (const key in params) {
             if (Object.prototype.hasOwnProperty.call(params, key)) {
-                const value: string | number | boolean | null | undefined = params[key];
-                if (value !== null && value !== undefined && ['string', 'number', 'boolean'].includes(typeof value)) {
-                    filteredParams[key] = String(value);
-                } else if (value !== null && value !== undefined) {
-                    console.warn(`API Client: Parameter '${key}' has non-primitive value (${typeof value}), excluding from query string.`);
+                const value = params[key];
+                if (value !== null && value !== undefined) {
+                    if (Array.isArray(value)) {
+                        value.forEach(item => queryParams.append(key, String(item)));
+                    } else {
+                        queryParams.set(key, String(value));
+                    }
                 }
             }
         }
-        const query: string = new URLSearchParams(filteredParams).toString();
+        const query: string = queryParams.toString();
         if (query) {
             url += `?${query}`;
         }
@@ -270,6 +230,13 @@ export const apiClient = async <T>(
                  errorData = { detail: `HTTP error ${response.status}: Failed to parse error response.` };
             }
             console.error(`API Client Error: ${response.status} ${response.statusText} for ${url}`, errorData);
+
+            // If we get a 401, the token is bad. Log the user out.
+            if (response.status === 401 && authContextRef) {
+                console.log("API Client: Received 401 Unauthorized. Logging out.");
+                authContextRef.logout();
+            }
+
             const error: any = new Error(errorData?.detail || `HTTP error ${response.status}`);
             error.status = response.status;
             error.detail = errorData?.detail;

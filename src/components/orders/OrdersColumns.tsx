@@ -41,11 +41,33 @@ export const columns: ColumnDef<ImagingOrder>[] = [
     header: "Accession #",
   },
   {
+    accessorKey: "referring_physician",
+    header: "Referring MD",
+    cell: ({ row }) => row.getValue("referring_physician") || <span className="text-muted-foreground">N/A</span>,
+  },
+  {
     accessorKey: "modality",
     header: "Modality",
     cell: ({ row }) => (
       <Badge variant="outline">{row.getValue("modality")}</Badge>
     ),
+  },
+  {
+    accessorKey: "requested_procedure_description",
+    header: "Procedure",
+    cell: ({ row }) => {
+        const description = row.getValue("requested_procedure_description") as string;
+        return (
+            <div className="truncate max-w-xs" title={description}>
+                {description || <span className="text-muted-foreground">N/A</span>}
+            </div>
+        )
+    }
+  },
+  {
+    accessorKey: "scheduled_station_ae_title",
+    header: "Scheduled AE",
+    cell: ({ row }) => row.getValue("scheduled_station_ae_title") || <span className="text-muted-foreground">N/A</span>,
   },
   {
     accessorKey: "scheduled_procedure_step_start_datetime",
@@ -71,5 +93,15 @@ export const columns: ColumnDef<ImagingOrder>[] = [
         </Badge>
       );
     },
+  },
+  {
+    accessorKey: "source_sending_facility",
+    header: "Sending Facility",
+    cell: ({ row }) => row.getValue("source_sending_facility") || <span className="text-muted-foreground">N/A</span>,
+  },
+  {
+    accessorKey: "source_receiving_facility",
+    header: "Receiving Facility",
+    cell: ({ row }) => row.getValue("source_receiving_facility") || <span className="text-muted-foreground">N/A</span>,
   },
 ];

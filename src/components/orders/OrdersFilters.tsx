@@ -8,41 +8,40 @@ import { CalendarIcon, XIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-
-// Hardcoding modalities for now. Sue me.
-// A real app would fetch this from a '/api/v1/modalities' endpoint.
-// But we're not building a real app, we're building THIS app.
-const MODALITIES = ["CT", "MR", "US", "XA", "CR", "OT"];
+import { OrderStatus, OrderStatusEnum } from "@/schemas/orderSchema";
+import { useRef, useEffect } from "react";
 
 interface OrdersFiltersProps {
   filters: OrderFilters;
   setFilters: (filters: OrderFilters) => void;
+  availableModalities: string[];
 }
 
-export function OrdersFilters({ filters, setFilters }: OrdersFiltersProps) {
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters({ ...filters, search: event.target.value });
+export function OrdersFilters({ filters, setFilters, availableModalities }: OrdersFiltersProps) {
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setFilters({ ...filters, [name]: value });
   };
 
   const handleModalityChange = (modality: string) => {
     const newModalities = filters.modalities.includes(modality)
-      ? filters.modalities.filter((m) => m !== modality)
+      ? filters.modalities.filter((m: string) => m !== modality)
       : [...filters.modalities, modality];
     setFilters({ ...filters, modalities: newModalities });
+  };
+
+  const handleStatusChange = (status: OrderStatus) => {
+    const newStatuses = filters.statuses.includes(status)
+      ? filters.statuses.filter((s: OrderStatus) => s !== status)
+      : [...filters.statuses, status];
+    setFilters({ ...filters, statuses: newStatuses });
   };
   
   const handleDateChange = (dateRange: { from?: Date; to?: Date }) => {
     setFilters({ 
       ...filters, 
-      dateRange: { from: dateRange.from ?? undefined, to: dateRange.to ?? undefined } // ensure both keys exist
+      dateRange: { from: dateRange.from ?? undefined, to: dateRange.to ?? undefined }
     });
   };
 
@@ -50,83 +49,99 @@ export function OrdersFilters({ filters, setFilters }: OrdersFiltersProps) {
     setFilters({
         search: "",
         modalities: [],
-        dateRange: { from: undefined, to: undefined }, // ensure both keys exist
+        statuses: [...OrderStatusEnum.options],
+        dateRange: { from: undefined, to: undefined },
     });
   }
 
-  const areFiltersActive = filters.search || filters.modalities.length > 0 || filters.dateRange.from || filters.dateRange.to;
+  const areFiltersActive = filters.search || filters.modalities.length > 0 || filters.statuses.length < OrderStatusEnum.options.length || filters.dateRange.from || filters.dateRange.to;
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-center">
-      {/* Search Input */}
-      <div className="flex-grow w-full md:w-auto">
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Input
-          placeholder="Search by Patient, MRN, or Accession..."
+          placeholder="Search Patient, MRN, Accession, Sending/Receiving Facility..."
+          name="search"
           value={filters.search}
-          onChange={handleSearchChange}
-          className="max-w-sm"
+          onChange={handleInputChange}
+          className="md:col-span-2"
         />
-      </div>
-
-      {/* Modality "Multi-Select" using Badges. It's chic. */}
-      <div className="flex gap-2 flex-wrap">
-        {MODALITIES.map((modality) => (
-          <Badge
-            key={modality}
-            variant={filters.modalities.includes(modality) ? "default" : "outline"}
-            onClick={() => handleModalityChange(modality)}
-            className="cursor-pointer"
-          >
-            {modality}
-          </Badge>
-        ))}
-      </div>
-
-      {/* Date Range Picker */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={"outline"}
-            className={cn(
-              "w-full md:w-[280px] justify-start text-left font-normal",
-              !filters.dateRange.from && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {filters.dateRange.from ? (
-              filters.dateRange.to ? (
-                <>
-                  {format(filters.dateRange.from, "LLL dd, y")} -{" "}
-                  {format(filters.dateRange.to, "LLL dd, y")}
-                </>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !filters.dateRange.from && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {filters.dateRange.from ? (
+                filters.dateRange.to ? (
+                  <>
+                    {format(filters.dateRange.from, "LLL dd, y")} -{" "}
+                    {format(filters.dateRange.to, "LLL dd, y")}
+                  </>
+                ) : (
+                  format(filters.dateRange.from, "LLL dd, y")
+                )
               ) : (
-                format(filters.dateRange.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Pick a date range</span>
-            )}
+                <span>Pick a date range</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+                mode="range"
+                selected={{
+                  from: filters.dateRange.from ?? undefined,
+                  to: filters.dateRange.to ?? undefined,
+                }}
+                onSelect={(range) => handleDateChange(range || { from: undefined, to: undefined })}
+                initialFocus
+              />
+          </PopoverContent>
+        </Popover>
+        {areFiltersActive && (
+          <Button variant="ghost" onClick={clearFilters}>
+              <XIcon className="mr-2 h-4 w-4" />
+              Clear
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-              mode="range"
-              selected={{
-                from: filters.dateRange.from ?? undefined,
-                to: filters.dateRange.to ?? undefined,
-              }}
-              onSelect={(range) => handleDateChange(range || { from: undefined, to: undefined })}
-              initialFocus
-            />
-        </PopoverContent>
-      </Popover>
-
-      {/* Clear Button - only shows if filters are active */}
-      {areFiltersActive && (
-        <Button variant="ghost" onClick={clearFilters}>
-            <XIcon className="mr-2 h-4 w-4" />
-            Clear
-        </Button>
-      )}
+        )}
+      </div>
+      
+      <div className="space-y-2">
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground">Modalities</h4>
+          <div className="flex gap-2 flex-wrap mt-2">
+            {availableModalities.map((modality) => (
+              <Badge
+                key={modality}
+                variant={filters.modalities.includes(modality) ? "default" : "outline"}
+                onClick={() => handleModalityChange(modality)}
+                className="cursor-pointer"
+              >
+                {modality}
+              </Badge>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="text-sm font-medium text-muted-foreground">Order Status</h4>
+          <div className="flex gap-2 flex-wrap mt-2">
+            {OrderStatusEnum.options.map((status: OrderStatus) => (
+              <Badge
+                key={status}
+                variant={filters.statuses.includes(status) ? "default" : "outline"}
+                onClick={() => handleStatusChange(status)}
+                className="cursor-pointer"
+              >
+                {status}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
