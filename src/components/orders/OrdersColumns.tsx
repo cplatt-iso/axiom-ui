@@ -6,7 +6,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ImagingOrder, OrderStatus } from "@/schemas/orderSchema";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 // This is a little helper to make the statuses look pretty.
 // A lesser coder would put this logic right in the cell render. Not me.

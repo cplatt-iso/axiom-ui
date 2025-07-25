@@ -63,6 +63,10 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
                 {order.patient_dob ? format(new Date(order.patient_dob), "PPP") : null}
               </DetailRow>
               <DetailRow label="Sex">{order.patient_sex}</DetailRow>
+              <DetailRow label="Address">{order.patient_address}</DetailRow>
+              <DetailRow label="Phone">{order.patient_phone_number}</DetailRow>
+              <DetailRow label="Patient Class">{order.patient_class}</DetailRow>
+              <DetailRow label="Visit Number">{order.visit_number}</DetailRow>
             </div>
           </div>
 
@@ -81,6 +85,14 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
               <DetailRow label="Scheduled Station Name">{order.scheduled_station_name}</DetailRow>
               <DetailRow label="Placer Order #">{order.placer_order_number}</DetailRow>
               <DetailRow label="Filler Order #">{order.filler_order_number}</DetailRow>
+              <DetailRow label="Placer Group #">{order.placer_group_number}</DetailRow>
+              <DetailRow label="Procedure Code">{order.requested_procedure_code}</DetailRow>
+              <DetailRow label="Order Received">
+                {order.order_received_at ? format(new Date(order.order_received_at), "PPpp") : null}
+              </DetailRow>
+              <DetailRow label="Last Updated">
+                {order.updated_at ? format(new Date(order.updated_at), "PPpp") : null}
+              </DetailRow>
             </div>
           </div>
           
@@ -90,15 +102,29 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
             <div className="grid grid-cols-3 gap-x-4 gap-y-2 p-4 border rounded-lg">
               <DetailRow label="Requesting Physician">{order.requesting_physician}</DetailRow>
               <DetailRow label="Referring Physician">{order.referring_physician}</DetailRow>
+              <DetailRow label="Attending Physician">{order.attending_physician}</DetailRow>
               <DetailRow label="Requested Procedure">{order.requested_procedure_description}</DetailRow>
               <DetailRow label="Study Instance UID">{order.study_instance_uid}</DetailRow>
             </div>
           </div>
 
+          {/* Source & Message Details */}
+          <div className="space-y-2">
+            <h4 className="font-semibold text-lg">Source & Message Details</h4>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-2 p-4 border rounded-lg">
+              <DetailRow label="Source System">{order.source}</DetailRow>
+              <DetailRow label="Sending Application">{order.source_sending_application}</DetailRow>
+              <DetailRow label="Sending Facility">{order.source_sending_facility}</DetailRow>
+              <DetailRow label="Receiving Application">{order.source_receiving_application}</DetailRow>
+              <DetailRow label="Receiving Facility">{order.source_receiving_facility}</DetailRow>
+              <DetailRow label="Message Control ID">{order.source_message_control_id}</DetailRow>
+            </div>
+          </div>
+
           {/* Raw HL7 - For the freaks */}
           {order.raw_hl7_message && (
-            <details>
-              <summary className="cursor-pointer font-semibold text-lg flex justify-between items-center">
+            <div className="space-y-2">
+              <h4 className="font-semibold text-lg flex justify-between items-center">
                 <span>Raw HL7 Message</span>
                  <Button variant="ghost" size="sm" onClick={handleCopy}>
                   {copied ? (
@@ -108,11 +134,11 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
                   )}
                   <span className="ml-2">{copied ? "Copied!" : "Copy"}</span>
                 </Button>
-              </summary>
+              </h4>
               <pre className="mt-2 p-2 border rounded-md bg-slate-100 dark:bg-slate-800 text-xs overflow-x-auto">
                 {order.raw_hl7_message}
               </pre>
-            </details>
+            </div>
           )}
         </div>
 

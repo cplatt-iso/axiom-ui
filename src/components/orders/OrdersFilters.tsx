@@ -10,7 +10,6 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { OrderStatus, OrderStatusEnum } from "@/schemas/orderSchema";
-import { useRef, useEffect } from "react";
 
 interface OrdersFiltersProps {
   filters: OrderFilters;
@@ -102,18 +101,12 @@ export function OrdersFilters({ filters, setFilters, availableModalities }: Orde
               />
           </PopoverContent>
         </Popover>
-        {areFiltersActive && (
-          <Button variant="ghost" onClick={clearFilters}>
-              <XIcon className="mr-2 h-4 w-4" />
-              Clear
-          </Button>
-        )}
       </div>
       
       <div className="space-y-2">
         <div>
           <h4 className="text-sm font-medium text-muted-foreground">Modalities</h4>
-          <div className="flex gap-2 flex-wrap mt-2">
+          <div className="flex gap-2 flex-wrap mt-2 items-center">
             {availableModalities.map((modality) => (
               <Badge
                 key={modality}
@@ -124,6 +117,12 @@ export function OrdersFilters({ filters, setFilters, availableModalities }: Orde
                 {modality}
               </Badge>
             ))}
+            {areFiltersActive && (
+                <Button variant="ghost" onClick={clearFilters} size="sm" className="flex items-center">
+                    <XIcon className="mr-2 h-4 w-4" />
+                    Clear
+                </Button>
+            )}
           </div>
         </div>
         <div>

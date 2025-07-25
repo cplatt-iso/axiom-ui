@@ -54,6 +54,7 @@ export function OrdersPage() {
         dateRange: filters.dateRange,
       }),
     placeholderData: (prev) => prev, // Use previous data for smooth pagination
+    refetchInterval: 10000, // Refetch every 10 seconds
   });
 
   const allModalitiesRef = useRef<string[]>([]);
