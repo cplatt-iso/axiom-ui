@@ -39,6 +39,7 @@ export const orderSchema = z.object({
     .datetime()
     .nullable()
     .optional(),
+  scheduled_exam_datetime: z.string().datetime().nullable().optional(),
   requesting_physician: z.string().nullable().optional(),
   referring_physician: z.string().nullable().optional(),
   attending_physician: z.string().nullable().optional(),

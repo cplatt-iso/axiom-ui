@@ -12,7 +12,8 @@ import {
     ClipboardDocumentListIcon, // <-- I HAVE ARRIVED.
     // --- ADDED Icons for Reorganization ---
     AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
-    WrenchScrewdriverIcon // For System Config
+    WrenchScrewdriverIcon, // For System Config
+    BuildingOfficeIcon, // For Facility & Modality Config
     // --- END ADDED ---
 } from '@heroicons/react/24/outline';
 // import { NavLink } from 'react-router-dom'; 
@@ -54,6 +55,8 @@ const Layout: React.FC = () => {
         { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
         // Added System Configuration
         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
+        // Added Facility & Modality Configuration
+        { name: 'Facilities & Modalities', href: '/admin/facility-modality-config', icon: BuildingOfficeIcon },
         { name: "AI Prompts", href: "/settings/ai-prompts", icon: BrainCircuit },
     ];
     // --- END UPDATED Admin Navigation ---

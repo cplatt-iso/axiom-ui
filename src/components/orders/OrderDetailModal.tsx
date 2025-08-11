@@ -13,7 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useState } from "react";
-import { CopyIcon, CheckIcon } from "lucide-react";
+import { CopyIcon, CheckIcon, TrashIcon } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteOrder } from "@/services/api";
+import { toast } from "sonner";
 
 interface OrderDetailModalProps {
   order: ImagingOrder;
@@ -32,6 +36,21 @@ const DetailRow = ({ label, children }: { label: string; children: React.ReactNo
 export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
   if (!order) return null;
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { isSuperUser } = useAuth();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteOrder(order.id),
+    onSuccess: () => {
+      toast.success(`Order with accession "${order.accession_number}" deleted successfully.`);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete order: ${error.message || 'Unknown error'}`);
+    },
+  });
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault(); // prevent details from toggling
@@ -40,6 +59,18 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate();
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -77,8 +108,8 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
               <DetailRow label="Modality"><Badge variant="outline">{order.modality}</Badge></DetailRow>
               <DetailRow label="Status"><Badge>{order.order_status}</Badge></DetailRow>
               <DetailRow label="Scheduled At">
-                {order.scheduled_procedure_step_start_datetime 
-                  ? format(new Date(order.scheduled_procedure_step_start_datetime), "PPpp")
+                {order.scheduled_exam_datetime
+                  ? format(new Date(order.scheduled_exam_datetime), "PPpp")
                   : null}
               </DetailRow>
               <DetailRow label="Scheduled AE Title">{order.scheduled_station_ae_title}</DetailRow>
@@ -143,9 +174,43 @@ export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
+          {showDeleteConfirm ? (
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={handleDeleteCancel}
+                disabled={deleteMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteConfirm}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-between w-full">
+              <div>
+                {isSuperUser() && (
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={handleDeleteClick}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <TrashIcon className="h-4 w-4 mr-2" />
+                    Delete Order
+                  </Button>
+                )}
+              </div>
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

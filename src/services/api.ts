@@ -17,6 +17,18 @@ import {
     OrdersApiResponse,
 } from '@/schemas/orderSchema';
 
+import {
+    FacilityCreate,
+    FacilityUpdate,
+    FacilityRead,
+} from '@/schemas/facilitySchema';
+
+import {
+    ModalityCreate,
+    ModalityUpdate,
+    ModalityRead,
+} from '@/schemas/modalitySchema';
+
 
 import {
     // From ruleSchema.ts (assuming index.ts re-exports them correctly)
@@ -147,6 +159,36 @@ export const getOrders = (params: {
   }
 
   return apiClient('/orders/', { params: apiParams });
+};
+
+export const deleteOrder = (orderId: number): Promise<void> => {
+  return apiClient(`/orders/${orderId}`, { method: 'DELETE' });
+};
+
+export const deleteAllOrders = async (): Promise<void> => {
+  // First, get all orders to know what to delete
+  const allOrdersResponse = await apiClient<OrdersApiResponse>('/orders/', { 
+    params: { skip: 0, limit: 10000 } // Get a large number to capture all orders
+  });
+  
+  if (allOrdersResponse.items.length === 0) {
+    return; // No orders to delete
+  }
+  
+  // Delete each order individually and collect results
+  const deleteResults = await Promise.allSettled(
+    allOrdersResponse.items.map(order => deleteOrder(order.id))
+  );
+  
+  // Check if any deletions failed
+  const failedDeletions = deleteResults.filter(result => result.status === 'rejected');
+  
+  if (failedDeletions.length > 0) {
+    const successCount = deleteResults.length - failedDeletions.length;
+    throw new Error(
+      `Partially completed: ${successCount}/${deleteResults.length} orders deleted. ${failedDeletions.length} failed.`
+    );
+  }
 };
 
 export const apiClient = async <T>(
@@ -514,6 +556,88 @@ export const updateGoogleHealthcareSource = async (
     );
 };
 
+// Facility API Functions
+export const getFacilities = async (params?: { 
+    skip?: number; 
+    limit?: number; 
+    is_active?: boolean; 
+}): Promise<FacilityRead[]> => {
+    return apiClient<FacilityRead[]>('/facilities/', { params });
+};
+
+export const getFacilityById = async (id: number): Promise<FacilityRead> => {
+    return apiClient<FacilityRead>(`/facilities/${id}`);
+};
+
+export const createFacility = async (data: FacilityCreate): Promise<FacilityRead> => {
+    return apiClient<FacilityRead>('/facilities/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+};
+
+export const updateFacility = async (id: number, data: FacilityUpdate): Promise<FacilityRead> => {
+    return apiClient<FacilityRead>(`/facilities/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+};
+
+export const deleteFacility = async (id: number): Promise<void> => {
+    return apiClient<void>(`/facilities/${id}`, { method: 'DELETE' });
+};
+
+export const getFacilityModalities = async (facilityId: number, params?: {
+    is_active?: boolean;
+    is_dmwl_enabled?: boolean;
+    modality_type?: string;
+}): Promise<ModalityRead[]> => {
+    return apiClient<ModalityRead[]>(`/facilities/${facilityId}/modalities`, { params });
+};
+
+// Modality API Functions
+export const getModalities = async (params?: {
+    skip?: number;
+    limit?: number;
+    facility_id?: number;
+    modality_type?: string;
+    is_active?: boolean;
+    is_dmwl_enabled?: boolean;
+    department?: string;
+}): Promise<ModalityRead[]> => {
+    return apiClient<ModalityRead[]>('/modalities/', { params });
+};
+
+export const getModalityById = async (id: number): Promise<ModalityRead> => {
+    return apiClient<ModalityRead>(`/modalities/${id}`);
+};
+
+export const createModality = async (data: ModalityCreate): Promise<ModalityRead> => {
+    return apiClient<ModalityRead>('/modalities/', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+};
+
+export const updateModality = async (id: number, data: ModalityUpdate): Promise<ModalityRead> => {
+    return apiClient<ModalityRead>(`/modalities/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+};
+
+export const deleteModality = async (id: number): Promise<void> => {
+    return apiClient<void>(`/modalities/${id}`, { method: 'DELETE' });
+};
+
+export const checkAeTitleAvailability = async (aeTitle: string, excludeId?: number): Promise<{ available: boolean }> => {
+    const params = excludeId ? { exclude_id: excludeId } : undefined;
+    return apiClient<{ available: boolean }>(`/modalities/check-ae-title/${aeTitle}`, {
+        method: 'POST',
+        params,
+    });
+};
+
 
 export type { UserWithRoles };
 
@@ -567,6 +691,12 @@ export type {
     CrosswalkMapRead,
     CrosswalkMapCreatePayload,
     CrosswalkMapUpdatePayload,
+    FacilityCreate,
+    FacilityUpdate,
+    FacilityRead,
+    ModalityCreate,
+    ModalityUpdate,
+    ModalityRead,
     // Add any other types that components import from api.ts
     // For example, if RulesetCreate, RulesetUpdate are used by components directly from api.ts
     RulesetCreate, 

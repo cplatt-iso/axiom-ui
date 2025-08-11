@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
             const backendResponseData = await apiClient<{
                 access_token: string;
                 token_type: string;
-                user: { email?: string; full_name?: string; picture?: string; roles?: { name: string }[] };
+                user: { email?: string; full_name?: string; picture?: string; roles?: { name: string }[]; is_superuser?: boolean };
             }>('/auth/google', {
                 method: 'POST',
                 body: JSON.stringify({ token: googleIdToken }),
@@ -37,7 +37,8 @@ const LoginPage: React.FC = () => {
                  email: backendResponseData.user?.email,
                  name: backendResponseData.user?.full_name,
                  picture: backendResponseData.user?.picture,
-                 roles: backendResponseData.user?.roles?.map(role => role.name) || []
+                 roles: backendResponseData.user?.roles?.map(role => role.name) || [],
+                 is_superuser: backendResponseData.user?.is_superuser || false
              };
 
             console.log("LoginPage: Calling AuthContext login with profile:", userProfile);

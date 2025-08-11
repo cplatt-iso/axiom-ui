@@ -8,6 +8,7 @@ export interface UserProfile {
     name?: string;
     picture?: string;
     roles?: string[];
+    is_superuser?: boolean;
 }
 
 export interface AuthContextType {
@@ -17,6 +18,7 @@ export interface AuthContextType {
     login: (profile: UserProfile) => void;
     logout: () => void;
     getToken: () => string | null;
+    isSuperUser: () => boolean;
 }
 // --- End Interfaces ---
 
@@ -72,7 +74,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                              email: profile.email,
                              name: profile.name,
                              picture: profile.picture,
-                             roles: profile.roles || []
+                             roles: profile.roles || [],
+                             is_superuser: profile.is_superuser
                          });
                     }
                     // --- End Temporary ---
@@ -111,7 +114,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             email: profile.email,
             name: profile.name,
             picture: profile.picture,
-            roles: profile.roles
+            roles: profile.roles,
+            is_superuser: profile.is_superuser
         }));
     };
 
@@ -128,6 +132,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return user?.sessionToken ?? localStorage.getItem('sessionToken');
     };
 
+    const isSuperUser = (): boolean => {
+        return user?.is_superuser ?? false;
+    };
+
 
     // --- Context value now includes isAuthenticated ---
     const contextValue = useMemo(() => ({
@@ -136,7 +144,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAuthenticated, // Pass derived value
         login,
         logout,
-        getToken
+        getToken,
+        isSuperUser
     }), [user, isLoading, isAuthenticated]); // Dependencies for context value memoization
     // --- End Context value ---
 

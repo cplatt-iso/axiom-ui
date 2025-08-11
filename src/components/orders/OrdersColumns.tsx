@@ -69,15 +69,13 @@ export const columns: ColumnDef<ImagingOrder>[] = [
     cell: ({ row }) => row.getValue("scheduled_station_ae_title") || <span className="text-muted-foreground">N/A</span>,
   },
   {
-    accessorKey: "scheduled_procedure_step_start_datetime",
+    accessorKey: "scheduled_exam_datetime",
     header: "Scheduled At",
     cell: ({ row }) => {
-      const value = row.getValue("scheduled_procedure_step_start_datetime") as string;
+      const value = row.getValue("scheduled_exam_datetime") as string;
       if (!value) {
         return <span className="text-muted-foreground">Unscheduled</span>;
       }
-      // "PPpp" is the "I want it all" format string from date-fns.
-      // e.g., "Jun 23, 2025, 7:48:05 PM"
       return format(new Date(value), "PPpp");
     },
   },

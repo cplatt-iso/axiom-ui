@@ -99,7 +99,7 @@ export function OrdersTable({
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {isLoading ? "Loading..." : "No results. Try a different filter, dumbass."}
+                  {isLoading ? "Loading..." : "No orders available that match your search critera."}
                 </TableCell>
               </TableRow>
             )}

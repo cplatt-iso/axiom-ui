@@ -47,6 +47,9 @@ import SysLimitsSettings from './components/system-config/SysLimitsSettings';
 import SysExternalServices from './components/system-config/SysExternalServices';
 import SysAdminActions from './components/system-config/SysAdminActions';
 import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesConfigPage';
+import FacilityModalityConfigPage from './pages/FacilityModalityConfigPage';
+import FacilitiesConfigPage from './pages/FacilitiesConfigPage';
+import ModalitiesConfigPage from './pages/ModalitiesConfigPage';
 // --- END ADDED ---
 
 function AppContent() {
@@ -152,6 +155,13 @@ function AppContent() {
                             <Route path="admin-actions" element={<SysAdminActions />} />
                         </Route>
                         <Route path="/settings/ai-prompts" element={<AiPromptConfigsPage />} />                                                
+
+                        {/* Facility and Modality Configuration Section */}
+                        <Route path="/admin/facility-modality-config" element={<FacilityModalityConfigPage />}>
+                            <Route index element={<Navigate to="facilities" replace />} />
+                            <Route path="facilities" element={<FacilitiesConfigPage />} />
+                            <Route path="modalities" element={<ModalitiesConfigPage />} />
+                        </Route>
                     </Route> {/* End Admin Protected Route */}
 
                 </Route> {/* End Layout */}

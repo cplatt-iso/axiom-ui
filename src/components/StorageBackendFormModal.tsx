@@ -286,11 +286,11 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
         try {
             switch (formData.backend_type) {
                 case "filesystem":
-                    apiPayloadToSend = { ...commonApiData, backend_type: "filesystem", path: formData.path! };
+                    apiPayloadToSend = { ...commonApiData, backend_type: formData.backend_type, path: formData.path! };
                     break;
                 case "cstore":
                     apiPayloadToSend = {
-                        ...commonApiData, backend_type: "cstore",
+                        ...commonApiData, backend_type: formData.backend_type,
                         remote_ae_title: formData.remote_ae_title!,
                         remote_host: formData.remote_host!,
                         remote_port: formData.remote_port!,
@@ -302,11 +302,11 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                     };
                     break;
                 case "gcs":
-                    apiPayloadToSend = { ...commonApiData, backend_type: "gcs", bucket: formData.bucket!, prefix: formData.prefix || null };
+                    apiPayloadToSend = { ...commonApiData, backend_type: formData.backend_type, bucket: formData.bucket!, prefix: formData.prefix || null };
                     break;
                 case "google_healthcare":
                     apiPayloadToSend = {
-                        ...commonApiData, backend_type: "google_healthcare",
+                        ...commonApiData, backend_type: formData.backend_type,
                         gcp_project_id: formData.gcp_project_id!,
                         gcp_location: formData.gcp_location!,
                         gcp_dataset_id: formData.gcp_dataset_id!,
@@ -315,7 +315,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                     break;
                 case "stow_rs":
                     apiPayloadToSend = {
-                        ...commonApiData, backend_type: "stow_rs",
+                        ...commonApiData, backend_type: formData.backend_type,
                         base_url: formData.base_url!,
                         auth_type: formData.stow_auth_type || "none",
                         basic_auth_username_secret_name: formData.stow_auth_type === 'basic' ? formData.stow_basic_auth_username_secret_name?.trim() || null : null,
