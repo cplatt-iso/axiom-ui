@@ -25,10 +25,12 @@ if (!googleClientId) {
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            // Optional: Configure default options like staleTime, gcTime, refetchOnWindowFocus
-            // staleTime: 1000 * 60 * 5, // 5 minutes
-            // gcTime: 1000 * 60 * 30, // 30 minutes (garbage collection time)
-            refetchOnWindowFocus: false, // Optional: disable auto refetch on focus
+            // Configure caching for better performance
+            staleTime: 1000 * 30, // Consider data fresh for 30 seconds
+            gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
+            refetchOnWindowFocus: false, // Disable auto refetch on focus
+            retry: 1, // Only retry once on failure
+            refetchInterval: false, // Disable auto-refetching by default
         },
     },
 })

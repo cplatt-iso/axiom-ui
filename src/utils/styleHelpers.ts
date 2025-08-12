@@ -19,7 +19,7 @@ export const getBackendTypeStyle = (backendType: string): { Icon: React.ElementT
 
 
 // New style helper for Scrapers
-export type ScraperType = 'dicomweb' | 'dimse-qr' | 'filesystem' | 'gcs' | string; // Allow future strings
+export type ScraperType = 'dicomweb' | 'dimse-qr' | 'google-healthcare' | 'filesystem' | 'gcs' | string; // Allow future strings
 
 export const getScraperTypeStyle = (scraperType: ScraperType): { Icon: React.ElementType, textClass: string, bgClass: string } => {
      switch (scraperType?.toLowerCase()) {
@@ -27,6 +27,8 @@ export const getScraperTypeStyle = (scraperType: ScraperType): { Icon: React.Ele
              return { Icon: Globe, textClass: 'text-green-700 dark:text-green-300', bgClass: 'bg-green-100 dark:bg-green-900/30' };
         case 'dimse-qr':
              return { Icon: Network, textClass: 'text-amber-700 dark:text-amber-300', bgClass: 'bg-amber-100 dark:bg-amber-900/30' };
+        case 'google-healthcare':
+             return { Icon: CloudCog, textClass: 'text-red-700 dark:text-red-300', bgClass: 'bg-red-100 dark:bg-red-900/30' };
         case 'filesystem': // Future
              return { Icon: FolderSearch, textClass: 'text-blue-700 dark:text-blue-300', bgClass: 'bg-blue-100 dark:bg-blue-900/30' };
         case 'gcs': // Future

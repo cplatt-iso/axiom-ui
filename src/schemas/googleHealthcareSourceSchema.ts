@@ -101,3 +101,25 @@ export const GoogleHealthcareSourceFormDataSchema = z.object({
 
 // Type definition inferred from the FormDataSchema
 export type GoogleHealthcareSourceFormData = z.infer<typeof GoogleHealthcareSourceFormDataSchema>;
+
+// --- Status Schema (for system status API) ---
+export const GoogleHealthcareSourceStatusSchema = z.object({
+    id: z.number().int(),
+    created_at: z.string().datetime(),
+    updated_at: z.string().datetime(),
+    name: z.string(),
+    is_enabled: z.boolean(),
+    gcp_project_id: z.string(),
+    gcp_dataset_id: z.string(),
+    gcp_dicom_store_id: z.string(),
+    gcp_location: z.string(),
+    health_status: z.enum(['UNKNOWN', 'OK', 'DOWN', 'ERROR']).default('UNKNOWN'),
+    last_health_check: z.string().datetime().nullable(),
+    last_health_error: z.string().nullable(),
+});
+export type GoogleHealthcareSourceStatus = z.infer<typeof GoogleHealthcareSourceStatusSchema>;
+
+export const GoogleHealthcareSourcesStatusResponseSchema = z.object({
+    sources: z.array(GoogleHealthcareSourceStatusSchema).default([]),
+});
+export type GoogleHealthcareSourcesStatusResponse = z.infer<typeof GoogleHealthcareSourcesStatusResponseSchema>;

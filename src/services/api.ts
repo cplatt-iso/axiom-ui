@@ -96,6 +96,7 @@ import {
     GoogleHealthcareSourceRead,
     GoogleHealthcareSourceCreate,
     GoogleHealthcareSourceUpdate,
+    GoogleHealthcareSourcesStatusResponse,
     // GoogleHealthcareSourceFormData, // Already imported separately below
 
     DiskUsageStats // from system.ts
@@ -364,6 +365,10 @@ export const getDimseListenersStatus = (): Promise<DimseListenersStatusResponse>
 };
 export const getDimseQrSourcesStatus = (): Promise<DimseQrSourcesStatusResponse> => {
     return apiClient<DimseQrSourcesStatusResponse>('/system/dimse-qr-sources/status');
+};
+
+export const getGoogleHealthcareSourcesStatus = (): Promise<GoogleHealthcareSourcesStatusResponse> => {
+    return apiClient<GoogleHealthcareSourcesStatusResponse>('/system/google-healthcare-sources/status');
 };
 export const getKnownInputSources = (): Promise<string[]> => {
     return apiClient<string[]>('/system/input-sources');

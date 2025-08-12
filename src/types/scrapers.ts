@@ -18,6 +18,15 @@ export interface UnifiedScraperStatus {
     remote_ae_title?: string | null;
     remote_host?: string | null;
     remote_port?: number | null;
+    gcp_project_id?: string | null;
+    gcp_dataset_id?: string | null;
+    gcp_dicom_store_id?: string | null;
+    gcp_location?: string | null;
+
+    // Health Status (NEW)
+    health_status?: 'UNKNOWN' | 'OK' | 'DOWN' | 'ERROR';
+    last_health_check?: string | null;
+    last_health_error?: string | null;
 
     // --- ADDED COUNTERS ---
     count_found?: number | null;        // Found Studies (DIMSE) or Instances (DICOMweb)
