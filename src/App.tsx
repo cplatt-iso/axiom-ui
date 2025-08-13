@@ -50,6 +50,12 @@ import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesCo
 import FacilityModalityConfigPage from './pages/FacilityModalityConfigPage';
 import FacilitiesConfigPage from './pages/FacilitiesConfigPage';
 import ModalitiesConfigPage from './pages/ModalitiesConfigPage';
+
+// --- ADDED: Import Query Spanning Pages ---
+import QuerySpanningLayout from './pages/QuerySpanningLayout';
+import SpannerConfigurationsPage from './pages/SpannerConfigurationsPage';
+import SpannerServicesPage from './pages/SpannerServicesPage';
+import SpannerAnalyticsPage from './pages/SpannerAnalyticsPage';
 // --- END ADDED ---
 
 function AppContent() {
@@ -162,6 +168,15 @@ function AppContent() {
                             <Route path="facilities" element={<FacilitiesConfigPage />} />
                             <Route path="modalities" element={<ModalitiesConfigPage />} />
                         </Route>
+
+                        {/* --- ADDED: Query Spanning Section --- */}
+                        <Route path="/admin/query-spanning" element={<QuerySpanningLayout />}>
+                            <Route index element={<Navigate to="configurations" replace />} />
+                            <Route path="configurations" element={<SpannerConfigurationsPage />} />
+                            <Route path="services" element={<SpannerServicesPage />} />
+                            <Route path="analytics" element={<SpannerAnalyticsPage />} />
+                        </Route>
+                        {/* --- END ADDED --- */}
                     </Route> {/* End Admin Protected Route */}
 
                 </Route> {/* End Layout */}

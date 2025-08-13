@@ -22,7 +22,8 @@ export * from './system';
 // export * from './systemStatusSchema';    
 export * from './userSchema';               
 export * from './dashboardSchema';  
-export * from './aiAssistSchema';             
+export * from './aiAssistSchema';
+export * from './spannerSchema';             
 
 // Or, export only the specific type if you prefer more control initially:
 // export type { DiskUsageStats } from './system';

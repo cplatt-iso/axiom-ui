@@ -99,6 +99,20 @@ import {
     GoogleHealthcareSourcesStatusResponse,
     // GoogleHealthcareSourceFormData, // Already imported separately below
 
+    // From spannerSchema.ts (via index.ts)
+    SpannerConfigRead,
+    SpannerConfigCreate,
+    SpannerConfigUpdate,
+    SpannerSourceMappingRead,
+    SpannerSourceMappingCreate,
+    SpannerSourceMappingUpdate,
+    SpannerServiceStatus,
+    SpannerServicesStatusResponse,
+    AvailableSource,
+    SpannerMetrics,
+    ServiceControlRequest,
+    ServiceControlResponse,
+
     DiskUsageStats // from system.ts
 } from '@/schemas/';
 
@@ -643,6 +657,685 @@ export const checkAeTitleAvailability = async (aeTitle: string, excludeId?: numb
     });
 };
 
+// ==========================================
+// SPANNER CONFIGURATION API FUNCTIONS
+// ==========================================
+// NOTE: All spanner endpoints are REAL and functional in the backend.
+// These replaced the previous mock implementations since spanner endpoints exist.
+
+// Spanner Configuration Management
+export const getSpannerConfigs = (skip: number = 0, limit: number = 100): Promise<SpannerConfigRead[]> => {
+    return apiClient<{ configs: SpannerConfigRead[]; total: number }>('/config/spanner', { params: { skip, limit } })
+        .then(response => response.configs);
+};
+
+export const getSpannerConfigById = (id: number): Promise<SpannerConfigRead> => {
+    return apiClient<SpannerConfigRead>(`/config/spanner/${id}`);
+};
+
+export const createSpannerConfig = (data: SpannerConfigCreate): Promise<SpannerConfigRead> => {
+    return apiClient<SpannerConfigRead>('/config/spanner', { 
+        method: 'POST', 
+        body: JSON.stringify(data) 
+    });
+};
+
+export const updateSpannerConfig = (id: number, data: SpannerConfigUpdate): Promise<SpannerConfigRead> => {
+    return apiClient<SpannerConfigRead>(`/config/spanner/${id}`, { 
+        method: 'PUT', 
+        body: JSON.stringify(data) 
+    });
+};
+
+export const deleteSpannerConfig = (id: number): Promise<void> => {
+    return apiClient<void>(`/config/spanner/${id}`, { method: 'DELETE' });
+};
+
+// Helper function to transform source mapping data for API calls
+const transformSourceMappingForApi = (data: any) => {
+    console.log('🔍 transformSourceMappingForApi - Input data:', data);
+    
+    if (!data.source_id || data.source_id <= 0 || !data.source_type) {
+        console.log('❌ Invalid source_id or missing source_type, returning original data');
+        return data;
+    }
+    
+    const { source_id, source_type, ...restData } = data;
+    
+    // The backend requires ALL source ID fields to be present
+    // Set unused fields to 0 instead of null or omitting them
+    let apiData: any = { 
+        ...restData, 
+        source_type,
+        dimse_qr_source_id: 0,
+        dicomweb_source_id: 0,
+        google_healthcare_source_id: 0,
+    };
+    
+    // Set the appropriate field based on source_type
+    switch (source_type) {
+        case 'dimse_qr':
+            apiData.dimse_qr_source_id = source_id;
+            break;
+        case 'dicomweb':
+            apiData.dicomweb_source_id = source_id;
+            break;
+        case 'google_healthcare':
+            apiData.google_healthcare_source_id = source_id;
+            break;
+        default:
+            console.warn('Unknown source_type:', source_type);
+            // Fallback to generic source_id if unknown type
+            apiData.source_id = source_id;
+    }
+    
+    console.log('✅ transformSourceMappingForApi - Output data:', apiData);
+    return apiData;
+};
+
+// Helper function to transform API response data back to frontend format
+const transformSourceMappingFromApi = (data: any) => {
+    if (!data.source_type) {
+        return data;
+    }
+    
+    let source_id: number | undefined;
+    
+    // Extract source_id from the appropriate field based on source_type
+    switch (data.source_type) {
+        case 'dimse_qr':
+            source_id = data.dimse_qr_source_id;
+            delete data.dimse_qr_source_id;
+            break;
+        case 'dicomweb':
+            source_id = data.dicomweb_source_id;
+            delete data.dicomweb_source_id;
+            break;
+        case 'google_healthcare':
+            source_id = data.google_healthcare_source_id;
+            delete data.google_healthcare_source_id;
+            break;
+        default:
+            source_id = data.source_id;
+    }
+    
+    return { ...data, source_id, source_type: data.source_type };
+};
+
+// Source Mapping Management
+export const getSpannerSourceMappings = (spannerId: number): Promise<SpannerSourceMappingRead[]> => {
+    return apiClient<{ mappings: any[]; total: number }>(`/config/spanner/${spannerId}/sources`)
+        .then(response => response.mappings.map(transformSourceMappingFromApi));
+};
+
+export const createSpannerSourceMapping = (spannerId: number, data: Omit<SpannerSourceMappingCreate, 'spanner_config_id'>): Promise<SpannerSourceMappingRead> => {
+    // Transform the data to match backend API expectations
+    const transformedData = { ...data, spanner_config_id: spannerId };
+    const apiData = transformSourceMappingForApi(transformedData);
+    
+    return apiClient<any>(`/config/spanner/${spannerId}/sources`, { 
+        method: 'POST', 
+        body: JSON.stringify(apiData) 
+    }).then(transformSourceMappingFromApi);
+};
+
+export const updateSpannerSourceMapping = (spannerId: number, mappingId: number, data: SpannerSourceMappingUpdate): Promise<SpannerSourceMappingRead> => {
+    // Transform the data if it contains source_id and source_type
+    const apiData = transformSourceMappingForApi(data);
+    
+    return apiClient<any>(`/config/spanner/${spannerId}/sources/${mappingId}`, { 
+        method: 'PUT', 
+        body: JSON.stringify(apiData) 
+    }).then(transformSourceMappingFromApi);
+};
+
+export const deleteSpannerSourceMapping = (spannerId: number, mappingId: number): Promise<void> => {
+    return apiClient<void>(`/config/spanner/${spannerId}/sources/${mappingId}`, { method: 'DELETE' });
+};
+
+// Reorder source mappings (for drag-and-drop)
+export const reorderSpannerSourceMappings = (spannerId: number, mappingIds: number[]): Promise<SpannerSourceMappingRead[]> => {
+    return apiClient<SpannerSourceMappingRead[]>(`/config/spanner/${spannerId}/sources/reorder`, { 
+        method: 'POST', 
+        body: JSON.stringify({ mapping_ids: mappingIds }) 
+    });
+};
+
+// Service Management
+export const getSpannerServicesStatus = (): Promise<SpannerServicesStatusResponse> => {
+    return apiClient<SpannerServicesStatusResponse>('/spanner/services/status');
+};
+
+export const startSpannerServices = (): Promise<ServiceControlResponse> => {
+    return apiClient<ServiceControlResponse>('/spanner/services/start', { method: 'POST' });
+};
+
+export const stopSpannerServices = (): Promise<ServiceControlResponse> => {
+    return apiClient<ServiceControlResponse>('/spanner/services/stop', { method: 'POST' });
+};
+
+export const restartSpannerService = (serviceId: string): Promise<ServiceControlResponse> => {
+    return apiClient<ServiceControlResponse>(`/spanner/services/restart/${serviceId}`, { method: 'POST' });
+};
+
+// Available Sources (for dropdowns and selection)
+export const getAvailableDimseQrSources = (): Promise<AvailableSource[]> => {
+    return apiClient<DimseQueryRetrieveSourceRead[]>('/config/dimse-qr-sources', { params: { skip: 0, limit: 500 } }).then(sources => 
+        sources.map(s => ({
+            id: s.id,
+            name: s.name,
+            description: s.description || undefined,
+            type: 'dimse_qr' as const,
+            status: s.is_active ? 'active' : 'inactive',
+            created_at: s.created_at,
+        }))
+    );
+};
+
+export const getAvailableDicomWebSources = (): Promise<AvailableSource[]> => {
+    return apiClient<DicomWebSourceConfigRead[]>('/config/dicomweb-sources', { params: { skip: 0, limit: 500 } }).then(sources => 
+        sources.map(s => ({
+            id: s.id,
+            name: s.name,
+            description: s.description || undefined,
+            type: 'dicomweb' as const,
+            status: s.is_active ? 'active' : 'inactive',
+            created_at: s.created_at,
+        }))
+    );
+};
+
+export const getAvailableGoogleHealthcareSources = (): Promise<AvailableSource[]> => {
+    return apiClient<GoogleHealthcareSourceRead[]>('/config/google-healthcare-sources/', { params: { skip: 0, limit: 500 } }).then(sources => 
+        sources.map(s => ({
+            id: s.id,
+            name: s.name,
+            description: s.description || undefined,
+            type: 'google_healthcare' as const,
+            status: s.is_active ? 'active' : 'inactive',
+            created_at: s.created_at,
+        }))
+    );
+};
+
+export const getAllAvailableSources = async (): Promise<AvailableSource[]> => {
+    const [dimseQr, dicomWeb, googleHealthcare] = await Promise.all([
+        getAvailableDimseQrSources().catch(() => []),
+        getAvailableDicomWebSources().catch(() => []),
+        getAvailableGoogleHealthcareSources().catch(() => []),
+    ]);
+    
+    return [...dimseQr, ...dicomWeb, ...googleHealthcare];
+};
+
+// Mock metrics data with extended interface to include timestamp for filtering
+interface MockSpannerMetrics extends SpannerMetrics {
+    timestamp: string; // Additional field for mock data filtering
+}
+
+const mockMetricsData: MockSpannerMetrics[] = [
+    {
+        spanner_config_id: 1,
+        spanner_config_name: "Enterprise Main PACS Query Spanner",
+        timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 450,
+        successful_queries: 425,
+        failed_queries: 25,
+        average_response_time_ms: 1250,
+        median_response_time_ms: 980,
+        p95_response_time_ms: 2100,
+        total_results_before_dedup: 1250,
+        total_results_after_dedup: 980,
+        deduplication_rate: 0.216,
+        source_metrics: [
+            {
+                source_id: 1,
+                source_name: "Main Hospital PACS",
+                source_type: 'dimse_qr' as const,
+                queries: 150,
+                successes: 142,
+                failures: 8,
+                avg_response_time_ms: 1100,
+                success_rate: 0.947,
+            },
+            {
+                source_id: 2,
+                source_name: "Radiology DICOM Web",
+                source_type: 'dicomweb' as const,
+                queries: 200,
+                successes: 192,
+                failures: 8,
+                avg_response_time_ms: 1350,
+                success_rate: 0.96,
+            },
+            {
+                source_id: 3,
+                source_name: "Cardiology Archive",
+                source_type: 'dimse_qr' as const,
+                queries: 100,
+                successes: 91,
+                failures: 9,
+                avg_response_time_ms: 1400,
+                success_rate: 0.91,
+            }
+        ],
+        from_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 1,
+        spanner_config_name: "Enterprise Main PACS Query Spanner",
+        timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 520,
+        successful_queries: 495,
+        failed_queries: 25,
+        average_response_time_ms: 1180,
+        median_response_time_ms: 920,
+        p95_response_time_ms: 1950,
+        total_results_before_dedup: 1480,
+        total_results_after_dedup: 1124,
+        deduplication_rate: 0.241,
+        source_metrics: [
+            {
+                source_id: 1,
+                source_name: "Main Hospital PACS",
+                source_type: 'dimse_qr' as const,
+                queries: 180,
+                successes: 172,
+                failures: 8,
+                avg_response_time_ms: 1050,
+                success_rate: 0.956,
+            },
+            {
+                source_id: 2,
+                source_name: "Radiology DICOM Web",
+                source_type: 'dicomweb' as const,
+                queries: 220,
+                successes: 212,
+                failures: 8,
+                avg_response_time_ms: 1280,
+                success_rate: 0.964,
+            },
+            {
+                source_id: 3,
+                source_name: "Cardiology Archive",
+                source_type: 'dimse_qr' as const,
+                queries: 120,
+                successes: 111,
+                failures: 9,
+                avg_response_time_ms: 1350,
+                success_rate: 0.925,
+            }
+        ],
+        from_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 2,
+        spanner_config_name: "Emergency Department Query Spanner",
+        timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 380,
+        successful_queries: 365,
+        failed_queries: 15,
+        average_response_time_ms: 890,
+        median_response_time_ms: 750,
+        p95_response_time_ms: 1400,
+        total_results_before_dedup: 920,
+        total_results_after_dedup: 780,
+        deduplication_rate: 0.152,
+        source_metrics: [
+            {
+                source_id: 4,
+                source_name: "Emergency PACS",
+                source_type: 'dimse_qr' as const,
+                queries: 190,
+                successes: 183,
+                failures: 7,
+                avg_response_time_ms: 820,
+                success_rate: 0.963,
+            },
+            {
+                source_id: 5,
+                source_name: "Trauma Archive",
+                source_type: 'dicomweb' as const,
+                queries: 190,
+                successes: 182,
+                failures: 8,
+                avg_response_time_ms: 960,
+                success_rate: 0.958,
+            }
+        ],
+        from_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 3,
+        spanner_config_name: "Multi-Site Research Query Spanner",
+        timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 680,
+        successful_queries: 642,
+        failed_queries: 38,
+        average_response_time_ms: 1520,
+        median_response_time_ms: 1200,
+        p95_response_time_ms: 2800,
+        total_results_before_dedup: 2100,
+        total_results_after_dedup: 1580,
+        deduplication_rate: 0.248,
+        source_metrics: [
+            {
+                source_id: 6,
+                source_name: "Research Site A",
+                source_type: 'google_healthcare' as const,
+                queries: 170,
+                successes: 158,
+                failures: 12,
+                avg_response_time_ms: 1680,
+                success_rate: 0.929,
+            },
+            {
+                source_id: 7,
+                source_name: "Research Site B",
+                source_type: 'dimse_qr' as const,
+                queries: 170,
+                successes: 162,
+                failures: 8,
+                avg_response_time_ms: 1420,
+                success_rate: 0.953,
+            },
+            {
+                source_id: 8,
+                source_name: "Research Site C",
+                source_type: 'dicomweb' as const,
+                queries: 170,
+                successes: 158,
+                failures: 12,
+                avg_response_time_ms: 1580,
+                success_rate: 0.929,
+            },
+            {
+                source_id: 9,
+                source_name: "Central Archive",
+                source_type: 'dimse_qr' as const,
+                queries: 170,
+                successes: 164,
+                failures: 6,
+                avg_response_time_ms: 1400,
+                success_rate: 0.965,
+            }
+        ],
+        from_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 1,
+        spanner_config_name: "Enterprise Main PACS Query Spanner",
+        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 590,
+        successful_queries: 565,
+        failed_queries: 25,
+        average_response_time_ms: 1350,
+        median_response_time_ms: 1050,
+        p95_response_time_ms: 2200,
+        total_results_before_dedup: 1620,
+        total_results_after_dedup: 1240,
+        deduplication_rate: 0.235,
+        source_metrics: [
+            {
+                source_id: 1,
+                source_name: "Main Hospital PACS",
+                source_type: 'dimse_qr' as const,
+                queries: 200,
+                successes: 192,
+                failures: 8,
+                avg_response_time_ms: 1200,
+                success_rate: 0.96,
+            },
+            {
+                source_id: 2,
+                source_name: "Radiology DICOM Web",
+                source_type: 'dicomweb' as const,
+                queries: 240,
+                successes: 232,
+                failures: 8,
+                avg_response_time_ms: 1450,
+                success_rate: 0.967,
+            },
+            {
+                source_id: 3,
+                source_name: "Cardiology Archive",
+                source_type: 'dimse_qr' as const,
+                queries: 150,
+                successes: 141,
+                failures: 9,
+                avg_response_time_ms: 1500,
+                success_rate: 0.94,
+            }
+        ],
+        from_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 2,
+        spanner_config_name: "Emergency Department Query Spanner",
+        timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        total_queries: 420,
+        successful_queries: 405,
+        failed_queries: 15,
+        average_response_time_ms: 950,
+        median_response_time_ms: 800,
+        p95_response_time_ms: 1600,
+        total_results_before_dedup: 1020,
+        total_results_after_dedup: 870,
+        deduplication_rate: 0.147,
+        source_metrics: [
+            {
+                source_id: 4,
+                source_name: "Emergency PACS",
+                source_type: 'dimse_qr' as const,
+                queries: 210,
+                successes: 203,
+                failures: 7,
+                avg_response_time_ms: 880,
+                success_rate: 0.967,
+            },
+            {
+                source_id: 5,
+                source_name: "Trauma Archive",
+                source_type: 'dicomweb' as const,
+                queries: 210,
+                successes: 202,
+                failures: 8,
+                avg_response_time_ms: 1020,
+                success_rate: 0.962,
+            }
+        ],
+        from_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 24 * 60 * 60 * 1000).toISOString()
+    },
+    {
+        spanner_config_id: 3,
+        spanner_config_name: "Multi-Site Research Query Spanner",
+        timestamp: new Date().toISOString(),
+        total_queries: 720,
+        successful_queries: 698,
+        failed_queries: 22,
+        average_response_time_ms: 1420,
+        median_response_time_ms: 1150,
+        p95_response_time_ms: 2500,
+        total_results_before_dedup: 2380,
+        total_results_after_dedup: 1820,
+        deduplication_rate: 0.235,
+        source_metrics: [
+            {
+                source_id: 6,
+                source_name: "Research Site A",
+                source_type: 'google_healthcare' as const,
+                queries: 180,
+                successes: 174,
+                failures: 6,
+                avg_response_time_ms: 1580,
+                success_rate: 0.967,
+            },
+            {
+                source_id: 7,
+                source_name: "Research Site B",
+                source_type: 'dimse_qr' as const,
+                queries: 180,
+                successes: 174,
+                failures: 6,
+                avg_response_time_ms: 1320,
+                success_rate: 0.967,
+            },
+            {
+                source_id: 8,
+                source_name: "Research Site C",
+                source_type: 'dicomweb' as const,
+                queries: 180,
+                successes: 175,
+                failures: 5,
+                avg_response_time_ms: 1480,
+                success_rate: 0.972,
+            },
+            {
+                source_id: 9,
+                source_name: "Central Archive",
+                source_type: 'dimse_qr' as const,
+                queries: 180,
+                successes: 175,
+                failures: 5,
+                avg_response_time_ms: 1300,
+                success_rate: 0.972,
+            }
+        ],
+        from_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        to_date: new Date().toISOString()
+    }
+];
+
+// Metrics and Analytics
+export const getSpannerMetrics = (
+    spannerId?: number, 
+    fromDate?: string, 
+    toDate?: string
+): Promise<SpannerMetrics[]> => {
+    // Use mock data for now since backend endpoints don't exist yet
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            let filteredData = [...mockMetricsData];
+            
+            // Filter by spanner config if provided
+            if (spannerId) {
+                filteredData = filteredData.filter(m => m.spanner_config_id === spannerId);
+            }
+            
+            // Filter by date range if provided
+            if (fromDate) {
+                const fromDateTime = new Date(fromDate);
+                filteredData = filteredData.filter(m => new Date(m.timestamp) >= fromDateTime);
+            }
+            
+            if (toDate) {
+                const toDateTime = new Date(toDate);
+                filteredData = filteredData.filter(m => new Date(m.timestamp) <= toDateTime);
+            }
+            
+            // Convert to SpannerMetrics type (remove timestamp field)
+            const convertedData: SpannerMetrics[] = filteredData.map(({ timestamp, ...metrics }) => metrics);
+            
+            resolve(convertedData);
+        }, 300); // Simulate network delay
+    });
+    
+    // Real API call (commented out until backend is ready)
+    // const params: Record<string, any> = {};
+    // if (spannerId) params.spanner_id = spannerId;
+    // if (fromDate) params.from_date = fromDate;
+    // if (toDate) params.to_date = toDate;
+    // return apiClient<SpannerMetrics[]>('/spanner/metrics', { params });
+};
+
+export const getSpannerConfigMetrics = (spannerId: number, _fromDate?: string, _toDate?: string): Promise<SpannerMetrics> => {
+    // Use mock data for now since backend endpoints don't exist yet
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            // Find the most recent metrics for this spanner config
+            const configMetrics = mockMetricsData
+                .filter(m => m.spanner_config_id === spannerId)
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+            
+            // Convert to SpannerMetrics type (remove timestamp field)
+            const result = configMetrics || mockMetricsData[0];
+            const { timestamp, ...metrics } = result;
+            
+            resolve(metrics);
+        }, 200);
+    });
+    
+    // Real API call (commented out until backend is ready)
+    // const params: Record<string, any> = {};
+    // if (fromDate) params.from_date = fromDate;
+    // if (toDate) params.to_date = toDate;
+    // return apiClient<SpannerMetrics>(`/spanner/metrics/${spannerId}`, { params });
+};
+
+// Test and Validation
+export const testSpannerConfig = (id: number): Promise<{ success: boolean; message: string; details?: any }> => {
+    return apiClient<{ success: boolean; message: string; details?: any }>(`/config/spanner/${id}/test`, { 
+        method: 'POST',
+        body: JSON.stringify({}) // Backend expects a body even if empty
+    });
+};
+
+export const validateSpannerSourceMapping = (
+    spannerId: number, 
+    mappingData: Omit<SpannerSourceMappingCreate, 'spanner_config_id'>
+): Promise<{ valid: boolean; issues: string[] }> => {
+    return apiClient<{ valid: boolean; issues: string[] }>(`/config/spanner/${spannerId}/sources/validate`, { 
+        method: 'POST', 
+        body: JSON.stringify(mappingData) 
+    });
+};
+
+// Bulk Operations
+export const bulkUpdateSpannerConfigs = (
+    updates: { id: number; data: SpannerConfigUpdate }[]
+): Promise<{ successful: number; failed: number; errors: any[] }> => {
+    return apiClient<{ successful: number; failed: number; errors: any[] }>('/config/spanner/bulk-update', { 
+        method: 'POST', 
+        body: JSON.stringify({ updates }) 
+    });
+};
+
+export const bulkEnableSpannerConfigs = (ids: number[], enabled: boolean): Promise<ServiceControlResponse> => {
+    return apiClient<ServiceControlResponse>('/config/spanner/bulk-enable', { 
+        method: 'POST', 
+        body: JSON.stringify({ ids, enabled }) 
+    });
+};
+
+// Import/Export
+export const exportSpannerConfigs = (ids?: number[]): Promise<Blob> => {
+    const params = ids ? { ids: ids.join(',') } : {};
+    return apiClient<Blob>('/config/spanner/export', { 
+        params,
+        headers: { Accept: 'application/json' }
+    });
+};
+
+export const importSpannerConfigs = (file: File): Promise<{ 
+    imported: number; 
+    skipped: number; 
+    errors: string[] 
+}> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    return apiClient<{ imported: number; skipped: number; errors: string[] }>('/config/spanner/import', { 
+        method: 'POST', 
+        body: formData 
+    });
+};
+
 
 export type { UserWithRoles };
 
@@ -709,6 +1402,20 @@ export type {
     RuleCreate, 
     RuleUpdate,
     OrdersApiResponse,
+    
+    // Spanner types
+    SpannerConfigRead,
+    SpannerConfigCreate,
+    SpannerConfigUpdate,
+    SpannerSourceMappingRead,
+    SpannerSourceMappingCreate,
+    SpannerSourceMappingUpdate,
+    SpannerServiceStatus,
+    SpannerServicesStatusResponse,
+    AvailableSource,
+    SpannerMetrics,
+    ServiceControlRequest,
+    ServiceControlResponse,
 };
 
 export default apiClient;

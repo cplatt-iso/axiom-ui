@@ -14,6 +14,7 @@ import {
     AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
     WrenchScrewdriverIcon, // For System Config
     BuildingOfficeIcon, // For Facility & Modality Config
+    Square3Stack3DIcon, // For Query Spanning
     // --- END ADDED ---
 } from '@heroicons/react/24/outline';
 // import { NavLink } from 'react-router-dom'; 
@@ -57,6 +58,8 @@ const Layout: React.FC = () => {
         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
         // Added Facility & Modality Configuration
         { name: 'Facilities & Modalities', href: '/admin/facility-modality-config', icon: BuildingOfficeIcon },
+        // Added Query Spanning
+        { name: 'Query Spanning', href: '/admin/query-spanning', icon: Square3Stack3DIcon },
         { name: "AI Prompts", href: "/settings/ai-prompts", icon: BrainCircuit },
     ];
     // --- END UPDATED Admin Navigation ---
