@@ -15,6 +15,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch'; // Import Switch
 import { Textarea } from "@/components/ui/textarea";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 import {
     DimseListenerConfigRead,
@@ -59,16 +66,17 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
     const form = useForm<DimseListenerFormData>({
         resolver: zodResolver(dimseListenerFormSchema),
         defaultValues: {
-        name: "",
-        ae_title: "",
-        port: 104,
-        is_enabled: true,
-        tls_enabled: false, 
-        description: null,
-        instance_id: null,
-        tls_cert_secret_name: null,
-        tls_key_secret_name: null,
-        tls_ca_cert_secret_name: null,
+            name: "",
+            ae_title: "",
+            port: 104,
+            is_enabled: true,
+            listener_type: 'pynetdicom', // Add this
+            tls_enabled: false,
+            description: null,
+            instance_id: null,
+            tls_cert_secret_name: null,
+            tls_key_secret_name: null,
+            tls_ca_cert_secret_name: null,
         },
     });
 
@@ -84,13 +92,16 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
                 port: listenerConfig.port ?? 11112,
                 is_enabled: listenerConfig.is_enabled ?? true,
                 instance_id: listenerConfig.instance_id ?? null,
+                listener_type: listenerConfig.listener_type ?? 'pynetdicom', // Add this
                 tls_enabled: listenerConfig.tls_enabled ?? false,
                 tls_cert_secret_name: listenerConfig.tls_cert_secret_name ?? null,
                 tls_key_secret_name: listenerConfig.tls_key_secret_name ?? null,
                 tls_ca_cert_secret_name: listenerConfig.tls_ca_cert_secret_name ?? null,
-            } : initialFormDefaults;
+            } : {
+                ...initialFormDefaults,
+                listener_type: 'pynetdicom', // And here
+            };
             form.reset(resetValues);
-            // console.log("Resetting DIMSE Listener form with:", resetValues);
         }
     }, [isOpen, listenerConfig, form]);
 
@@ -130,6 +141,7 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
             port: values.port,
             is_enabled: values.is_enabled,
             instance_id: values.instance_id?.trim() || null,
+            listener_type: values.listener_type, // Add this
             // Add TLS fields to payload
             tls_enabled: values.tls_enabled,
             tls_cert_secret_name: values.tls_enabled ? (values.tls_cert_secret_name?.trim() || null) : null,
@@ -226,6 +238,30 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
                                    <FormMessage></FormMessage>
                                </FormItem>
                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="listener_type"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Listener Type</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select a listener type" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="pynetdicom">pynetdicom</SelectItem>
+                                            <SelectItem value="dcm4che">dcm4che</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormDescription>
+                                        Select the underlying listener implementation.
+                                    </FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
                         />
                         <FormField
                            control={form.control}

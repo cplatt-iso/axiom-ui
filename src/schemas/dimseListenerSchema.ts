@@ -10,9 +10,10 @@ export const DimseListenerConfigReadSchema = z.object({
     ae_title: z.string(),
     port: z.number().int(),
     is_enabled: z.boolean(),
-    instance_id: z.string().nullable().optional(), // was .nullable() in old file, .optional() also makes sense
+    instance_id: z.string().nullable().optional(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
+    listener_type: z.string().default('pynetdicom'),
     tls_enabled: z.boolean().default(false),
     tls_cert_secret_name: z.string().optional().nullable(),
     tls_key_secret_name: z.string().optional().nullable(),
@@ -27,11 +28,16 @@ export const DimseListenerConfigCreatePayloadSchema = z.object({
     ae_title: z.string().min(1).max(16),
     port: z.number().int().gt(0).lt(65536),
     is_enabled: z.boolean().optional().default(true),
-    instance_id: z.string().optional().nullable(), // Matching Read schema
+    instance_id: z.string().optional().nullable(),
+    listener_type: z.enum(['pynetdicom', 'dcm4che']).default('pynetdicom'),
+    tls_enabled: z.boolean().default(false),
+    tls_cert_secret_name: z.string().optional().nullable(),
+    tls_key_secret_name: z.string().optional().nullable(),
+    tls_ca_cert_secret_name: z.string().optional().nullable(),
 });
 export type DimseListenerConfigCreatePayload = z.infer<typeof DimseListenerConfigCreatePayloadSchema>;
 
-export const DimseListenerConfigUpdatePayloadSchema = DimseListenerConfigCreatePayloadSchema.partial().refine(
+export const DimseListenerConfigUpdatePayloadSchema = DimseListenerConfigCreatePayloadSchema.deepPartial().refine(
     (data) => Object.keys(data).length > 0,
     "At least one field must be provided for update."
 );
