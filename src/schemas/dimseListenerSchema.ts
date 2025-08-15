@@ -83,6 +83,7 @@ export const dimseListenerFormSchema = z.object({
         .refine(val => val === null || val === undefined || (typeof val === 'string' && val.trim() === val), {
             message: "Instance ID cannot have leading/trailing spaces",
         }),
+    listener_type: z.enum(['pynetdicom', 'dcm4che']),
     tls_enabled: z.boolean(),
     tls_cert_secret_name: z.string().optional().nullable(),
     tls_key_secret_name: z.string().optional().nullable(),

@@ -45,9 +45,12 @@ const LoginPage: React.FC = () => {
             login(userProfile);
             // Navigate automatically handled by the redirect check below
 
-        } catch (err: any) {
+        } catch (err: unknown) {
              console.error("LoginPage: Backend login failed:", err);
-             setError(err.message || "Failed to log in with backend.");
+             const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : "Failed to log in with backend.";
+             setError(errorMessage);
         } finally {
              setIsLoading(false);
         }

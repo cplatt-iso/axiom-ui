@@ -1,5 +1,4 @@
 // src/components/UserManagementTable.tsx
-import React from 'react';
 import { UserWithRoles } from '../services/api'; // Import types
 import { formatDistanceToNow } from 'date-fns';
 import { PencilSquareIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
@@ -15,10 +14,10 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
     const formatOptionalDate = (dateString?: string): string => {
         // ... (same date formatting function as in ApiKeyList) ...
         if (!dateString) return 'N/A';
-         try { return `${formatDistanceToNow(new Date(dateString))} ago`; } catch (e) { return 'Invalid Date'; }
+         try { return `${formatDistanceToNow(new Date(dateString))} ago`; } catch { return 'Invalid Date'; }
     };
     const formatTimestamp = (dateString: string): string => {
-         try { return new Date(dateString).toLocaleString(); } catch (e) { return 'Invalid Date'; }
+         try { return new Date(dateString).toLocaleString(); } catch { return 'Invalid Date'; }
     };
 
 

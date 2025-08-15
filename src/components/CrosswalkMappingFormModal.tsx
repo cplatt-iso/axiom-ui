@@ -133,10 +133,10 @@ export function CrosswalkMappingFormModal({
 
             onSubmitSuccess(result);
             onClose();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Failed to save crosswalk map:", error);
             sonnerToast.error("Error", {
-                description: error.message || "Failed to save crosswalk map.",
+                description: error instanceof Error ? error.message : "Failed to save crosswalk map.",
             });
         }
     };

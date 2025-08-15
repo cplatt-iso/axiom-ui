@@ -34,23 +34,29 @@ const DetailRow = ({ label, children }: { label: string; children: React.ReactNo
 );
 
 export function OrderDetailModal({ order, onClose }: OrderDetailModalProps) {
-  if (!order) return null;
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { isSuperUser } = useAuth();
   const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteOrder(order.id),
+    mutationFn: () => order ? deleteOrder(order.id) : Promise.reject('No order'),
     onSuccess: () => {
-      toast.success(`Order with accession "${order.accession_number}" deleted successfully.`);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      onClose();
+      if (order) {
+        toast.success(`Order with accession "${order.accession_number}" deleted successfully.`);
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        onClose();
+      }
     },
-    onError: (error: any) => {
-      toast.error(`Failed to delete order: ${error.message || 'Unknown error'}`);
+    onError: (error: unknown) => {
+      const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : 'Unknown error';
+      toast.error(`Failed to delete order: ${errorMessage}`);
     },
   });
+
+  if (!order) return null;
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault(); // prevent details from toggling

@@ -2,7 +2,7 @@ import React from 'react';
 
 interface PerformanceTableProps {
     title?: string;
-    sources?: any[];
+    sources?: unknown[];
     type?: 'top' | 'worst';
 }
 

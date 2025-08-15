@@ -24,6 +24,20 @@ interface DateRange {
     to: Date;
 }
 
+interface SourceMetric {
+    source_id: number;
+    source_name: string;
+    queries: number;
+    successes: number;
+    failures: number;
+    avg_response_time_ms: number;
+}
+
+interface ProcessedSourceMetric extends SourceMetric {
+    totalResponseTime: number;
+    success_rate?: number;
+}
+
 const SpannerAnalyticsPage: React.FC = () => {
     // State
     const [selectedConfigId, setSelectedConfigId] = useState<number | null>(null);
@@ -126,9 +140,9 @@ const SpannerAnalyticsPage: React.FC = () => {
             acc[key].failures += source.failures;
             acc[key].totalResponseTime += source.avg_response_time_ms * source.queries;
             return acc;
-        }, {} as Record<string, any>);
+        }, {} as Record<string, ProcessedSourceMetric>);
 
-        const sourceMetrics = Object.values(sourcePerformance).map((source: any) => ({
+        const sourceMetrics = Object.values(sourcePerformance).map((source: ProcessedSourceMetric) => ({
             ...source,
             avg_response_time_ms: source.queries > 0 ? source.totalResponseTime / source.queries : 0,
             success_rate: source.queries > 0 ? source.successes / source.queries : 0,

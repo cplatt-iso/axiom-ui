@@ -1,5 +1,5 @@
 // src/components/CreateRulesetModal.tsx
-import React, { useState, useEffect, Fragment, FormEvent } from 'react'; // Added useEffect
+import { useState, useEffect, Fragment, FormEvent } from 'react'; // Added useEffect
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 // --- Import updateRuleset ---
@@ -88,9 +88,10 @@ const CreateRulesetModal: React.FC<CreateRulesetModalProps> = ({
             const updatedRuleset = await updateRuleset(existingRuleset.id, rulesetUpdateData);
             onSuccess(updatedRuleset);
             handleClose();
-        } catch (err: any) {
+        } catch (err: unknown) {
+             const message = err instanceof Error ? err.message : 'Failed to update ruleset. Please try again.';
              console.error('Failed to update ruleset:', err);
-             setError(err.message || 'Failed to update ruleset. Please try again.');
+             setError(message);
              setIsLoading(false);
         }
 
@@ -107,9 +108,10 @@ const CreateRulesetModal: React.FC<CreateRulesetModalProps> = ({
           const newRuleset = await createRuleset(rulesetCreateData);
           onSuccess(newRuleset);
           handleClose();
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to create ruleset. Please try again.';
           console.error('Failed to create ruleset:', err);
-          setError(err.message || 'Failed to create ruleset. Please try again.');
+          setError(message);
           setIsLoading(false);
         }
     }

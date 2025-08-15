@@ -22,7 +22,7 @@ export const modelParametersStringSchema = z.string()
         try {
             JSON.parse(val); // Or use json5 for more forgiving parsing if desired
             return true;
-        } catch (e) {
+        } catch {
             return false;
         }
     }, { message: "Invalid JSON format for model parameters." })
@@ -30,7 +30,7 @@ export const modelParametersStringSchema = z.string()
         if (!val.trim()) return null; // Convert empty string to null for backend
         try {
             return JSON.parse(val); // Or json5.parse(val)
-        } catch (e) {
+        } catch {
             // This should ideally not be reached if refine worked, but as a fallback
             return {}; // Or throw error / return null
         }

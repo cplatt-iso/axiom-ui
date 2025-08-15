@@ -1,5 +1,5 @@
 // frontend/src/pages/AiPromptConfigsPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ColumnDef,
@@ -134,7 +134,7 @@ const AiPromptConfigsPage: React.FC = () => {
 
     const createMutation = useMutation({
         mutationFn: createAiPromptConfig,
-        onSuccess: (_data, _variables, _context) => {
+        onSuccess: () => {
             handleMutationSuccess();
             toast.success('AI Prompt Configuration created successfully!');
         },
@@ -144,7 +144,7 @@ const AiPromptConfigsPage: React.FC = () => {
     const updateMutation = useMutation({
         mutationFn: (data: { id: number; payload: AiPromptConfigUpdatePayload }) =>
             updateAiPromptConfig(data.id, data.payload),
-        onSuccess: (_data, _variables, _context) => {
+        onSuccess: () => {
             handleMutationSuccess();
             toast.success('AI Prompt Configuration updated successfully!');
         },
@@ -180,7 +180,7 @@ const AiPromptConfigsPage: React.FC = () => {
         setIsFormModalOpen(true);
     };
 
-    const handleOpenEditModal = (config: AiPromptConfigRead) => {
+    const handleOpenEditModal = useCallback((config: AiPromptConfigRead) => {
         setSelectedConfigForEditingOrDeleting(config);
         reset({
             name: config.name,
@@ -193,17 +193,17 @@ const AiPromptConfigsPage: React.FC = () => {
         });
         formMethods.clearErrors();
         setIsFormModalOpen(true);
-    };
+    }, [reset, formMethods]);
 
-    const handleOpenDeleteConfirm = (config: AiPromptConfigRead) => {
+    const handleOpenDeleteConfirm = useCallback((config: AiPromptConfigRead) => {
         setSelectedConfigForEditingOrDeleting(config);
         setIsDeleteConfirmOpen(true);
-    };
+    }, []);
 
 
 
     const onSubmit: SubmitHandler<AiPromptConfigFormData> = (formData) => {
-        let parsedModelParameters: Record<string, any> | null = null;
+        let parsedModelParameters: Record<string, unknown> | null = null;
 
         if (typeof formData.model_parameters === 'string') {
             const txt = formData.model_parameters.trim();
@@ -280,10 +280,8 @@ const AiPromptConfigsPage: React.FC = () => {
                 ),
             },
         ],
-        // Removed reset from deps, handleOpenEditModal and handleOpenDeleteConfirm are stable if defined outside or useCallback
-        // Add deps if these functions are redefined on every render and cause issues.
-        // For now, assuming they are stable enough.
-        [] // Or add specific dependencies like `handleOpenEditModal`, `handleOpenDeleteConfirm` if they are memoized
+        // Add the functions as dependencies since they're used in the column definitions
+        [handleOpenEditModal, handleOpenDeleteConfirm]
     );
 
     const table = useReactTable({

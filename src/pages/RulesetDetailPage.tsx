@@ -40,9 +40,12 @@ const RulesetDetailPage: React.FC = () => {
             setRuleset(rulesetData);
             setRules(rulesData);
             setError(null); // Clear error on success
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching ruleset details or rules:", err);
-            setError(err.message || "Failed to load ruleset data.");
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : "Failed to load ruleset data.";
+            setError(errorMessage);
             setRuleset(null); setRules([]); // Clear data on error
         } finally {
             // Only set initial isLoading to false ONCE
@@ -84,8 +87,15 @@ const RulesetDetailPage: React.FC = () => {
        if (!window.confirm(`Are you sure you want to delete rule "${ruleToDelete.name}" (ID: ${ruleId})?`)) return;
        const originalRules = [...rules]; setRules(prev => prev.filter(r => r.id !== ruleId)); setError(null);
        try { await deleteRule(ruleId); console.log(`Rule ${ruleId} deleted.`); fetchData(); /* Refresh */ /* TODO: Notify */ }
-       catch (err: any) { console.error(`Failed to delete rule ID ${ruleId}:`, err); setError(`Failed to delete rule ID ${ruleId}. ${err.message || 'Please try again.'}`); setRules(originalRules); /* TODO: Notify */ }
-    }, [rules, fetchData]); // Depend on rules (for confirm message) and fetchData
+       catch (err: unknown) { 
+           console.error(`Failed to delete rule ID ${ruleId}:`, err); 
+           const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+               ? err.message
+               : 'Please try again.';
+           setError(`Failed to delete rule ID ${ruleId}. ${errorMessage}`); 
+           setRules(originalRules); /* TODO: Notify */ 
+       }
+    }, [rules, fetchData]); // Depend on rules (for confirm) and fetchData
 
     const handleToggleRuleStatus = useCallback(async (ruleId: number, newStatus: boolean) => {
         const originalRules = [...rules]; const ruleIndex = rules.findIndex(r => r.id === ruleId); if (ruleIndex === -1) return;
@@ -93,8 +103,15 @@ const RulesetDetailPage: React.FC = () => {
         setError(null);
         setRules(prevRules => prevRules.map(rule => rule.id === ruleId ? { ...rule, is_active: newStatus } : rule )); // Optimistic UI
         try { await updateRule(ruleId, { is_active: newStatus }); console.log(`Rule ${ruleId} status toggled.`); /* Optionally fetchData(); */ /* TODO: Notify */ }
-        catch (err: any) { console.error(`Failed to toggle status for rule ID ${ruleId}:`, err); setError(`Failed to toggle status for rule ${ruleId}. ${err.message || 'Please try again.'}`); setRules(originalRules); /* TODO: Notify */ }
-    }, [rules, fetchData]); // Depend on rules (for confirm) and fetchData
+        catch (err: unknown) { 
+            console.error(`Failed to toggle status for rule ID ${ruleId}:`, err); 
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : 'Please try again.';
+            setError(`Failed to toggle status for rule ${ruleId}. ${errorMessage}`); 
+            setRules(originalRules); /* TODO: Notify */ 
+        }
+    }, [rules]); // Depend on rules (for confirm message) only
     // --- End Stabilized Handlers ---
 
     // --- Render Logic ---

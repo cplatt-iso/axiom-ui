@@ -80,7 +80,7 @@ export const crosswalkDataSourceFormSchema = z.object({
         const parsed = json5.parse(data.connection_details);
         // Validate against the object schema
         return connectionDetailsObjectSchema.safeParse(parsed).success;
-    } catch (e) {
+    } catch {
         return false;
     }
 }, {

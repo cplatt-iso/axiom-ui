@@ -54,15 +54,18 @@ const EditSpannerConfigModal: React.FC<EditSpannerConfigModalProps> = ({
             toast.success('Spanner configuration updated successfully');
             onSuccess();
             onClose();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to update spanner config:', error);
-            toast.error(error?.detail || 'Failed to update spanner configuration');
+            const errorMessage = error && typeof error === 'object' && 'detail' in error && typeof error.detail === 'string'
+                ? error.detail
+                : 'Failed to update spanner configuration';
+            toast.error(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleInputChange = (field: keyof SpannerConfigUpdate, value: any) => {
+    const handleInputChange = (field: keyof SpannerConfigUpdate, value: unknown) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 

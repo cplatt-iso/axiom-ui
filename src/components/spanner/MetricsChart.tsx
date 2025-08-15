@@ -2,7 +2,7 @@ import React from 'react';
 
 interface MetricsChartProps {
     title?: string;
-    data?: any[];
+    data?: unknown[];
     dataKey?: string;
     color?: string;
     isLoading?: boolean;

@@ -64,7 +64,7 @@ const formatDate = (date?: Date | string): string => {
         const parsedDate = typeof date === 'string' ? new Date(date) : date;
         if (isNaN(parsedDate.getTime())) return 'Invalid Date';
         return format(parsedDate, 'MMM d, yyyy HH:mm');
-    } catch (e) {
+    } catch {
         return 'Invalid Date';
     }
 };
@@ -94,7 +94,7 @@ const getColumns = (
                 if (row.itemType === 'study') return row.studyInstanceUid;
                 if (row.itemType === 'series') return row.seriesInstanceUid;
                 if (row.itemType === 'sop') return row.sop_instance_uid || row.id;
-                return (row as any).id || "unknown-id";
+                return (row as StudyLevelExceptionItem).id || "unknown-id";
             },
             id: 'identifier',
             header: 'Study UID / Series UID / SOP UID',

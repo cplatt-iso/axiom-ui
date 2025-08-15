@@ -1,9 +1,10 @@
 // src/components/CrosswalkDataSourceTable.tsx
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatDistanceToNowStrict } from 'date-fns';
 import {
+  Column,
   ColumnDef,
   flexRender,
   getCoreRowModel,
@@ -67,7 +68,7 @@ const formatOptionalDate = (dateString: string | null | undefined): string => {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'Invalid Date';
         return formatDistanceToNowStrict(date, { addSuffix: true });
-    } catch (e) { return 'Invalid Date'; }
+    } catch { return 'Invalid Date'; }
 };
 
 // Helper for Sync Status Badge
@@ -82,7 +83,7 @@ const getSyncStatusBadge = (status: CrosswalkSyncStatus): { text: string; Icon: 
 };
 
 // SortableHeader component (reuse)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: Column<CrosswalkDataSourceRead, unknown>, title: string }) => (
     <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4 h-8">
         {title}
         <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -102,19 +103,19 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
 
     const deleteMutation = useMutation({
         mutationFn: deleteCrosswalkDataSource,
-        onSuccess: (deletedData) => {
+        onSuccess: (deletedData: CrosswalkDataSourceRead) => {
             toast.success(`Data Source "${deletedData.name}" deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['crosswalkDataSources'] });
         },
-        onError: (err: any, variables_id) => {
-             const errorDetail = err?.detail || err.message || `Failed to delete Data Source (ID: ${variables_id})`;
+        onError: (err: Error, variables_id: number) => {
+             const errorDetail = (err as { detail?: string }).detail || err.message || `Failed to delete Data Source (ID: ${variables_id})`;
              toast.error(errorDetail);
         },
     });
 
     const testConnectionMutation = useMutation({
         mutationFn: testCrosswalkDataSourceConnection,
-        onSuccess: (data, sourceId) => {
+        onSuccess: (data: { success: boolean; message: string }, sourceId: number) => {
             if (data.success) {
                 toast.success(`Connection test successful for source ID ${sourceId}.`);
             } else {
@@ -122,7 +123,7 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
             }
             setTestingConnectionId(null);
         },
-        onError: (error: any, sourceId) => {
+        onError: (error: Error, sourceId: number) => {
             toast.error(`Error testing connection for source ID ${sourceId}: ${error.message || 'Unknown error'}`);
             setTestingConnectionId(null);
         },
@@ -130,32 +131,32 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
 
     const triggerSyncMutation = useMutation({
         mutationFn: triggerCrosswalkDataSourceSync,
-        onSuccess: (data, sourceId) => {
+        onSuccess: (data: { task_id: string }, sourceId: number) => {
             toast.info(`Sync task queued for source ID ${sourceId}. Task ID: ${data.task_id}`);
             setSyncingId(null);
             setTimeout(() => queryClient.invalidateQueries({ queryKey: ['crosswalkDataSources'] }), 500);
         },
-        onError: (error: any, sourceId) => {
+        onError: (error: Error, sourceId: number) => {
             toast.error(`Failed to queue sync task for source ID ${sourceId}: ${error.message || 'Unknown error'}`);
             setSyncingId(null);
         },
     });
 
-    const handleDelete = (id: number, name: string) => {
+    const handleDelete = useCallback((id: number, name: string) => {
         if (window.confirm(`Are you sure you want to delete Data Source "${name}" (ID: ${id})? This will also delete associated mappings.`)) {
             deleteMutation.mutate(id);
         }
-    };
+    }, [deleteMutation]);
 
-    const handleTestConnection = (id: number) => {
+    const handleTestConnection = useCallback((id: number) => {
         setTestingConnectionId(id);
         testConnectionMutation.mutate(id);
-    };
+    }, [testConnectionMutation]);
 
-    const handleTriggerSync = (id: number) => {
+    const handleTriggerSync = useCallback((id: number) => {
         setSyncingId(id);
         triggerSyncMutation.mutate(id);
-    };
+    }, [triggerSyncMutation]);
 
     const columns: ColumnDef<CrosswalkDataSourceRead>[] = useMemo(() => [
         { accessorKey: "id", header: ({ column }) => <SortableHeader column={column} title="ID" />, cell: ({ row }) => <div className="w-10 font-mono text-xs">{row.getValue("id")}</div>, size: 50 },
@@ -241,7 +242,7 @@ const CrosswalkDataSourceTable: React.FC<CrosswalkDataSourceTableProps> = ({ dat
                  );
              },
         },
-    ], [deleteMutation, testingConnectionId, syncingId, onEdit]);
+    ], [deleteMutation, testingConnectionId, syncingId, onEdit, handleDelete, handleTestConnection, handleTriggerSync]);
 
     const table = useReactTable({
         data: dataSources || [], columns, getCoreRowModel: getCoreRowModel(), onSortingChange: setSorting, getSortedRowModel: getSortedRowModel(), state: { sorting },

@@ -60,7 +60,7 @@ const CreateSpannerConfigModal: React.FC<CreateSpannerConfigModalProps> = ({
         }
     };
 
-    const handleInputChange = (field: keyof SpannerConfigCreate, value: any) => {
+    const handleInputChange = (field: keyof SpannerConfigCreate, value: unknown) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 

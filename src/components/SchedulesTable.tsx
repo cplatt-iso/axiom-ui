@@ -1,5 +1,5 @@
 // src/components/SchedulesTable.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatDistanceToNowStrict } from 'date-fns';
@@ -25,7 +25,7 @@ const formatOptionalDate = (dateString: string | null | undefined): string => {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return 'Invalid Date';
         return formatDistanceToNowStrict(date, { addSuffix: true });
-    } catch (e) { return 'Invalid Date'; }
+    } catch { return 'Invalid Date'; }
 };
 
 // Helper to format TimeRanges for display
@@ -57,7 +57,7 @@ const formatTimeRangesTooltip = (ranges: Schedule['time_ranges']): string => {
 }
 
 // SortableHeader component (reuse)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => false | "asc" | "desc" }, title: string }) => (
     <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4 h-8">
         {title}
         <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -80,12 +80,16 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
             toast.success(`Schedule "${deletedData.name}" deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['schedules'] }); // Refetch schedules list
         },
-        onError: (err: any, variables_id) => {
+        onError: (err: unknown, variables_id) => {
              // Check for specific constraint error first
-            if (err?.detail && typeof err.detail === 'string' && err.detail.includes("still referenced by one or more rules")) {
+            if (err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string' && err.detail.includes("still referenced by one or more rules")) {
                  toast.error("Delete Failed: Schedule is still in use by one or more rules.", { description: `Please remove schedule ID ${variables_id} from rules before deleting.`});
             } else {
-                 const errorDetail = err?.detail || err.message || `Failed to delete Schedule (ID: ${variables_id})`;
+                 const errorDetail = (err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string') 
+                     ? err.detail 
+                     : (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') 
+                         ? err.message 
+                         : `Failed to delete Schedule (ID: ${variables_id})`;
                  toast.error(errorDetail);
             }
         },
@@ -99,27 +103,31 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
             toast.success(`Schedule "${updatedData.name}" ${updatedData.is_enabled ? 'enabled' : 'disabled'}.`);
             queryClient.invalidateQueries({ queryKey: ['schedules'] });
         },
-        onError: (err: any, variables) => {
+        onError: (err: unknown, variables) => {
             const action = variables.payload.is_enabled ? 'enable' : 'disable';
-            const errorDetail = err?.detail || err.message || `Failed to ${action} Schedule (ID: ${variables.id})`;
+            const errorDetail = (err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string') 
+                ? err.detail 
+                : (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') 
+                    ? err.message 
+                    : `Failed to ${action} Schedule (ID: ${variables.id})`;
             toast.error(`Failed to ${action} Schedule: ${errorDetail}`);
             // Optional: Add queryClient.invalidateQueries to revert optimistic update if implemented
         },
     });
 
-    const handleDelete = (id: number, name: string) => {
+    const handleDelete = useCallback((id: number, name: string) => {
         if (window.confirm(`Are you sure you want to delete Schedule "${name}" (ID: ${id})? This cannot be undone.`)) {
             deleteMutation.mutate(id);
         }
-    };
+    }, [deleteMutation]);
 
-    const handleToggleEnabled = (schedule: Schedule) => {
+    const handleToggleEnabled = useCallback((schedule: Schedule) => {
          const newStatus = !schedule.is_enabled;
          const actionText = newStatus ? 'enable' : 'disable';
          if (window.confirm(`Are you sure you want to ${actionText} schedule "${schedule.name}"?`)) {
              toggleStatusMutation.mutate({ id: schedule.id, payload: { is_enabled: newStatus } });
          }
-     };
+     }, [toggleStatusMutation]);
 
     const columns: ColumnDef<Schedule>[] = useMemo(() => [
         { accessorKey: "id", header: ({ column }) => <SortableHeader column={column} title="ID" />, cell: ({ row }) => <div className="w-10 font-mono text-xs">{row.getValue("id")}</div>, size: 50 },
@@ -201,7 +209,7 @@ const SchedulesTable: React.FC<SchedulesTableProps> = ({ schedules, onEdit }) =>
                  );
              },
         },
-    ], [deleteMutation, toggleStatusMutation, onEdit]); // Add toggleStatusMutation dependency
+    ], [deleteMutation, toggleStatusMutation, onEdit, handleDelete, handleToggleEnabled]); // Add all function dependencies
 
     const table = useReactTable({
         data: schedules || [], columns, getCoreRowModel: getCoreRowModel(), onSortingChange: setSorting, getSortedRowModel: getSortedRowModel(), state: { sorting },

@@ -59,7 +59,7 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
         if (query !== expectedDisplayForValue) {
             setQuery(expectedDisplayForValue);
         }
-    }, [valueFromParent]);
+    }, [valueFromParent, query]);
 
     // Explicitly type selectedDicomTagObjectForCombobox to DicomTagInfo | null
     // The error message says line 45. Please adjust this line number based on your actual file.

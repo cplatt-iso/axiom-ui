@@ -19,6 +19,9 @@ export const stowRsAuthTypeEnum = z.enum([
 ]);
 export type StowRsAuthType = z.infer<typeof stowRsAuthTypeEnum>;
 
+export const senderTypeEnum = z.enum(["pynetdicom", "dcm4che"]);
+export type SenderType = z.infer<typeof senderTypeEnum>;
+
 // --- Constants ---
 const AE_TITLE_PATTERN_STRICT = /^[A-Za-z0-9._-]{1,16}$/; // No leading/trailing spaces
 const AE_TITLE_PATTERN_FORM = /^[ A-Za-z0-9._-]{1,16}$/; // Allows for trimming
@@ -42,6 +45,8 @@ export const storageBackendFormSchema = z.object({
     remote_port: z.coerce.number().int().min(1).max(65535).optional().nullable(),
     local_ae_title: z.string().max(16, "AE Title max 16 chars").regex(AE_TITLE_PATTERN_FORM, "Invalid AE Title format (A-Z, a-z, 0-9, ., _, - space allowed but will be trimmed).").optional().nullable(),
     
+    sender_type: senderTypeEnum.default("pynetdicom").optional(),
+
     tls_enabled: z.boolean().default(false).optional(), // CStore specific
     tls_ca_cert_secret_name: z.string().max(512).regex(SECRET_NAME_PATTERN, "Invalid Secret Name format.").optional().nullable(), // Shared by CStore & STOW-RS
     
@@ -138,6 +143,7 @@ const cstoreApiBaseObject = baseApiSchema.extend({
     remote_port: z.number().int().min(1).max(65535),
     local_ae_title: z.string().max(16).regex(AE_TITLE_PATTERN_STRICT, "Invalid AE Title format (no leading/trailing spaces).").nullish().transform(s => s ? s.trim() : null),
     tls_enabled: z.boolean().default(false),
+    sender_type: senderTypeEnum.optional(),
     tls_ca_cert_secret_name: z.string().min(1).regex(SECRET_NAME_PATTERN).nullish(),
     tls_client_cert_secret_name: z.string().min(1).regex(SECRET_NAME_PATTERN).nullish(),
     tls_client_key_secret_name: z.string().min(1).regex(SECRET_NAME_PATTERN).nullish(),
@@ -219,6 +225,7 @@ export const StorageBackendConfigUpdateApiPayloadSchema = z.object({
     remote_host: z.string().max(255).optional().transform(s => s ? s.trim() : undefined),
     remote_port: z.coerce.number().int().min(1).max(65535).optional(),
     local_ae_title: z.string().max(16).regex(AE_TITLE_PATTERN_STRICT).nullish().optional().transform(s => s === undefined ? undefined : (s === null ? null : s.trim())),
+    sender_type: senderTypeEnum.optional(),
     tls_enabled: z.boolean().optional(),
     
     bucket: z.string().max(255).optional(),
@@ -246,12 +253,12 @@ export const StorageBackendConfigUpdateApiPayloadSchema = z.object({
     // For PATCH, cross-field validation is tricky as we don't know the full final state.
     // These validations are best effort if fields are present in the patch.
     // Backend should perform full validation against the updated object.
-    if (data.tls_enabled === true && data.hasOwnProperty('tls_ca_cert_secret_name') && !data.tls_ca_cert_secret_name) {
+    if (data.tls_enabled === true && 'tls_ca_cert_secret_name' in data && !data.tls_ca_cert_secret_name) {
          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['tls_ca_cert_secret_name'], message: "If CStore TLS is enabled, CA Secret Name is required." });
     }
     if (data.auth_type) { // If auth_type is part of the PATCH
         const authType = data.auth_type;
-        if (authType === 'basic' && (data.hasOwnProperty('basic_auth_username_secret_name') && !data.basic_auth_username_secret_name || data.hasOwnProperty('basic_auth_password_secret_name') && !data.basic_auth_password_secret_name )) {
+        if (authType === 'basic' && ('basic_auth_username_secret_name' in data && !data.basic_auth_username_secret_name || 'basic_auth_password_secret_name' in data && !data.basic_auth_password_secret_name )) {
             // This implies if you set auth_type to basic, you must provide both secrets if they are not already set.
             // This is hard to enforce perfectly here for PATCH.
         }
@@ -278,10 +285,11 @@ const CStoreConfigReadSchema = baseApiSchema.extend({
     remote_host: z.string(),
     remote_port: z.number().int(),
     local_ae_title: z.string().nullish(),
+    sender_type: senderTypeEnum.default('pynetdicom'),
     tls_enabled: z.boolean(),
-    tls_ca_cert_secret_name: z.string().regex(SECRET_NAME_PATTERN).nullish(),
-    tls_client_cert_secret_name: z.string().regex(SECRET_NAME_PATTERN).nullish(),
-    tls_client_key_secret_name: z.string().regex(SECRET_NAME_PATTERN).nullish(),
+    tls_ca_cert_secret_name: z.string().nullable(),
+    tls_client_cert_secret_name: z.string().nullable(),
+    tls_client_key_secret_name: z.string().nullable(),
     created_at: z.string().datetime(),
     updated_at: z.string().datetime(),
 });

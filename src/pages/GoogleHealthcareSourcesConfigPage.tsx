@@ -67,8 +67,12 @@ const GoogleHealthcareSourcesConfigPage: React.FC = () => {
             toast.success(`Google Healthcare Source (ID: ${deletedId}) deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['googleHealthcareSources'] });
         },
-        onError: (err: any, deletedId) => {
-            const errorMsg = err?.response?.data?.detail || err.message || "Failed to delete source.";
+        onError: (err: unknown, deletedId) => {
+            const errorMsg = err && typeof err === 'object' && 'response' in err && err.response && typeof err.response === 'object' && 'data' in err.response && err.response.data && typeof err.response.data === 'object' && 'detail' in err.response.data && typeof err.response.data.detail === 'string'
+                ? err.response.data.detail
+                : err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : "Failed to delete source.";
             toast.error(`Deletion failed for ID ${deletedId}: ${errorMsg}`);
             console.error(`Delete Google Healthcare Source error for ID ${deletedId}:`, err);
         },

@@ -143,7 +143,7 @@ const transformExceptionsToHierarchy = (flatLogs: DicomExceptionLogRead[]): Hier
                     s === ExceptionStatusEnum.Enum.RETRY_PENDING || s === ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS
                 ).length;
                 
-                let summaryParts: string[] = [];
+                const summaryParts: string[] = [];
                 if (newCount > 0) summaryParts.push(`${newCount} New`);
                 if (manualReviewCount > 0) summaryParts.push(`${manualReviewCount} Review`);
                 if (retryCount > 0) summaryParts.push(`${retryCount} Retry`);
@@ -177,7 +177,7 @@ const transformExceptionsToHierarchy = (flatLogs: DicomExceptionLogRead[]): Hier
                 s === ExceptionStatusEnum.Enum.RETRY_PENDING || s === ExceptionStatusEnum.Enum.RETRY_IN_PROGRESS
             ).length;
 
-            let summaryParts: string[] = [];
+            const summaryParts: string[] = [];
             if (newCount > 0) summaryParts.push(`${newCount} New`);
             if (manualReviewCount > 0) summaryParts.push(`${manualReviewCount} Review`);
             if (retryCount > 0) summaryParts.push(`${retryCount} Retry`);
@@ -222,8 +222,11 @@ const ExceptionsPage: React.FC = () => {
             // Optionally, you could refetch exceptions after a short delay,
             // but the worker will update them anyway.
             // setTimeout(() => queryClient.invalidateQueries({ queryKey: ['exceptions', filters] }), 5000); 
-        } catch (err: any) {
-            toast.error(`Failed to trigger retry cycle: ${err.message || 'Unknown server error'}`);
+        } catch (err: unknown) {
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : 'Unknown server error';
+            toast.error(`Failed to trigger retry cycle: ${errorMessage}`);
             console.error("Trigger retry cycle API call error:", err);
         } finally {
             setIsTriggeringRetryCycle(false);
@@ -265,9 +268,12 @@ const ExceptionsPage: React.FC = () => {
                 setIsDetailModalOpen(false);
             }
         },
-        onError: (err: any, variables) => {
+        onError: (err: unknown, variables) => {
             if (!isBulkUpdating) {
-                toast.error(`Failed to update exception ${variables.uuid}: ${err.message || 'Unknown error'}`);
+                const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                    ? err.message
+                    : 'Unknown error';
+                toast.error(`Failed to update exception ${variables.uuid}: ${errorMessage}`);
             }
             // Error handling for bulk will be part of Promise.allSettled
         },
@@ -290,7 +296,7 @@ const ExceptionsPage: React.FC = () => {
 
         let actionTypeForAPI: "SET_STATUS" | "REQUEUE_RETRYABLE";
         let payloadForAPI: DicomExceptionBulkActionRequest['payload'] = null;
-        let scopeForAPI: BulkActionScope = {};
+        const scopeForAPI: BulkActionScope = {};
 
         let actionDescriptionToast = ""; // For the toast message
 
@@ -403,8 +409,11 @@ const ExceptionsPage: React.FC = () => {
                         console.warn("Bulk action details/errors:", response.details);
                     }
 
-                } catch (err: any) {
-                    toast.error(`Bulk action failed: ${err.message || 'Unknown server error'}`);
+                } catch (err: unknown) {
+                    const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                        ? err.message
+                        : 'Unknown server error';
+                    toast.error(`Bulk action failed: ${errorMessage}`);
                     console.error("Bulk action API call error:", err);
                 } finally {
                     queryClient.invalidateQueries({ queryKey: ['exceptions', filters] });

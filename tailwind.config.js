@@ -34,4 +34,3 @@ export default {
   },
   plugins: [require("tailwindcss-animate")], // <-- ADD THIS PLUGIN
 }
-```    *   **Note:** I added `darkMode: ["class"]` and placeholder comments for `theme.extend` based on typical `shadcn/ui` setups. You might need to adjust the `extend` section based on the components you add and the output of `npx shadcn-ui@latest init`. The most critical part is adding `require("tailwindcss-animate")` to `plugins`.

@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import {
     Form,
-    //   FormControl, // Keep FormControl for Select wrapper if needed, but not direct child
+    FormControl,
     FormField,
     FormItem,
     FormLabel,
@@ -79,7 +79,7 @@ const initialFormDefaults: {
     target_table: '', sync_interval_seconds: 3600, is_enabled: true,
 };
 const dbTypePlaceholders: Record<string, number> = { POSTGRES: 5432, MYSQL: 3306, MSSQL: 1433 };
-const configExamples: Record<string, Record<string, any>> = {
+const configExamples: Record<string, Record<string, string | number | boolean>> = {
     POSTGRES: { host: "postgres.example.com", port: 5432, user: "reader", password_secret: "db_password", dbname: "emr_data" },
     MYSQL: { host: "mysql.example.com", port: 3306, user: "reader", password_secret: "db_password", dbname: "emr_data" },
     MSSQL: { host: "sqlserver.example.com", port: 1433, user: "reader", password_secret: "db_password", dbname: "EMR_Data", odbc_driver: "ODBC Driver 17 for SQL Server" },
@@ -194,14 +194,17 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
         onClose();
     }, [isEditMode, queryClient, onClose]);
 
-    const handleMutationError = useCallback((error: any, variables: any) => {
+    const handleMutationError = useCallback((error: unknown, variables: CrosswalkDataSourceUpdatePayload | { id: number; data: CrosswalkDataSourceUpdatePayload; }) => {
         const action = isEditMode ? 'update' : 'creation';
-        const id = isEditMode ? variables.id : '';
+        const id = isEditMode ? (variables as { id: number }).id : '';
         let specificError = `Failed to ${action} data source.`;
 
-        if (error?.response?.data?.detail) {
-            const detail = error.response.data.detail;
-            if (Array.isArray(detail) && detail[0]?.loc && detail[0]?.msg) {
+        // More robust error checking
+        const responseData = (error as { response?: { data?: { detail?: unknown } } })?.response?.data;
+
+        if (responseData && responseData.detail) {
+            const { detail } = responseData;
+            if (Array.isArray(detail) && detail.length > 0 && detail[0].loc && detail[0].msg) {
                 const field = detail[0].loc[1] || 'input';
                 specificError = `Validation Error on field '${field}': ${detail[0].msg}`;
             } else if (typeof detail === 'string') {
@@ -209,12 +212,12 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
             } else {
                 specificError = json5.stringify(detail);
             }
-        } else if (error?.message) {
+        } else if (error instanceof Error) {
             specificError = error.message;
         }
 
         toast.error(`Source ${action} failed${id ? ` for ID ${id}` : ''}: ${specificError}`);
-        console.error(`Source ${action} error details${id ? ` for ID ${id}` : ''}:`, error?.response?.data?.detail || error);
+        console.error(`Source ${action} error details${id ? ` for ID ${id}` : ''}:`, responseData?.detail || error);
     }, [isEditMode]);
 
     const createMutation = useMutation({
@@ -244,8 +247,8 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
             } else {
                 toast.error("Connection Test Failed", { description: result.message });
             }
-        } catch (error: any) {
-            const message = error.message || "An unknown error occurred during connection test.";
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : "An unknown error occurred during connection test.";
             setTestResult({ success: false, message });
             toast.error("Connection Test Error", { description: message });
         } finally {
@@ -274,10 +277,11 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
             } else {
                 createMutation.mutate(payload);
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error("Validation failed:", error);
+            const message = error instanceof Error ? error.message : "Please check the form inputs.";
             toast.error("Invalid input", {
-                description: error.message || "Please check the form inputs.",
+                description: message,
             });
         }
     }, [isEditMode, dataSource, createMutation, updateMutation]);
@@ -337,21 +341,16 @@ const CrosswalkDataSourceFormModal: React.FC<CrosswalkDataSourceFormModalProps> 
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Database Type*</FormLabel>
-                                    {/* Select component itself, not wrapped by FormControl */}
                                     <Select
                                         onValueChange={field.onChange}
                                         value={field.value}
-                                        disabled={isLoading} // Apply disabled state
+                                        disabled={isLoading}
                                     >
-                                        {/* Trigger uses useFormField implicitly via FormItem context? Maybe not. */}
-                                        {/* Let's try adding necessary props manually */}
-                                        <SelectTrigger
-                                            id={useFormField().formItemId} // Get ID from context
-                                            aria-invalid={!!useFormField().error}
-                                            aria-describedby={useFormField().formDescriptionId}
-                                        >
-                                            <SelectValue placeholder="Select DB type" />
-                                        </SelectTrigger>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select DB type" />
+                                            </SelectTrigger>
+                                        </FormControl>
                                         <SelectContent>
                                             <SelectItem value="POSTGRES">PostgreSQL</SelectItem>
                                             <SelectItem value="MYSQL">MySQL</SelectItem>

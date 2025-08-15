@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"; // Import cn for conditional classes
 
 interface RuleFormAssociationCriteriaProps {
     associationCriteria: AssociationMatchCriterionFormData[];
-    updateAssociationCriterion: (index: number, field: keyof AssociationMatchCriterionFormData, value: any) => void;
+    updateAssociationCriterion: (index: number, field: keyof AssociationMatchCriterionFormData, value: unknown) => void;
     addAssociationCriterion: () => void;
     removeAssociationCriterion: (index: number) => void;
     isLoading: boolean;

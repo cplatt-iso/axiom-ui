@@ -78,7 +78,7 @@ export const crosswalkMapFormSchema = z.object({
     try {
         const parsed = json5.parse(data.match_columns);
         return Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => mappingItemSchema.safeParse(item).success);
-    } catch (e) { return false; }
+    } catch { return false; }
 }, {
     message: "Match Columns must be a valid JSON array of objects, each with non-empty 'column_name' and 'dicom_tag'.",
     path: ["match_columns"],
@@ -87,7 +87,7 @@ export const crosswalkMapFormSchema = z.object({
     try {
         const parsed = json5.parse(data.cache_key_columns);
         return Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => typeof item === 'string' && item.length > 0);
-    } catch (e) { return false; }
+    } catch { return false; }
 }, {
     message: "Cache Key Columns must be a valid JSON array of non-empty strings.",
     path: ["cache_key_columns"],
@@ -96,7 +96,7 @@ export const crosswalkMapFormSchema = z.object({
     try {
         const parsed = json5.parse(data.replacement_mapping);
         return Array.isArray(parsed) && parsed.length > 0 && parsed.every(item => replacementMappingItemSchema.safeParse(item).success);
-    } catch (e) { return false; }
+    } catch { return false; }
 }, {
     message: "Replacement Mapping must be a valid JSON array of objects, each with non-empty 'source_column', 'dicom_tag', and optional 'dicom_vr'.",
     path: ["replacement_mapping"],

@@ -1,5 +1,5 @@
 // src/pages/ApiKeysPage.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { apiClient, ApiKey, ApiKeyCreateResponse } from '../services/api'; // Import types if defined in api.ts
 import ApiKeyList from '../components/ApiKeyList'; // We will create this
@@ -10,7 +10,7 @@ import ShowApiKeyModal from '../components/ShowApiKeyModal'; // We will create t
 // interface ApiKey { id: number; name: string; prefix: string; is_active: boolean; created_at: string; updated_at: string; last_used_at?: string; user_id: number;}
 // interface ApiKeyCreateResponse extends ApiKey { full_key: string; }
 
-const ApiKeysPage: React.FC = () => {
+const ApiKeysPage = () => {
     const [keys, setKeys] = useState<ApiKey[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -25,8 +25,11 @@ const ApiKeysPage: React.FC = () => {
         try {
             const fetchedKeys = await apiClient<ApiKey[]>('/apikeys/'); // Use GET endpoint
             setKeys(fetchedKeys);
-        } catch (err: any) {
-            setError(err.message || "Failed to fetch API keys.");
+        } catch (err: unknown) {
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : "Failed to fetch API keys.";
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

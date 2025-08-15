@@ -1,5 +1,5 @@
 // src/components/rule-form/RuleFormTagModifications.tsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline'; // Keep TrashIcon
 //import { Loader2 } from 'lucide-react'; // Keep Loader2 if used elsewhere, or remove
 import { z } from 'zod';
@@ -48,21 +48,21 @@ interface RuleFormTagModificationsProps {
       | 'tagInfo'
       | 'sourceTagInfo'
       | 'destTagInfo',
-    value: any
+    value: unknown
   ) => void;
 
   addTagModification: () => void;
   removeTagModification: (index: number) => void;
 
   isLoading?: boolean;
-  validationErrors?: Record<string, any>;
+  validationErrors?: Record<string, unknown>;
 
   availableCrosswalkMaps?: CrosswalkMapRead[];
   crosswalkMapsLoading?: boolean;
   crosswalkMapsError?: string;
 
   containerRef?: React.RefObject<HTMLDivElement>;
-  errors?: Record<string, any>;
+  errors?: Record<string, unknown>;
   disabled?: boolean;
 }
 
@@ -75,7 +75,7 @@ const errorInputStyles = "border-red-500 focus:border-red-500 focus:ring-red-500
 const normalInputStyles = "border-gray-300 dark:border-gray-600";
 
 // Placeholder label for layout consistency
-const SpacerLabel = () => <Label className="text-xs font-medium text-transparent select-none"> </Label>;
+const SpacerLabel = () => <Label className="text-xs font-medium text-transparent select-none">&nbsp;</Label>;
 
 const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
     tagModifications,
@@ -95,17 +95,23 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
 
     // Ensure arrays are safe before operating on them
     const modsToRender = Array.isArray(tagModifications) ? tagModifications : [];
-    const crosswalkMapsToDisplay = Array.isArray(availableCrosswalkMaps) ? availableCrosswalkMaps : [];
+    const crosswalkMapsToDisplay = useMemo(() => 
+        Array.isArray(availableCrosswalkMaps) ? availableCrosswalkMaps : [], 
+        [availableCrosswalkMaps]
+    );
 
     // --- renderModificationInputs Callback ---
     // This function generates the specific input fields based on the selected action
     const renderModificationInputs = useCallback((mod: TagModificationFormData, index: number): [React.ReactNode, React.ReactNode] => {
         // Helper to get error message for a specific field
-        const getError = (keySuffix: string): string | undefined => validationErrors?.[`tag_modifications[${index}].${keySuffix}`];
+        const getError = (keySuffix: string): string | undefined => {
+            const error = validationErrors?.[`tag_modifications[${index}].${keySuffix}`];
+            return typeof error === 'string' ? error : undefined;
+        };
         // const hasError = (keySuffix: string): boolean => !!getError(keySuffix);
 
         switch (mod.action) {
-            case ModifyActionSchema.enum.set:
+            case ModifyActionSchema.enum.set: {
                 const setMod = mod as z.infer<typeof TagSetModificationSchema>;
                 const setValueError = getError('value');
                 const setVrError = getError('vr');
@@ -149,9 +155,10 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                         {setVrError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-vr-${index}-error`}>{setVrError}</p>}
                     </div>
                 ];
+            }
 
             case ModifyActionSchema.enum.prepend:
-            case ModifyActionSchema.enum.suffix:
+            case ModifyActionSchema.enum.suffix: {
                  const stringMod = mod as z.infer<typeof TagPrependModificationSchema | typeof TagSuffixModificationSchema>;
                  const stringValueError = getError('value');
                  return [
@@ -177,8 +184,9 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                      // Spacer to maintain grid layout
                      <div key={`string-empty-${index}`} className="hidden sm:flex sm:flex-col"></div>
                  ];
+            }
 
-             case ModifyActionSchema.enum.regex_replace:
+             case ModifyActionSchema.enum.regex_replace: {
                  const regexMod = mod as z.infer<typeof TagRegexReplaceModificationSchema>;
                  const patternError = getError('pattern');
                  const replacementError = getError('replacement');
@@ -222,9 +230,10 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                          {replacementError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-replacement-${index}-error`}>{replacementError}</p>}
                      </div>
                  ];
+            }
 
              case ModifyActionSchema.enum.copy:
-             case ModifyActionSchema.enum.move:
+             case ModifyActionSchema.enum.move: {
                  const copyMoveMod = mod as z.infer<typeof TagCopyModificationSchema | typeof TagMoveModificationSchema>;
                  const destTagError = getError('destination_tag');
                  const destVrError = getError('destination_vr');
@@ -266,8 +275,9 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                         {destVrError && <p className="mt-1 text-xs text-red-600 dark:text-red-400" id={`tm-dest-vr-${index}-error`}>{destVrError}</p>}
                     </div>
                  ];
+            }
 
-            case ModifyActionSchema.enum.crosswalk:
+            case ModifyActionSchema.enum.crosswalk: {
                  const crosswalkMod = mod as z.infer<typeof TagCrosswalkModificationSchema>;
                  // Filter maps that are enabled *before* rendering
                  const enabledMaps = crosswalkMapsToDisplay.filter(m => m.is_enabled);
@@ -325,9 +335,10 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                      // Spacer
                      <div key={`cw-empty-${index}`} className="hidden sm:flex sm:flex-col"></div>
                  ];
+            }
 
             case ModifyActionSchema.enum.delete:
-            default:
+            default: {
                 // No additional inputs needed for 'delete'
                 return [
                     <div key={`del-empty-${index}`} className="sm:col-span-2 flex flex-col space-y-1">
@@ -340,6 +351,7 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                     </div>,
                      null // No second column needed
                 ];
+            }
         }
     }, [ validationErrors, isLoading, updateTagModification, crosswalkMapsToDisplay, crosswalkMapsLoading, crosswalkMapsError, containerRef ]); // Dependencies for the callback
 
@@ -358,9 +370,9 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                      const actionKey = `tag_modifications[${index}].action`;
                      const targetTagKey = `tag_modifications[${index}].tag`;
                      const sourceTagKey = `tag_modifications[${index}].source_tag`;
-                     const actionError = validationErrors?.[actionKey];
-                     const targetTagError = validationErrors?.[targetTagKey];
-                     const sourceTagError = validationErrors?.[sourceTagKey];
+                     const actionError = typeof validationErrors?.[actionKey] === 'string' ? validationErrors[actionKey] : undefined;
+                     const targetTagError = typeof validationErrors?.[targetTagKey] === 'string' ? validationErrors[targetTagKey] : undefined;
+                     const sourceTagError = typeof validationErrors?.[sourceTagKey] === 'string' ? validationErrors[sourceTagKey] : undefined;
 
                      // Get the specific inputs for the current action
                      const [inputCol1, inputCol2] = renderModificationInputs(mod, index);
@@ -405,7 +417,7 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                                              <Label htmlFor={`tm-tag-${index}`} className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Tag*</Label>
                                              <DicomTagCombobox
                                                 inputId={`tm-tag-${index}`}
-                                                value={(mod as any).tag ?? ''}
+                                                value={('tag' in mod ? mod.tag : '') ?? ''}
                                                 onChange={(tagInfo: DicomTagInfo | null) => updateTagModification(index, 'tagInfo', tagInfo)}
                                                 disabled={isLoading}
                                                 required
@@ -420,7 +432,7 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                                              <Label htmlFor={`tm-source-tag-${index}`} className="text-xs font-medium text-gray-700 dark:text-gray-300">Source Tag*</Label>
                                              <DicomTagCombobox
                                                 inputId={`tm-source-tag-${index}`}
-                                                value={(mod as any).source_tag ?? ''}
+                                                value={('source_tag' in mod ? mod.source_tag : '') ?? ''}
                                                 onChange={(tagInfo: DicomTagInfo | null) => updateTagModification(index, 'sourceTagInfo', tagInfo)}
                                                 disabled={isLoading}
                                                 required
@@ -474,11 +486,17 @@ const RuleFormTagModifications: React.FC<RuleFormTagModificationsProps> = ({
                 <PlusIcon className="h-4 w-4 mr-1"/> Add Modification
             </Button>
              {/* General validation error for the whole array */}
-             {validationErrors?.['tag_modifications'] && typeof validationErrors['tag_modifications'] === 'string' && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="tag_modifications-error">
-                    {validationErrors['tag_modifications']}
-                </p>
-            )}
+             {(() => {
+                 const error = validationErrors?.['tag_modifications'];
+                 if (error && typeof error === 'string') {
+                     return (
+                         <p className="mt-1 text-xs text-red-600 dark:text-red-400" id="tag_modifications-error">
+                             {error}
+                         </p>
+                     );
+                 }
+                 return null;
+             })()}
         </fieldset>
     );
 };

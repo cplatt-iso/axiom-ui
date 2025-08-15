@@ -132,7 +132,7 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 interface ApiOptions extends RequestInit {
-    params?: Record<string, any>;
+    params?: Record<string, string | number | boolean | (string | number)[]>;
     useAuth?: boolean;
 }
 
@@ -152,7 +152,7 @@ export const getOrders = (params: {
 }): Promise<OrdersApiResponse> => {
   const { pageIndex, pageSize, search, modalities, statuses, dateRange } = params;
   
-  const apiParams: Record<string, any> = {
+  const apiParams: Record<string, string | number | string[]> = {
     skip: pageIndex * pageSize,
     limit: pageSize,
   };
@@ -275,7 +275,7 @@ export const apiClient = async <T>(
         const response: Response = await fetch(url, fetchOptions);
 
         if (!response.ok) {
-            let errorData: any;
+            let errorData: { detail?: unknown } | { detail: string } | Record<string, unknown>;
             const contentType: string | null = response.headers.get("content-type");
             try {
                 if (contentType && contentType.includes("application/json")) {
@@ -283,7 +283,8 @@ export const apiClient = async <T>(
                 } else {
                      errorData = { detail: await response.text() || `HTTP error ${response.status}` };
                 }
-            } catch (e) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            } catch (_) {
                  errorData = { detail: `HTTP error ${response.status}: Failed to parse error response.` };
             }
             console.error(`API Client Error: ${response.status} ${response.statusText} for ${url}`, errorData);
@@ -294,9 +295,13 @@ export const apiClient = async <T>(
                 authContextRef.logout();
             }
 
-            const error: any = new Error(errorData?.detail || `HTTP error ${response.status}`);
+            const detail = (typeof errorData === 'object' && errorData !== null && 'detail' in errorData && typeof errorData.detail === 'string')
+                ? errorData.detail
+                : `HTTP error ${response.status}`;
+
+            const error = new Error(detail) as Error & { status?: number; detail?: string };
             error.status = response.status;
-            error.detail = errorData?.detail;
+            error.detail = detail;
             throw error;
         }
 
@@ -460,7 +465,7 @@ export const triggerCrosswalkDataSourceSync = (id: number): Promise<{ task_id: s
     return apiClient<{ task_id: string }>(`/config/crosswalk/data-sources/${id}/sync`, { method: 'POST' });
 };
 export const getCrosswalkMaps = (dataSourceId: number | undefined, skip: number = 0, limit: number = 100): Promise<CrosswalkMapRead[]> => {
-    let url = `/config/crosswalk/mappings`;
+    const url = `/config/crosswalk/mappings`;
     return apiClient<CrosswalkMapRead[]>(url, { params: { skip, limit, ...(dataSourceId !== undefined && { data_source_id: dataSourceId }) } });
 };
 export const createCrosswalkMap = (data: CrosswalkMapCreatePayload): Promise<CrosswalkMapRead> => {
@@ -511,7 +516,7 @@ export const getAiPromptConfigs = (
     dicom_tag_keyword?: string | null, // Optional filter
     model_identifier?: string | null // Optional filter
 ): Promise<AiPromptConfigRead[]> => {
-    const params: Record<string, any> = { skip, limit }; // Start with skip and limit
+    const params: Record<string, string | number | boolean> = { skip, limit }; // Start with skip and limit
 
     // Conditionally add filters to the params object if they are provided
     if (is_enabled !== undefined && is_enabled !== null) {
@@ -692,7 +697,7 @@ export const deleteSpannerConfig = (id: number): Promise<void> => {
 };
 
 // Helper function to transform source mapping data for API calls
-const transformSourceMappingForApi = (data: any) => {
+const transformSourceMappingForApi = (data: Partial<SpannerSourceMappingCreate | SpannerSourceMappingUpdate>) => {
     console.log('🔍 transformSourceMappingForApi - Input data:', data);
     
     if (!data.source_id || data.source_id <= 0 || !data.source_type) {
@@ -704,7 +709,7 @@ const transformSourceMappingForApi = (data: any) => {
     
     // The backend requires ALL source ID fields to be present
     // Set unused fields to 0 instead of null or omitting them
-    let apiData: any = { 
+    const apiData: Record<string, unknown> = { 
         ...restData, 
         source_type,
         dimse_qr_source_id: 0,
@@ -734,37 +739,46 @@ const transformSourceMappingForApi = (data: any) => {
 };
 
 // Helper function to transform API response data back to frontend format
-const transformSourceMappingFromApi = (data: any) => {
-    if (!data.source_type) {
-        return data;
+const transformSourceMappingFromApi = (data: Record<string, unknown>): SpannerSourceMappingRead => {
+    const source_type = data.source_type as SpannerSourceMappingRead['source_type'];
+    if (!source_type) {
+        // This case should ideally not happen if the API is consistent.
+        // We return it as-is but cast, which might be unsafe.
+        // Consider logging an error here.
+        return data as SpannerSourceMappingRead;
     }
     
     let source_id: number | undefined;
     
     // Extract source_id from the appropriate field based on source_type
-    switch (data.source_type) {
+    switch (source_type) {
         case 'dimse_qr':
-            source_id = data.dimse_qr_source_id;
+            source_id = data.dimse_qr_source_id as number;
             delete data.dimse_qr_source_id;
             break;
         case 'dicomweb':
-            source_id = data.dicomweb_source_id;
+            source_id = data.dicomweb_source_id as number;
             delete data.dicomweb_source_id;
             break;
         case 'google_healthcare':
-            source_id = data.google_healthcare_source_id;
+            source_id = data.google_healthcare_source_id as number;
             delete data.google_healthcare_source_id;
             break;
         default:
-            source_id = data.source_id;
+            // This handles any other case, though we expect one of the above
+            source_id = data.source_id as number;
     }
     
-    return { ...data, source_id, source_type: data.source_type };
+    // Ensure source_id is a number, defaulting to 0 if it's not found.
+    // This prevents the return type from having an `undefined` id.
+    const final_source_id = source_id ?? 0;
+
+    return { ...data, source_id: final_source_id, source_type: source_type } as SpannerSourceMappingRead;
 };
 
 // Source Mapping Management
 export const getSpannerSourceMappings = (spannerId: number): Promise<SpannerSourceMappingRead[]> => {
-    return apiClient<{ mappings: any[]; total: number }>(`/config/spanner/${spannerId}/sources`)
+    return apiClient<{ mappings: Record<string, unknown>[]; total: number }>(`/config/spanner/${spannerId}/sources`)
         .then(response => response.mappings.map(transformSourceMappingFromApi));
 };
 
@@ -773,7 +787,7 @@ export const createSpannerSourceMapping = (spannerId: number, data: Omit<Spanner
     const transformedData = { ...data, spanner_config_id: spannerId };
     const apiData = transformSourceMappingForApi(transformedData);
     
-    return apiClient<any>(`/config/spanner/${spannerId}/sources`, { 
+    return apiClient<Record<string, unknown>>(`/config/spanner/${spannerId}/sources`, { 
         method: 'POST', 
         body: JSON.stringify(apiData) 
     }).then(transformSourceMappingFromApi);
@@ -783,7 +797,7 @@ export const updateSpannerSourceMapping = (spannerId: number, mappingId: number,
     // Transform the data if it contains source_id and source_type
     const apiData = transformSourceMappingForApi(data);
     
-    return apiClient<any>(`/config/spanner/${spannerId}/sources/${mappingId}`, { 
+    return apiClient<Record<string, unknown>>(`/config/spanner/${spannerId}/sources/${mappingId}`, { 
         method: 'PUT', 
         body: JSON.stringify(apiData) 
     }).then(transformSourceMappingFromApi);
@@ -1240,21 +1254,22 @@ export const getSpannerMetrics = (
             }
             
             // Convert to SpannerMetrics type (remove timestamp field)
-            const convertedData: SpannerMetrics[] = filteredData.map(({ timestamp, ...metrics }) => metrics);
+            const convertedData: SpannerMetrics[] = filteredData.map(({ ...metrics }) => metrics);
             
             resolve(convertedData);
         }, 300); // Simulate network delay
     });
     
     // Real API call (commented out until backend is ready)
-    // const params: Record<string, any> = {};
+    // const params: Record<string, unknown> = {};
     // if (spannerId) params.spanner_id = spannerId;
     // if (fromDate) params.from_date = fromDate;
     // if (toDate) params.to_date = toDate;
     // return apiClient<SpannerMetrics[]>('/spanner/metrics', { params });
 };
 
-export const getSpannerConfigMetrics = (spannerId: number, _fromDate?: string, _toDate?: string): Promise<SpannerMetrics> => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const getSpannerConfigMetrics = (spannerId: number, _?: string, __?: string): Promise<SpannerMetrics> => {
     // Use mock data for now since backend endpoints don't exist yet
     return new Promise((resolve) => {
         setTimeout(() => {
@@ -1265,22 +1280,22 @@ export const getSpannerConfigMetrics = (spannerId: number, _fromDate?: string, _
             
             // Convert to SpannerMetrics type (remove timestamp field)
             const result = configMetrics || mockMetricsData[0];
-            const { timestamp, ...metrics } = result;
+            const { ...metrics } = result;
             
             resolve(metrics);
         }, 200);
     });
     
     // Real API call (commented out until backend is ready)
-    // const params: Record<string, any> = {};
+    // const params: Record<string, unknown> = {};
     // if (fromDate) params.from_date = fromDate;
     // if (toDate) params.to_date = toDate;
     // return apiClient<SpannerMetrics>(`/spanner/metrics/${spannerId}`, { params });
 };
 
 // Test and Validation
-export const testSpannerConfig = (id: number): Promise<{ success: boolean; message: string; details?: any }> => {
-    return apiClient<{ success: boolean; message: string; details?: any }>(`/config/spanner/${id}/test`, { 
+export const testSpannerConfig = (id: number): Promise<{ success: boolean; message: string; details?: Record<string, unknown> }> => {
+    return apiClient<{ success: boolean; message: string; details?: Record<string, unknown> }>(`/config/spanner/${id}/test`, { 
         method: 'POST',
         body: JSON.stringify({}) // Backend expects a body even if empty
     });
@@ -1299,8 +1314,8 @@ export const validateSpannerSourceMapping = (
 // Bulk Operations
 export const bulkUpdateSpannerConfigs = (
     updates: { id: number; data: SpannerConfigUpdate }[]
-): Promise<{ successful: number; failed: number; errors: any[] }> => {
-    return apiClient<{ successful: number; failed: number; errors: any[] }>('/config/spanner/bulk-update', { 
+): Promise<{ successful: number; failed: number; errors: Record<string, unknown>[] }> => {
+    return apiClient<{ successful: number; failed: number; errors: Record<string, unknown>[] }>('/config/spanner/bulk-update', { 
         method: 'POST', 
         body: JSON.stringify({ updates }) 
     });
@@ -1315,7 +1330,10 @@ export const bulkEnableSpannerConfigs = (ids: number[], enabled: boolean): Promi
 
 // Import/Export
 export const exportSpannerConfigs = (ids?: number[]): Promise<Blob> => {
-    const params = ids ? { ids: ids.join(',') } : {};
+    const params: Record<string, string> = {};
+    if (ids) {
+        params.ids = ids.join(',');
+    }
     return apiClient<Blob>('/config/spanner/export', { 
         params,
         headers: { Accept: 'application/json' }

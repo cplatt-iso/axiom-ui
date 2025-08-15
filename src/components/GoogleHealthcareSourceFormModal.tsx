@@ -101,9 +101,11 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
             onClose();
             form.reset(initialFormDefaults);
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
             let errorMsg = "Failed to create source.";
-            if (error?.response?.data?.detail) {
+            if (error && typeof error === 'object' && 'response' in error && 
+                error.response && typeof error.response === 'object' && 'data' in error.response &&
+                error.response.data && typeof error.response.data === 'object' && 'detail' in error.response.data) {
                  if (Array.isArray(error.response.data.detail)) {
                      const firstError = error.response.data.detail[0];
                      errorMsg = `Validation Error on ${firstError.loc?.slice(1).join('.') || 'field'}: ${firstError.msg}`;
@@ -111,7 +113,9 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
                      errorMsg = error.response.data.detail;
                  }
             } else {
-                errorMsg = error.message || errorMsg;
+                errorMsg = (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') 
+                    ? error.message 
+                    : errorMsg;
             }
             toast.error(`Creation failed: ${errorMsg}`);
             console.error("Create Google Healthcare Source error:", error);
@@ -128,9 +132,11 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
             queryClient.invalidateQueries({ queryKey: ['googleHealthcareSource', data.id] });
             onClose();
         },
-        onError: (error: any, variables) => {
+        onError: (error: unknown, variables) => {
             let errorMsg = "Failed to update source.";
-             if (error?.response?.data?.detail) {
+             if (error && typeof error === 'object' && 'response' in error && 
+                error.response && typeof error.response === 'object' && 'data' in error.response &&
+                error.response.data && typeof error.response.data === 'object' && 'detail' in error.response.data) {
                  if (Array.isArray(error.response.data.detail)) {
                      const firstError = error.response.data.detail[0];
                      errorMsg = `Validation Error on ${firstError.loc?.slice(1).join('.') || 'field'}: ${firstError.msg}`;
@@ -138,7 +144,9 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
                      errorMsg = error.response.data.detail;
                  }
             } else {
-                 errorMsg = error.message || errorMsg;
+                 errorMsg = (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') 
+                     ? error.message 
+                     : errorMsg;
             }
             toast.error(`Update failed for ID ${variables.id}: ${errorMsg}`);
             console.error(`Update Google Healthcare Source error for ID ${variables.id}:`, error);
@@ -149,11 +157,11 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
     // (query_filters is string | null, polling_interval_seconds is number | undefined)
     const onSubmit: SubmitHandler<GoogleHealthcareSourceFormData> = (formData) => {
         // Transform query_filters from string to object/null for API
-        let parsedQueryFilters: Record<string, any> | null = null;
+        let parsedQueryFilters: Record<string, unknown> | null = null;
         if (formData.query_filters && formData.query_filters.trim()) {
             try {
                 parsedQueryFilters = json5.parse(formData.query_filters);
-            } catch (e) {
+            } catch {
                 // Should not happen if refine worked, but as a safeguard
                 form.setError('query_filters', { type: 'manual', message: 'Invalid JSON format.' });
                 toast.error("Invalid JSON in Query Filters.");
@@ -178,7 +186,7 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
                     Object.keys(GoogleHealthcareSourceBaseSchema.shape)
                 );
                 if (validKeys.has(k)) {
-                    (updatePayload as any)[k] = finalApiPayload[k];
+                    (updatePayload as Record<string, unknown>)[k] = finalApiPayload[k];
                 }
             });
             const typedUpdatePayload: GoogleHealthcareSourceUpdate = {
@@ -197,9 +205,9 @@ const GoogleHealthcareSourceFormModal: React.FC<GoogleHealthcareSourceFormModalP
             for (const key in typedUpdatePayload) {
                 const castKey = key as keyof GoogleHealthcareSourceUpdate;
                 if (typedUpdatePayload[castKey] !== undefined) { // Send if value is not undefined
-                    (finalUpdatePayloadToSend as any)[castKey] = typedUpdatePayload[castKey];
-                } else if (source && source[castKey as keyof GoogleHealthcareSourceRead] !== undefined && typedUpdatePayload[castKey] === undefined) {
+                    (finalUpdatePayloadToSend as Record<string, unknown>)[castKey] = typedUpdatePayload[castKey];
                 }
+                // Note: undefined values are intentionally omitted from the update payload
             }
             updateMutation.mutate({ id: source.id, data: typedUpdatePayload });
 

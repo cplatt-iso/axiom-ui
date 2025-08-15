@@ -57,7 +57,7 @@ const getCleanedFormDataForType = (
         stow_auth_type: newBackendType === 'stow_rs' ? (newStowAuthType || 'none') : 'none',
     });
 
-    let cleanedData: StorageBackendFormData = {
+    const cleanedData: StorageBackendFormData = {
         ...baseDefaults,
         name: currentData.name || baseDefaults.name,
         description: currentData.description !== undefined ? currentData.description : baseDefaults.description,
@@ -74,6 +74,7 @@ const getCleanedFormDataForType = (
             cleanedData.remote_host = currentData.remote_host !== undefined ? currentData.remote_host : baseDefaults.remote_host;
             cleanedData.remote_port = currentData.remote_port !== undefined ? currentData.remote_port : baseDefaults.remote_port;
             cleanedData.local_ae_title = currentData.local_ae_title !== undefined ? currentData.local_ae_title : baseDefaults.local_ae_title;
+            cleanedData.sender_type = currentData.sender_type !== undefined ? currentData.sender_type : baseDefaults.sender_type;
             cleanedData.tls_enabled = currentData.tls_enabled !== undefined ? currentData.tls_enabled : baseDefaults.tls_enabled;
             cleanedData.tls_ca_cert_secret_name = currentData.tls_ca_cert_secret_name !== undefined ? currentData.tls_ca_cert_secret_name : baseDefaults.tls_ca_cert_secret_name;
             cleanedData.tls_client_cert_secret_name = currentData.tls_client_cert_secret_name !== undefined ? currentData.tls_client_cert_secret_name : baseDefaults.tls_client_cert_secret_name;
@@ -129,6 +130,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
             remote_host: null,
             remote_port: null, // Or a default number if your schema demands it, but null for optional number
             local_ae_title: null,
+            sender_type: "pynetdicom",
             tls_enabled: false, // Explicitly false, matching Zod default
             tls_ca_cert_secret_name: null,
             tls_client_cert_secret_name: null,
@@ -235,12 +237,15 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                 form.reset(getCleanedFormDataForType({}, 'filesystem'));
             }
         },
-        onError: (error: any, variables: any) => {
+        onError: (error: unknown, variables: unknown) => {
             const operation = isEditMode ? 'update' : 'creation';
-            const idContext = isEditMode ? `for ID ${(variables as { id: number }).id}` : '';
+            const idContext = isEditMode && variables && typeof variables === 'object' && 'id' in variables 
+                ? `for ID ${(variables as { id: number }).id}` 
+                : '';
 
             let specificError = `Failed to ${operation} backend config ${idContext}.`;
-            const errorDetailSource = error?.response?.data?.detail || error?.detail;
+            const errorObj = error as { response?: { data?: { detail?: unknown } }; detail?: unknown };
+            const errorDetailSource = errorObj?.response?.data?.detail || errorObj?.detail;
 
             if (errorDetailSource) {
                 if (Array.isArray(errorDetailSource) && errorDetailSource[0]) {
@@ -252,8 +257,8 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                     specificError = errorDetailSource;
                     form.setError("root.serverError", { type: "manual", message: specificError });
                 }
-            } else if (error.message) {
-                specificError = error.message;
+            } else if (errorObj && typeof errorObj === 'object' && 'message' in errorObj && typeof errorObj.message === 'string') {
+                specificError = errorObj.message;
                 form.setError("root.serverError", { type: "manual", message: specificError });
             }
             toast.error(`${operation.charAt(0).toUpperCase() + operation.slice(1)} failed: ${specificError}`);
@@ -295,6 +300,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                         remote_host: formData.remote_host!,
                         remote_port: formData.remote_port!,
                         local_ae_title: formData.local_ae_title || null,
+                        sender_type: formData.sender_type || "pynetdicom",
                         tls_enabled: formData.tls_enabled ?? false,
                         tls_ca_cert_secret_name: (formData.tls_enabled && formData.tls_ca_cert_secret_name?.trim()) ? formData.tls_ca_cert_secret_name.trim() : null,
                         tls_client_cert_secret_name: (formData.tls_enabled && formData.tls_client_cert_secret_name?.trim()) ? formData.tls_client_cert_secret_name.trim() : null,
@@ -326,23 +332,24 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                         tls_ca_cert_secret_name: formData.tls_ca_cert_secret_name?.trim() || null,
                     };
                     break;
-                default:
+                default: {
                     const _exhaustiveCheck: never = formData.backend_type;
                     toast.error("Internal Error: Unhandled backend type during payload construction.");
                     console.error("Unhandled backend type in onSubmit:", formData.backend_type, _exhaustiveCheck);
                     return;
+                }
             }
 
             if (isEditMode && backend) {
                 // Construct a truly partial payload for PATCH
-                let patchData: Partial<StorageBackendConfigUpdateApiPayload> = {};
+                const patchData: Partial<StorageBackendConfigUpdateApiPayload> = {};
                 const dirtyFields = form.formState.dirtyFields;
 
                 (Object.keys(dirtyFields) as Array<keyof StorageBackendFormData>).forEach(dirtyFieldKey => {
                     // Map form field names to API payload field names if they differ
                     // For now, assuming they are mostly the same or handled by the spread
                     if (dirtyFieldKey in apiPayloadToSend) { // Check if the dirty field is part of the constructed full payload for this type
-                        (patchData as any)[dirtyFieldKey] = (apiPayloadToSend as any)[dirtyFieldKey];
+                        (patchData as Record<string, unknown>)[dirtyFieldKey] = (apiPayloadToSend as Record<string, unknown>)[dirtyFieldKey];
                     }
                 });
 
@@ -363,9 +370,10 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                 createMutation.mutate(apiPayloadToSend as StorageBackendConfigCreatePayload);
             }
 
-        } catch (validationError: any) {
+        } catch (validationError: unknown) {
             console.error("Zod validation error for API payload construction or submission:", validationError);
-            toast.error(`Data submission error: ${validationError.errors?.[0]?.message || validationError.message || "Invalid data"}`);
+            const errorObj = validationError as { errors?: Array<{ message?: string }>; message?: string };
+            toast.error(`Data submission error: ${errorObj.errors?.[0]?.message || errorObj.message || "Invalid data"}`);
         }
     };
 
@@ -464,12 +472,36 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                             {/* CStore Fields */}
                             {watchedBackendType === 'cstore' && (
                                 <div className="space-y-4">
+                                    <FormField
+                                        control={form.control}
+                                        name="sender_type"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>DICOM Engine</FormLabel>
+                                                <Select onValueChange={field.onChange} value={field.value || 'pynetdicom'}>
+                                                    <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select DICOM Engine" />
+                                                        </SelectTrigger>
+                                                    </FormControl>
+                                                    <SelectContent>
+                                                        <SelectItem value="pynetdicom">pynetdicom</SelectItem>
+                                                        <SelectItem value="dcm4che">dcm4che</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                <FormDescription>
+                                                    Select the underlying DICOM engine to use for sending files.
+                                                </FormDescription>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                     <FormField control={form.control} name="remote_ae_title" render={({ field }) => (<FormItem> <FormLabel>Remote AE Title*</FormLabel> <FormControl><Input placeholder="REMOTE_PACS_AE" {...field} value={field.value ?? ''} maxLength={16} /></FormControl> <FormMessage /> </FormItem>)} />
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <FormField control={form.control} name="remote_host" render={({ field }) => (<FormItem> <FormLabel>Remote Host*</FormLabel> <FormControl><Input placeholder="pacs.example.com or IP" {...field} value={field.value ?? ''} /></FormControl> <FormMessage /> </FormItem>)} />
                                         <FormField control={form.control} name="remote_port" render={({ field }) => (<FormItem> <FormLabel>Remote Port*</FormLabel> <FormControl><Input type="number" min="1" max="65535" step="1" {...field} value={field.value ?? ''} onChange={event => field.onChange(event.target.value === '' ? null : +event.target.value)} /></FormControl> <FormMessage /> </FormItem>)} />
                                     </div>
-                                    <FormField control={form.control} name="local_ae_title" render={({ field }) => (<FormItem> <FormLabel>Local AE Title (Optional)</FormLabel> <FormDescription>AE Title this system will use to connect. Defaults if blank.</FormDescription> <FormControl><Input placeholder="AXIOM_STORE_SCU" {...field} value={field.value ?? ''} maxLength={16} /></FormControl> <FormMessage /> </FormItem>)} />
+                                    <FormField control={form.control} name="local_ae_title" render={({ field }) => (<FormItem> <FormLabel>Calling AE Title</FormLabel> <FormDescription>AE Title this system will use to connect. Defaults if blank.</FormDescription> <FormControl><Input placeholder="AXIOM_STORE_SCU" {...field} value={field.value ?? ''} maxLength={16} /></FormControl> <FormMessage /> </FormItem>)} />
                                     <div className="space-y-4 rounded-md border p-4 shadow-sm">
                                         <FormField control={form.control} name="tls_enabled" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0"> <FormControl><Switch id="cstore_tls_enabled" checked={!!field.value} onCheckedChange={field.onChange} ref={field.ref} /></FormControl> <div className="space-y-1 leading-none"> <FormLabel htmlFor="cstore_tls_enabled">Enable TLS</FormLabel> <FormDescription>Use secure TLS for the outgoing C-STORE connection.</FormDescription> </div> <FormMessage /> </FormItem>)} />
                                         {watchedCStoreTlsEnabled && (

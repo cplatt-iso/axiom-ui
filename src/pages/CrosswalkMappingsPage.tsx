@@ -1,5 +1,5 @@
 // src/pages/CrosswalkMappingsPage.tsx
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PlusCircle, Map } from 'lucide-react'; // Use Map icon
 import { 
@@ -18,7 +18,7 @@ import {
 } from '@/services/api';
 import { CrosswalkDataSourceRead } from '@/schemas';
 
-const CrosswalkMappingsPage: React.FC = () => {
+const CrosswalkMappingsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingMap, setEditingMap] = useState<CrosswalkMapRead | null>(null);
 

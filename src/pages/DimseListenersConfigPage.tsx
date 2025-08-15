@@ -1,5 +1,5 @@
 // src/pages/DimseListenersConfigPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ColumnDef,
@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 import DimseListenerFormModal from '@/components/DimseListenerFormModal'; // Ensure path is correct
 
 // SortableHeader component
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
   <Button
     variant="ghost"
     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -63,8 +63,12 @@ const DimseListenersConfigPage: React.FC = () => {
             toast.success(`DIMSE Listener "${deletedData.name}" (ID: ${deletedData.id}) deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dimseListenerConfigs'] });
         },
-        onError: (err: any, variables_id) => { // variables for mutate is just the id
-             const errorDetail = err?.detail || err.message || `Failed to delete DIMSE Listener (ID: ${variables_id})`;
+        onError: (err: unknown, variables_id) => { // variables for mutate is just the id
+             const errorDetail = err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string' 
+                ? err.detail
+                : err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message 
+                : `Failed to delete DIMSE Listener (ID: ${variables_id})`;
              toast.error(errorDetail);
              console.error("Deletion error:", err);
         },
@@ -81,11 +85,11 @@ const DimseListenersConfigPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: number, name: string) => {
+    const handleDelete = useCallback((id: number, name: string) => {
         if (window.confirm(`Are you sure you want to delete the DIMSE Listener configuration "${name}" (ID: ${id})? This does NOT stop a running listener process, only removes its config.`)) {
             deleteMutation.mutate(id);
         }
-    };
+    }, [deleteMutation]);
 
     const closeModal = () => {
         setIsModalOpen(false);
@@ -177,7 +181,7 @@ const DimseListenersConfigPage: React.FC = () => {
              },
              size: 50,
         },
-    ], [deleteMutation]);
+    ], [deleteMutation, handleDelete]);
 
     const table = useReactTable({
         data: listeners || [],

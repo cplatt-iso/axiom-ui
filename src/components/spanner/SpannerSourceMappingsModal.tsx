@@ -1,5 +1,5 @@
 // src/components/spanner/SpannerSourceMappingsModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     SpannerConfigRead, 
     SpannerSourceMappingRead,
@@ -62,7 +62,7 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
         retry_delay_seconds: 5,
     });
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
             const [mappings, sources] = await Promise.all([
@@ -72,7 +72,7 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
             // Ensure we always set arrays, even if the API returns something unexpected
             setSourceMappings(Array.isArray(mappings) ? mappings : []);
             setAvailableSources(Array.isArray(sources) ? sources : []);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to fetch data:', error);
             toast.error('Failed to load source mappings');
             // Reset to empty arrays on error
@@ -81,13 +81,13 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [config.id]);
 
     useEffect(() => {
         if (isOpen) {
             fetchData();
         }
-    }, [isOpen, config.id]);
+    }, [isOpen, config.id, fetchData]);
 
     const resetForm = () => {
         setFormData({
@@ -171,9 +171,12 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
             
             resetForm();
             fetchData(); // Refresh the list
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to save mapping:', error);
-            toast.error(error?.detail || 'Failed to save source mapping');
+            const errorMessage = error && typeof error === 'object' && 'detail' in error && typeof error.detail === 'string'
+                ? error.detail
+                : 'Failed to save source mapping';
+            toast.error(errorMessage);
         }
     };
 
@@ -186,9 +189,12 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
             await deleteSpannerSourceMapping(config.id, mapping.id);
             toast.success('Source mapping deleted successfully');
             fetchData(); // Refresh the list
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to delete mapping:', error);
-            toast.error(error?.detail || 'Failed to delete source mapping');
+            const errorMessage = error && typeof error === 'object' && 'detail' in error && typeof error.detail === 'string'
+                ? error.detail
+                : 'Failed to delete source mapping';
+            toast.error(errorMessage);
         }
     };
 
@@ -343,7 +349,7 @@ const SpannerSourceMappingsModal: React.FC<SpannerSourceMappingsModalProps> = ({
                                                             value={formData.source_type}
                                                             onChange={(e) => setFormData(prev => ({ 
                                                                 ...prev, 
-                                                                source_type: e.target.value as any,
+                                                                source_type: e.target.value as 'dimse_qr' | 'dicomweb' | 'google_healthcare',
                                                                 source_id: 0 // Reset source_id when type changes
                                                             }))}
                                                             disabled={!!editingMapping}

@@ -1,5 +1,5 @@
 // src/pages/StorageBackendsConfigPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ColumnDef,
@@ -29,7 +29,7 @@ import { toast } from 'sonner';
 import StorageBackendFormModal from '@/components/StorageBackendFormModal';
 
 // SortableHeader component (reusable)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
   <Button
     variant="ghost"
     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -72,8 +72,12 @@ const StorageBackendsConfigPage: React.FC = () => {
             toast.success(`Storage Backend "${deletedData.name}" (ID: ${deletedData.id}) deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['storageBackendConfigs'] });
         },
-        onError: (err: any, variables_id) => {
-             const errorDetail = err?.detail || err.message || `Failed to delete Storage Backend (ID: ${variables_id})`;
+        onError: (err: unknown, variables_id) => {
+             const errorDetail = err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string'
+                 ? err.detail
+                 : err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                 ? err.message
+                 : `Failed to delete Storage Backend (ID: ${variables_id})`;
              toast.error(errorDetail);
              console.error("Deletion error:", err);
         },
@@ -89,11 +93,11 @@ const StorageBackendsConfigPage: React.FC = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: number, name: string) => {
+    const handleDelete = useCallback((id: number, name: string) => {
         if (window.confirm(`Are you sure you want to delete the Storage Backend configuration "${name}" (ID: ${id})? This could affect existing rules.`)) {
             deleteMutation.mutate(id);
         }
-    };
+    }, [deleteMutation]);
 
     const closeModal = () => {
         setIsModalOpen(false);
@@ -130,6 +134,18 @@ const StorageBackendsConfigPage: React.FC = () => {
             },
             // --- END UPDATED ---
             size: 150,
+        },
+        {
+            id: "dicom_engine",
+            header: "DICOM Engine",
+            cell: ({ row }) => {
+                const backend = row.original;
+                if (backend.backend_type === 'cstore') {
+                    return <Badge variant="secondary">{backend.sender_type || 'pynetdicom'}</Badge>;
+                }
+                return <div className="text-xs text-slate-500 dark:text-slate-400">N/A</div>;
+            },
+            size: 120,
         },
         {
             accessorKey: "description",
@@ -182,7 +198,7 @@ const StorageBackendsConfigPage: React.FC = () => {
              },
              size: 50,
         },
-    ], [deleteMutation]);
+    ], [deleteMutation, handleDelete]);
 
     const table = useReactTable({
         data: backends || [],

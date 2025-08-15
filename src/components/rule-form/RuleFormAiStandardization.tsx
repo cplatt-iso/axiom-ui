@@ -22,7 +22,7 @@ export const RuleFormAiStandardization: React.FC<RuleFormAiStandardizationProps>
     validationErrors = {},
 }) => {
     // Ensure selectedConfigIds is always an array within this component
-    const selectedConfigIds = selectedConfigIdsFromProps || []; // <<<< KEY CHANGE/GUARD
+    const selectedConfigIds = React.useMemo(() => selectedConfigIdsFromProps || [], [selectedConfigIdsFromProps]);
 
     // ... rest of your component logic using `selectedConfigIds` ...
     // For example:

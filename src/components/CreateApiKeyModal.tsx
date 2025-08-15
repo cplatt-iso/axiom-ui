@@ -1,5 +1,5 @@
 // src/components/CreateApiKeyModal.tsx
-import React, { useState, Fragment } from 'react';
+import { useState, Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { apiClient, ApiKeyCreateResponse } from '../services/api'; // Import types
 
@@ -33,8 +33,9 @@ const CreateApiKeyModal: React.FC<CreateApiKeyModalProps> = ({ isOpen, onClose, 
             });
             setKeyName(''); // Clear name on success
             onSuccess(newKeyData);
-        } catch (err: any) {
-            setError(err.message || "Failed to create key.");
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : "Failed to create key.";
+            setError(message);
         } finally {
             setIsCreating(false);
         }

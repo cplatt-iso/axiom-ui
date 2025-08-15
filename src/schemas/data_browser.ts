@@ -53,7 +53,7 @@ export interface StudyResultItem {
     source_id: number;
     source_name: string;
     source_type: AllowedQuerySourceType | 'Unknown' | 'Error';
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface DataBrowserQueryResponse {

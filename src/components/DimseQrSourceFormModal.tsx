@@ -113,8 +113,9 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
             queryClient.invalidateQueries({ queryKey: ['dimseQrSources'] });
             onClose();
         },
-        onError: (error: any) => {
-            const errorMsg = error?.detail?.[0]?.msg || error?.detail || error.message || "Failed to create source.";
+        onError: (error: unknown) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            const errorMsg = (Array.isArray(errorObj.detail) && errorObj.detail[0]?.msg) || (typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to create source.";
             toast.error(`Creation failed: ${errorMsg}`);
             console.error("Create DIMSE Q/R Source error:", error);
         },
@@ -129,15 +130,16 @@ const DimseQrSourceFormModal: React.FC<DimseQrSourceFormModalProps> = ({ isOpen,
             queryClient.invalidateQueries({ queryKey: ['dimseQrSource', data.id] });
             onClose();
         },
-        onError: (error: any, variables) => {
-            const errorMsg = error?.detail?.[0]?.msg || error?.detail || error.message || "Failed to update source.";
+        onError: (error: unknown, variables) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            const errorMsg = (Array.isArray(errorObj.detail) && errorObj.detail[0]?.msg) || (typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to update source.";
             toast.error(`Update failed for ID ${variables.id}: ${errorMsg}`);
             console.error(`Update DIMSE Q/R Source error for ID ${variables.id}:`, error);
         },
     });
 
     const onSubmit = (values: DimseQrSourceFormData) => {
-        let parsedQueryFilters: Record<string, any> | null = null;
+        let parsedQueryFilters: Record<string, unknown> | null = null;
         if (typeof values.query_filters === 'string' && values.query_filters.trim()) {
              try {
                  parsedQueryFilters = json5.parse(values.query_filters);

@@ -21,8 +21,9 @@ const ApiKeyList: React.FC<ApiKeyListProps> = ({ keys, onDeleteSuccess }) => {
                 await apiClient(`/apikeys/${keyId}`, { method: 'DELETE' });
                 onDeleteSuccess(keyId);
                 // Optionally add a success toast notification here
-            } catch (error: any) {
-                alert(`Failed to delete key: ${error.message}`); // Simple alert for now
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : "An unknown error occurred";
+                alert(`Failed to delete key: ${message}`); // Simple alert for now
             }
         }
     };
@@ -31,7 +32,7 @@ const ApiKeyList: React.FC<ApiKeyListProps> = ({ keys, onDeleteSuccess }) => {
         if (!dateString) return 'Never';
         try {
             return `${formatDistanceToNow(new Date(dateString))} ago`;
-        } catch (e) {
+        } catch {
             return 'Invalid Date';
         }
     };
@@ -39,7 +40,7 @@ const ApiKeyList: React.FC<ApiKeyListProps> = ({ keys, onDeleteSuccess }) => {
      const formatTimestamp = (dateString: string): string => {
         try {
             return new Date(dateString).toLocaleString();
-        } catch (e) {
+        } catch {
             return 'Invalid Date';
         }
     };

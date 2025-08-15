@@ -46,7 +46,6 @@ export interface ListExceptionsParams {
   celeryTaskId?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  [key: string]: any; // Add index signature
 }
 
 export const performBulkExceptionAction = async (
@@ -62,7 +61,10 @@ export const performBulkExceptionAction = async (
 
 export const listExceptions = async (params: ListExceptionsParams): Promise<DicomExceptionLogListResponse> => {
   // MODIFIED: Call api (apiClient) directly, specifying the method in options
-  const responseData = await api<DicomExceptionLogListResponse>('/exceptions/', { method: 'GET', params });
+  const responseData = await api<DicomExceptionLogListResponse>('/exceptions/', { 
+    method: 'GET', 
+    params: params as Record<string, string | number | boolean | (string | number)[]>
+  });
   return dicomExceptionLogListResponseSchema.parse(responseData); // Validate with Zod
 };
 

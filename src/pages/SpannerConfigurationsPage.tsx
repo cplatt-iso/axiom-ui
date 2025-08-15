@@ -77,8 +77,11 @@ const SpannerConfigurationsPage: React.FC = () => {
             toast.success('Configuration deleted successfully');
             setDeletingConfig(null);
         },
-        onError: (error: any) => {
-            toast.error(`Failed to delete configuration: ${error.message}`);
+        onError: (error: unknown) => {
+            const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+                ? error.message
+                : 'Unknown error';
+            toast.error(`Failed to delete configuration: ${errorMessage}`);
         },
     });
 
@@ -90,8 +93,11 @@ const SpannerConfigurationsPage: React.FC = () => {
             toast.success(`Configurations ${enabled ? 'enabled' : 'disabled'} successfully`);
             setSelectedConfigs(new Set());
         },
-        onError: (error: any) => {
-            toast.error(`Bulk operation failed: ${error.message}`);
+        onError: (error: unknown) => {
+            const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+                ? error.message
+                : 'Unknown error';
+            toast.error(`Bulk operation failed: ${errorMessage}`);
         },
     });
 
@@ -104,14 +110,17 @@ const SpannerConfigurationsPage: React.FC = () => {
                 toast.error(`Configuration test failed: ${result.message}`);
             }
         },
-        onError: (error: any) => {
-            toast.error(`Test failed: ${error.message}`);
+        onError: (error: unknown) => {
+            const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+                ? error.message
+                : 'Unknown error';
+            toast.error(`Test failed: ${errorMessage}`);
         },
     });
 
     // Filter and sort configs
     const filteredAndSortedConfigs = React.useMemo(() => {
-        let filtered = configs.filter(config => {
+        const filtered = configs.filter(config => {
             // Search filter
             if (filters.search && !config.name.toLowerCase().includes(filters.search.toLowerCase()) &&
                 !config.description?.toLowerCase().includes(filters.search.toLowerCase())) {
@@ -151,26 +160,19 @@ const SpannerConfigurationsPage: React.FC = () => {
 
         // Sort
         filtered.sort((a, b) => {
-            let aValue: any;
-            let bValue: any;
-
-            // Handle special cases
-            // Note: success_rate and total_queries removed from SortField as backend doesn't provide metrics
-            aValue = (a as any)[sortField];
-            bValue = (b as any)[sortField];
+            const aValue = a[sortField as keyof SpannerConfigRead];
+            const bValue = b[sortField as keyof SpannerConfigRead];
 
             // Handle null/undefined values
-            if (aValue == null) aValue = '';
-            if (bValue == null) bValue = '';
+            const valA = aValue == null ? '' : aValue;
+            const valB = bValue == null ? '' : bValue;
 
-            if (typeof aValue === 'string') {
-                aValue = aValue.toLowerCase();
-                bValue = bValue.toLowerCase();
-            }
+            const strA = String(valA).toLowerCase();
+            const strB = String(valB).toLowerCase();
 
             let comparison = 0;
-            if (aValue < bValue) comparison = -1;
-            if (aValue > bValue) comparison = 1;
+            if (strA < strB) comparison = -1;
+            if (strA > strB) comparison = 1;
 
             return sortDirection === 'desc' ? -comparison : comparison;
         });

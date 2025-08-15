@@ -180,69 +180,145 @@ const ScraperStatusWidget: React.FC = () => {
             ]);
 
             // Transform DICOMweb sources
-            const unifiedDicomWeb: UnifiedScraperStatus[] = (dicomWebResult?.pollers || []).map((s: any) => ({
-                id: s.id,
-                name: s.source_name || s.name,
-                scraperType: 'dicomweb',
-                is_enabled: s.is_enabled,
-                is_active: true, // Assume active if in status response
-                last_successful_run: s.last_successful_run,
-                last_error_time: s.last_error_run,
-                last_error_message: s.last_error_message,
-                description: null,
-                base_url: s.base_url || 'N/A',
-                health_status: s.health_status,
-                last_health_check: s.last_health_check,
-                last_health_error: s.last_health_error,
-                count_found: s.found_instance_count ?? 0,
-                count_queued: s.queued_instance_count ?? 0,
-                count_processed: s.processed_instance_count ?? 0,
-            }));
+            const unifiedDicomWeb: UnifiedScraperStatus[] = (dicomWebResult?.pollers || []).flatMap((s: unknown) => {
+                // Type guard for DicomWebSourceStatus
+                const isValidSource = s && typeof s === 'object' && 
+                    'id' in s && 'source_name' in s && 'is_enabled' in s;
+                if (!isValidSource) return [];
+                
+                const source = s as { 
+                    id: number; 
+                    source_name?: string; 
+                    name?: string; 
+                    is_enabled: boolean;
+                    last_successful_run?: string;
+                    last_error_run?: string;
+                    last_error_message?: string;
+                    found_instance_count?: number;
+                    queued_instance_count?: number;
+                    processed_instance_count?: number;
+                    base_url?: string;
+                    health_status?: string;
+                    last_health_check?: string;
+                    last_health_error?: string;
+                };
+                
+                return [{
+                    id: source.id,
+                    name: source.source_name || source.name || '',
+                    scraperType: 'dicomweb' as const,
+                    is_enabled: source.is_enabled,
+                    is_active: true, // Assume active if in status response
+                    last_successful_run: source.last_successful_run,
+                    last_error_time: source.last_error_run,
+                    last_error_message: source.last_error_message,
+                    description: null,
+                    base_url: source.base_url || 'N/A',
+                    health_status: (source.health_status as 'UNKNOWN' | 'OK' | 'DOWN' | 'ERROR') || undefined,
+                    last_health_check: source.last_health_check,
+                    last_health_error: source.last_health_error,
+                    count_found: source.found_instance_count ?? 0,
+                    count_queued: source.queued_instance_count ?? 0,
+                    count_processed: source.processed_instance_count ?? 0,
+                }];
+            });
 
             // Transform DIMSE Q/R sources
-            const unifiedDimseQr: UnifiedScraperStatus[] = (dimseQrResult?.sources || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                scraperType: 'dimse-qr',
-                is_enabled: s.is_enabled,
-                is_active: true, // Assume active if in status response
-                last_successful_run: s.last_successful_query ?? s.last_successful_move,
-                last_error_time: s.last_error_time,
-                last_error_message: s.last_error_message,
-                description: null,
-                remote_ae_title: s.remote_ae_title,
-                remote_host: s.remote_host,
-                remote_port: s.remote_port,
-                health_status: s.health_status,
-                last_health_check: s.last_health_check,
-                last_health_error: s.last_health_error,
-                count_found: s.found_study_count ?? 0,
-                count_queued: s.queued_study_count ?? 0,
-                count_processed: s.processed_study_count ?? 0,
-            }));
+            const unifiedDimseQr: UnifiedScraperStatus[] = (dimseQrResult?.sources || []).flatMap((s: unknown) => {
+                // Type guard for DIMSE Q/R source
+                const isValidSource = s && typeof s === 'object' && 
+                    'id' in s && 'name' in s && 'is_enabled' in s;
+                if (!isValidSource) return [];
+                
+                const source = s as { 
+                    id: number; 
+                    name: string; 
+                    is_enabled: boolean;
+                    last_successful_query?: string;
+                    last_successful_move?: string;
+                    last_error_time?: string;
+                    last_error_message?: string;
+                    remote_ae_title?: string;
+                    remote_host?: string;
+                    remote_port?: number;
+                    health_status?: string;
+                    last_health_check?: string;
+                    last_health_error?: string;
+                    found_study_count?: number;
+                    queued_study_count?: number;
+                    processed_study_count?: number;
+                };
+                
+                return [{
+                    id: source.id,
+                    name: source.name,
+                    scraperType: 'dimse-qr' as const,
+                    is_enabled: source.is_enabled,
+                    is_active: true, // Assume active if in status response
+                    last_successful_run: source.last_successful_query ?? source.last_successful_move,
+                    last_error_time: source.last_error_time,
+                    last_error_message: source.last_error_message,
+                    description: null,
+                    remote_ae_title: source.remote_ae_title,
+                    remote_host: source.remote_host,
+                    remote_port: source.remote_port,
+                    health_status: (source.health_status as 'UNKNOWN' | 'OK' | 'DOWN' | 'ERROR') || undefined,
+                    last_health_check: source.last_health_check,
+                    last_health_error: source.last_health_error,
+                    count_found: source.found_study_count ?? 0,
+                    count_queued: source.queued_study_count ?? 0,
+                    count_processed: source.processed_study_count ?? 0,
+                }];
+            });
 
             // Transform Google Healthcare sources
-            const unifiedGoogleHealthcare: UnifiedScraperStatus[] = (googleHealthcareResult?.sources || []).map((s: any) => ({
-                id: s.id,
-                name: s.name,
-                scraperType: 'google-healthcare',
-                is_enabled: s.is_enabled,
-                is_active: true, // Assume active if in status response
-                last_successful_run: s.last_successful_run,
-                last_error_time: s.last_error_time,
-                last_error_message: s.last_error_message,
-                description: null,
-                gcp_project_id: s.gcp_project_id,
-                gcp_location: s.gcp_location,
-                gcp_dataset_id: s.gcp_dataset_id,
-                gcp_dicom_store_id: s.gcp_dicom_store_id,
-                health_status: s.health_status,
-                last_health_check: s.last_health_check,
-                last_health_error: s.last_health_error,
-                count_found: s.found_instance_count ?? 0,
-                count_queued: s.queued_instance_count ?? 0,
-                count_processed: s.processed_instance_count ?? 0,
-            }));
+            const unifiedGoogleHealthcare: UnifiedScraperStatus[] = (googleHealthcareResult?.sources || []).flatMap((s: unknown) => {
+                // Type guard for Google Healthcare source
+                const isValidSource = s && typeof s === 'object' && 
+                    'id' in s && 'name' in s && 'is_enabled' in s;
+                if (!isValidSource) return [];
+                
+                const source = s as { 
+                    id: number; 
+                    name: string; 
+                    is_enabled: boolean;
+                    last_successful_run?: string;
+                    last_error_time?: string;
+                    last_error_message?: string;
+                    gcp_project_id?: string;
+                    gcp_location?: string;
+                    gcp_dataset_id?: string;
+                    gcp_dicom_store_id?: string;
+                    health_status?: string;
+                    last_health_check?: string;
+                    last_health_error?: string;
+                    found_instance_count?: number;
+                    queued_instance_count?: number;
+                    processed_instance_count?: number;
+                };
+                
+                return [{
+                    id: source.id,
+                    name: source.name,
+                    scraperType: 'google-healthcare' as const,
+                    is_enabled: source.is_enabled,
+                    is_active: true, // Assume active if in status response
+                    last_successful_run: source.last_successful_run,
+                    last_error_time: source.last_error_time,
+                    last_error_message: source.last_error_message,
+                    description: null,
+                    gcp_project_id: source.gcp_project_id,
+                    gcp_location: source.gcp_location,
+                    gcp_dataset_id: source.gcp_dataset_id,
+                    gcp_dicom_store_id: source.gcp_dicom_store_id,
+                    health_status: (source.health_status as 'UNKNOWN' | 'OK' | 'DOWN' | 'ERROR') || undefined,
+                    last_health_check: source.last_health_check,
+                    last_health_error: source.last_health_error,
+                    count_found: source.found_instance_count ?? 0,
+                    count_queued: source.queued_instance_count ?? 0,
+                    count_processed: source.processed_instance_count ?? 0,
+                }];
+            });
 
             return [...unifiedDicomWeb, ...unifiedDimseQr, ...unifiedGoogleHealthcare];
         },

@@ -1,5 +1,5 @@
 // frontend/src/pages/DataBrowserPage.tsx
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Database, Loader2 } from 'lucide-react';
@@ -29,7 +29,7 @@ const parseCompositeId = (compositeId: string | null): { type: string | null, id
 };
 
 
-const DataBrowserPage: React.FC = () => {
+const DataBrowserPage = () => {
     const [selectedCompositeIds, setSelectedCompositeIds] = useState<string[]>([]);
     const [queryResults, setQueryResults] = useState<StudyResultItem[]>([]);
     const [isQuerying, setIsQuerying] = useState<boolean>(false);
@@ -54,41 +54,39 @@ const DataBrowserPage: React.FC = () => {
         setQueryMessages([]);
         setQueriedSourcesInfo(`Querying ${selectedCompositeIds.length} source(s)...`);
 
-        const queryPromises = selectedCompositeIds.map((compositeId) => {
-            return new Promise<DataBrowserQueryResponse>(async (resolve, reject) => {
-                let sourceName = `Source ID ${compositeId}`;
-                try {
-                    const { type: sourceType, id: sourceId } = parseCompositeId(compositeId);
-                    sourceName = `Source ${sourceId} (${sourceType})`;
+        const queryPromises = selectedCompositeIds.map(async (compositeId) => {
+            let sourceName = `Source ID ${compositeId}`;
+            try {
+                const { type: sourceType, id: sourceId } = parseCompositeId(compositeId);
+                sourceName = `Source ${sourceId} (${sourceType})`;
 
-                    if (sourceId === null || sourceType === null) {
-                        throw new Error(`Invalid source selection format (${compositeId})`);
-                    }
-
-                    const validatedSourceType = AllowedQuerySourceType.parse(sourceType);
-
-                    const request: DataBrowserQueryRequest = {
-                        source_id: sourceId,
-                        source_type: validatedSourceType,
-                        query_parameters: params,
-                        query_level: QueryLevel.STUDY
-                    };
-
-                    console.log(`Submitting query for ${sourceName}:`, request);
-                    const response = await submitDataBrowserQuery(request);
-                    sourceName = response.source_name ?? sourceName;
-
-                    if (response.query_status !== 'success' && response.message) {
-                        throw new Error(`Source '${sourceName}': ${response.message}`);
-                    }
-                    resolve(response);
-
-                } catch (error: any) {
-                    const errorMessage = error?.message || `Query failed for ${sourceName}`;
-                    console.error(`Query construction or submission failed for ${compositeId}:`, error);
-                    reject({ sourceName: sourceName, message: errorMessage });
+                if (sourceId === null || sourceType === null) {
+                    throw new Error(`Invalid source selection format (${compositeId})`);
                 }
-            });
+
+                const validatedSourceType = AllowedQuerySourceType.parse(sourceType);
+
+                const request: DataBrowserQueryRequest = {
+                    source_id: sourceId,
+                    source_type: validatedSourceType,
+                    query_parameters: params,
+                    query_level: QueryLevel.STUDY
+                };
+
+                console.log(`Submitting query for ${sourceName}:`, request);
+                const response = await submitDataBrowserQuery(request);
+                sourceName = response.source_name ?? sourceName;
+
+                if (response.query_status !== 'success' && response.message) {
+                    throw new Error(`Source '${sourceName}': ${response.message}`);
+                }
+                return response;
+
+            } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : `Query failed for ${sourceName}`;
+                console.error(`Query construction or submission failed for ${compositeId}:`, error);
+                throw { sourceName: sourceName, message: errorMessage };
+            }
         });
 
 
@@ -98,7 +96,7 @@ const DataBrowserPage: React.FC = () => {
         const errors: string[] = [];
         const infoMessages: string[] = [];
         let successfulSourcesCount = 0;
-        let queriedSourceNames: string[] = [];
+        const queriedSourceNames: string[] = [];
 
         results.forEach((result, index) => {
             const compositeId = selectedCompositeIds[index];
@@ -238,8 +236,11 @@ const DataBrowserPage: React.FC = () => {
                             </div>
                         )}
                         <DataBrowserResultsTable
-                            results={queryResults}
-                            isLoading={isQuerying}
+                            data={queryResults}
+                            isFetching={isQuerying}
+                            error={queryErrors.length > 0 ? new Error(queryErrors.join(', ')) : null}
+                            sourceName={queriedSourcesInfo}
+                            sourceType=""
                         />
                     </CardContent>
                 </Card>

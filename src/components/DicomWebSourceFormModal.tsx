@@ -117,11 +117,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
             queryClient.invalidateQueries({ queryKey: ['dicomWebSources'] });
             onClose();
         },
-        onError: (error: any) => {
-            let specificError = error?.detail || error.message || "Failed to create source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+        onError: (error: unknown) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            let specificError = (errorObj.detail && typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to create source.";
+            if (errorObj.detail && Array.isArray(errorObj.detail) && errorObj.detail[0]) { const errDetail = errorObj.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
             toast.error(`Creation failed: ${specificError}`);
-            console.error("Create DICOMweb error:", error?.detail || error); // Keep error log
+            console.error("Create DICOMweb error:", errorObj.detail || error); // Keep error log
         },
     });
 
@@ -133,11 +134,12 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
             queryClient.invalidateQueries({ queryKey: ['dicomWebSource', data.id] });
             onClose();
         },
-        onError: (error: any, variables) => {
-            let specificError = error?.detail || error.message || "Failed to update source.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+        onError: (error: unknown, variables) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            let specificError = (errorObj.detail && typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to update source.";
+            if (errorObj.detail && Array.isArray(errorObj.detail) && errorObj.detail[0]) { const errDetail = errorObj.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
             toast.error(`Update failed for ID ${variables.id}: ${specificError}`);
-            console.error(`Update DICOMweb error for ID ${variables.id}:`, error?.detail || error); // Keep error log
+            console.error(`Update DICOMweb error for ID ${variables.id}:`, errorObj.detail || error); // Keep error log
         },
     });
     // --- End Mutations ---
@@ -148,10 +150,10 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
         // console.log(">>> DicomWebSourceFormModal - onSubmit received values:", JSON.stringify(values, null, 2));
 
         // Parse JSON strings from textareas back into objects or null
-        const safeJson5Parse = (jsonString: string | null | undefined | object, fieldName: 'auth_config' | 'search_filters'): Record<string, any> | null => {
+        const safeJson5Parse = (jsonString: string | null | undefined | object, fieldName: 'auth_config' | 'search_filters'): Record<string, unknown> | null => {
              // If it's already an object (from schema?), return it directly (might happen depending on RHF state)
              if (typeof jsonString === 'object' && jsonString !== null) {
-                 return jsonString as Record<string, any>;
+                 return jsonString as Record<string, unknown>;
              }
              // If it's not a string or empty, return null
              if (typeof jsonString !== 'string' || !jsonString.trim()) {
@@ -172,8 +174,8 @@ const DicomWebSourceFormModal: React.FC<DicomWebSourceFormModalProps> = ({ isOpe
              }
         };
 
-        let parsedAuthConfig: Record<string, any> | null = null;
-        let parsedSearchFilters: Record<string, any> | null = null;
+        let parsedAuthConfig: Record<string, unknown> | null = null;
+        let parsedSearchFilters: Record<string, unknown> | null = null;
 
         try {
             // Use the helper to parse both fields

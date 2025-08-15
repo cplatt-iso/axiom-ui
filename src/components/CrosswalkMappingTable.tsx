@@ -1,5 +1,5 @@
 // src/components/CrosswalkMappingTable.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 // import { formatDistanceToNowStrict } from 'date-fns';
@@ -28,7 +28,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 //};
 
 // SortableHeader component (reuse)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (ascending?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
     <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="-ml-4 h-8">
         {title}
         <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -53,20 +53,20 @@ const CrosswalkMappingTable: React.FC<CrosswalkMappingTableProps> = ({ mappings,
             // Also refetch the specific source's maps if filtered view exists
             queryClient.invalidateQueries({ queryKey: ['crosswalkMaps', deletedData.data_source_id] });
         },
-        onError: (err: any, variables_id) => {
-             const errorDetail = err?.detail || err.message || `Failed to delete Mapping (ID: ${variables_id})`;
+        onError: (err: unknown, variables_id) => {
+             const errorDetail = (err instanceof Error && err.message) || `Failed to delete Mapping (ID: ${variables_id})`;
              toast.error(errorDetail);
         },
     });
 
-    const handleDelete = (id: number, name: string) => {
+    const handleDelete = useCallback((id: number, name: string) => {
         if (window.confirm(`Are you sure you want to delete Mapping "${name}" (ID: ${id})?`)) {
             deleteMutation.mutate(id);
         }
-    };
+    }, [deleteMutation]);
 
     // Truncate helper
-    const truncateJson = (jsonArray: any[] | null | undefined, maxLength: number = 3) => {
+    const truncateJson = (jsonArray: unknown[] | null | undefined, maxLength: number = 3) => {
          if (!Array.isArray(jsonArray)) return 'N/A';
          const items = jsonArray.slice(0, maxLength).map(item => JSON.stringify(item));
          let result = items.join(', ');
@@ -133,7 +133,7 @@ const CrosswalkMappingTable: React.FC<CrosswalkMappingTableProps> = ({ mappings,
                  );
              },
         },
-    ], [deleteMutation, onEdit]); // Include dependencies
+    ], [deleteMutation, onEdit, handleDelete]); // Include dependencies
 
     const table = useReactTable({
         data: mappings || [], columns, getCoreRowModel: getCoreRowModel(), onSortingChange: setSorting, getSortedRowModel: getSortedRowModel(), state: { sorting },

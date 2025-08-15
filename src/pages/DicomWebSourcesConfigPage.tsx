@@ -1,5 +1,5 @@
 // src/pages/DicomWebSourcesConfigPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ColumnDef, flexRender, getCoreRowModel, useReactTable, SortingState, getSortedRowModel,
@@ -21,7 +21,7 @@ import DicomWebSourceFormModal from '@/components/DicomWebSourceFormModal';
 import { getScraperTypeStyle } from '@/utils/styleHelpers'; // Import helper for type icon
 
 // SortableHeader component (reuse if not already in a shared util)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
   <Button
     variant="ghost"
     onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -82,8 +82,12 @@ const DicomWebSourcesConfigPage: React.FC = () => {
             toast.success(`DICOMweb Source "${sourceName}" deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dicomWebSources'] });
         },
-        onError: (err: any, deletedId) => {
-             const errorDetail = err?.detail || err.message || `Failed to delete DICOMweb Source (ID: ${deletedId})`;
+        onError: (err: unknown, deletedId) => {
+             const errorDetail = err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string' 
+                ? err.detail
+                : err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message 
+                : `Failed to delete DICOMweb Source (ID: ${deletedId})`;
              toast.error(errorDetail);
              console.error("Deletion error:", err);
         },
@@ -91,7 +95,11 @@ const DicomWebSourcesConfigPage: React.FC = () => {
 
     const handleAdd = () => { setEditingSource(null); setIsModalOpen(true); };
     const handleEdit = (source: DicomWebSourceConfigRead) => { setEditingSource(source); setIsModalOpen(true); };
-    const handleDelete = (id: number, name: string) => { if (window.confirm(`Are you sure you want to delete the DICOMweb source "${name}" (ID: ${id})?`)) { deleteMutation.mutate(id); } };
+    const handleDelete = useCallback((id: number, name: string) => { 
+        if (window.confirm(`Are you sure you want to delete the DICOMweb source "${name}" (ID: ${id})?`)) { 
+            deleteMutation.mutate(id); 
+        } 
+    }, [deleteMutation]);
     const closeModal = () => { setIsModalOpen(false); setEditingSource(null); };
 
     // --- MODIFIED Table Definition ---
@@ -105,7 +113,7 @@ const DicomWebSourcesConfigPage: React.FC = () => {
         { // Type Icon
             id: 'type',
             header: () => <div className="px-2 text-center">Type</div>,
-            cell: ({ }) => {
+            cell: () => {
                 const style = getScraperTypeStyle('dicomweb'); // Always dicomweb here
                  return (
                      <Tooltip>
@@ -194,7 +202,7 @@ const DicomWebSourcesConfigPage: React.FC = () => {
              },
              size: 60, // Keep actions narrow
         },
-    ], [deleteMutation]);
+    ], [deleteMutation, handleDelete]);
     // --- END MODIFIED Table Definition ---
 
 

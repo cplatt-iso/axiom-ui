@@ -129,10 +129,11 @@ const createDefaultModification = (action: ModifyAction): TagModificationFormDat
             return { ...base, source_tag: '', destination_tag: '', destination_vr: null, action: ModifyActionSchema.enum.move };
         case ModifyActionSchema.enum.crosswalk:
             return { ...base, crosswalk_map_id: 0, action: ModifyActionSchema.enum.crosswalk };
-        default:
+        default: {
             const exhaustiveCheck: never = action;
             console.error(`Unhandled modification action: ${exhaustiveCheck}`);
             return { ...base, tag: '', value: '', vr: null, action: ModifyActionSchema.enum.set };
+        }
     }
 };
 
@@ -240,28 +241,46 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                     const parsedAssocCriteria = existingRule.association_criteria ?? [];
                     const parsedMods = existingRule.tag_modifications ?? [];
 
-                    setMatchCriteria(deepClone(parsedCriteria).map((c: any) => ({
-                        tag: c.tag ?? '',
-                        op: MatchOperationSchema.safeParse(c.op).success ? c.op : MatchOperationSchema.enum.eq,
-                        value: Array.isArray(c.value) ? c.value.join(', ') : String(c.value ?? ''),
-                    })));
-                    setAssociationCriteria(deepClone(parsedAssocCriteria).map((c: any) => ({
-                        parameter: associationParameterSchema.safeParse(c.parameter).success ? c.parameter : 'CALLING_AE_TITLE',
-                        op: MatchOperationSchema.safeParse(c.op).success ? c.op : MatchOperationSchema.enum.eq,
-                        value: Array.isArray(c.value) ? c.value.join(', ') : String(c.value ?? '')
-                    })));
-                    setTagModifications(deepClone(parsedMods).map((m: any) => {
-                        const action = ModifyActionSchema.safeParse(m.action);
-                        const defaultMod = _createDefaultModification(action.success ? action.data : ModifyActionSchema.enum.set);
-                        if (m.action === ModifyActionSchema.enum.crosswalk && m.crosswalk_map_id !== undefined && m.crosswalk_map_id !== null) {
-                            m.crosswalk_map_id = parseInt(String(m.crosswalk_map_id), 10);
-                            if (isNaN(m.crosswalk_map_id) || m.crosswalk_map_id <= 0) { // Treat non-positive as unselected (matches default 0)
-                                m.crosswalk_map_id = 0;
-                            }
-                        } else if (m.action === ModifyActionSchema.enum.crosswalk) {
-                            m.crosswalk_map_id = 0; // Ensure it's 0 if not provided or null
+                    setMatchCriteria(deepClone(parsedCriteria).map((c: unknown) => {
+                        const isValidCriterion = c && typeof c === 'object' && 'tag' in c && 'op' in c;
+                        const tag = (isValidCriterion && typeof c.tag === 'string') ? c.tag : '';
+                        const op = (isValidCriterion && MatchOperationSchema.safeParse(c.op).success) 
+                            ? c.op as MatchOperation 
+                            : MatchOperationSchema.enum.eq;
+                        const value = (isValidCriterion && 'value' in c) 
+                            ? (Array.isArray(c.value) ? c.value.join(', ') : String(c.value ?? '')) 
+                            : '';
+                        return { tag, op, value };
+                    }));
+                    setAssociationCriteria(deepClone(parsedAssocCriteria).map((c: unknown) => {
+                        const isValidCriterion = c && typeof c === 'object' && 'parameter' in c && 'op' in c;
+                        const parameter = (isValidCriterion && associationParameterSchema.safeParse(c.parameter).success) 
+                            ? c.parameter as 'CALLING_AE_TITLE' | 'CALLED_AE_TITLE' | 'SOURCE_IP' 
+                            : 'CALLING_AE_TITLE';
+                        const op = (isValidCriterion && MatchOperationSchema.safeParse(c.op).success) 
+                            ? c.op as MatchOperation 
+                            : MatchOperationSchema.enum.eq;
+                        const value = (isValidCriterion && 'value' in c) 
+                            ? (Array.isArray(c.value) ? c.value.join(', ') : String(c.value ?? '')) 
+                            : '';
+                        return { parameter, op, value };
+                    }));
+                    setTagModifications(deepClone(parsedMods).map((m: unknown) => {
+                        const action = (m && typeof m === 'object' && 'action' in m && ModifyActionSchema.safeParse(m.action).success) 
+                            ? m.action 
+                            : ModifyActionSchema.enum.set;
+                        const defaultMod = _createDefaultModification(action as ModifyAction);
+                        
+                        // Handle crosswalk map ID parsing
+                        if (action === ModifyActionSchema.enum.crosswalk && m && typeof m === 'object' && 'crosswalk_map_id' in m && m.crosswalk_map_id !== undefined && m.crosswalk_map_id !== null) {
+                            const parsedId = parseInt(String(m.crosswalk_map_id), 10);
+                            const crosswalkMapId = (!isNaN(parsedId) && parsedId > 0) ? parsedId : 0;
+                            return { ...defaultMod, ...(m as Record<string, unknown>), crosswalk_map_id: crosswalkMapId };
+                        } else if (action === ModifyActionSchema.enum.crosswalk) {
+                            return { ...defaultMod, ...(m as Record<string, unknown>), crosswalk_map_id: 0 };
                         }
-                        return { ...defaultMod, ...m };
+                        
+                        return { ...defaultMod, ...(m as Record<string, unknown>) };
                     }));
                     setSelectedDestinationIds(new Set(existingRule.destinations?.map(d => d.id) || []));
                 } else {
@@ -286,7 +305,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         } else {
             processedRuleIdRef.current = null;
         }
-    }, [isOpen, existingRule, combinedSources, refetchDestinations, refetchSchedules, _createDefaultModification]);
+    }, [isOpen, existingRule, combinedSources, selectedSources.length, refetchDestinations, refetchSchedules, _createDefaultModification]);
 
     const handleDialogClose = useCallback(() => {
         if (!overallIsLoading) {
@@ -318,12 +337,20 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
     const handleSourceSelectionChange = useCallback((selectedItems: SourceInfo[]) => {
         setSelectedSources(selectedItems);
-        setValidationErrors(prev => { const { applicable_sources, ...rest } = prev; return rest; });
+        setValidationErrors(prev => { 
+            const newErrors = { ...prev };
+            delete newErrors.applicable_sources;
+            return newErrors;
+        });
     }, []);
 
     const handleScheduleChange = useCallback((scheduleId: number | null) => {
         setSelectedScheduleId(scheduleId);
-        setValidationErrors(prev => { const { schedule_id, ...rest } = prev; return rest; });
+        setValidationErrors(prev => { 
+            const newErrors = { ...prev };
+            delete newErrors.schedule_id;
+            return newErrors;
+        });
     }, []);
 
     const addMatchCriterion = useCallback(() => {
@@ -333,7 +360,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         ]);
     }, []);
 
-    const updateMatchCriterion = useCallback((index: number, field: keyof MatchCriterionFormData | 'tagInfo', value: any) => {
+    const updateMatchCriterion = useCallback((index: number, field: keyof MatchCriterionFormData | 'tagInfo', value: unknown) => {
         setMatchCriteria(prev => {
             const updated = deepClone(prev);
             const currentCrit = updated[index];
@@ -342,9 +369,9 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             }
 
             if (field === 'tagInfo') {
-                currentCrit.tag = value ? value.tag : '';
+                currentCrit.tag = (value && typeof value === 'object' && 'tag' in value && typeof value.tag === 'string') ? value.tag : '';
             } else {
-                (currentCrit as any)[field] = value;
+                (currentCrit as Record<string, unknown>)[field] = value;
                 if (field === 'op' && !isValueRequired(value as MatchOperation)) {
                     currentCrit.value = '';
                 }
@@ -352,7 +379,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             return updated;
         });
         const key = `match_criteria[${index}].${field === 'tagInfo' ? 'tag' : field}`;
-        setValidationErrors(prev => { const { [key]: _, ...rest } = prev; delete rest[`match_criteria[${index}]`]; return rest; });
+        setValidationErrors(prev => { 
+            const newErrors = { ...prev };
+            delete newErrors[key];
+            delete newErrors[`match_criteria[${index}]`];
+            return newErrors;
+        });
     }, []);
 
     const removeMatchCriterion = useCallback((index: number) => {
@@ -366,7 +398,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         ]);
     }, []);
 
-    const updateAssociationCriterion = useCallback((index: number, field: keyof AssociationMatchCriterionFormData, value: any) => {
+    const updateAssociationCriterion = useCallback((index: number, field: keyof AssociationMatchCriterionFormData, value: unknown) => {
         setAssociationCriteria(prev => {
             const updated = deepClone(prev);
             const currentCrit = updated[index];
@@ -374,7 +406,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 return prev;
             }
 
-            (currentCrit as any)[field] = value;
+            (currentCrit as Record<string, unknown>)[field] = value;
 
             if (field === 'parameter') {
                 const isIpParam = value === 'SOURCE_IP';
@@ -391,7 +423,12 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             return updated;
         });
         const key = `association_criteria[${index}].${field}`;
-        setValidationErrors(prev => { const { [key]: _, ...rest } = prev; delete rest[`association_criteria[${index}]`]; return rest; });
+        setValidationErrors(prev => { 
+            const newErrors = { ...prev };
+            delete newErrors[key];
+            delete newErrors[`association_criteria[${index}]`];
+            return newErrors;
+        });
     }, []);
 
 
@@ -403,7 +440,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         setTagModifications((prev) => [...prev, _createDefaultModification(ModifyActionSchema.enum.set)]);
     }, [_createDefaultModification]);
 
-    const updateTagModification = useCallback((index: number, field: UpdatableTagModificationField, value: any) => {
+    const updateTagModification = useCallback((index: number, field: UpdatableTagModificationField, value: unknown) => {
         setTagModifications(prev => {
             const updated = deepClone(prev);
             const currentModFromState = updated[index];
@@ -411,7 +448,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
                 return prev;
             }
 
-            const currentMod = currentModFromState as any;
+            const currentMod = currentModFromState as Record<string, unknown>;
 
             const updateTagField = (
                 fieldName: 'tag' | 'source_tag' | 'destination_tag',
@@ -425,17 +462,17 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             };
 
             if (field === 'tagInfo') {
-                updateTagField('tag', 'vr', value);
+                updateTagField('tag', 'vr', value as DicomTagInfo | null);
             } else if (field === 'sourceTagInfo') {
-                updateTagField('source_tag', null, value);
+                updateTagField('source_tag', null, value as DicomTagInfo | null);
             } else if (field === 'destTagInfo') {
-                updateTagField('destination_tag', 'destination_vr', value);
+                updateTagField('destination_tag', 'destination_vr', value as DicomTagInfo | null);
             } else if (field === 'action') {
                 const newAction = value as ModifyAction;
                 const oldModData = { ...currentModFromState };
 
                 updated[index] = _createDefaultModification(newAction);
-                const newModObject = updated[index] as any;
+                const newModObject = updated[index] as Record<string, unknown>;
 
                 if ('tag' in newModObject && 'tag' in oldModData) newModObject.tag = oldModData.tag;
                 if ('value' in newModObject && 'value' in oldModData && typeof oldModData.value === 'string') newModObject.value = oldModData.value;
@@ -445,7 +482,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
 
                 if ('crosswalk_map_id' in newModObject && 'crosswalk_map_id' in oldModData) newModObject.crosswalk_map_id = oldModData.crosswalk_map_id;
 
-                const tagToUseForVrLookup = newModObject.tag || newModObject.destination_tag;
+                const tagToUseForVrLookup = (typeof newModObject.tag === 'string' ? newModObject.tag : '') || (typeof newModObject.destination_tag === 'string' ? newModObject.destination_tag : '');
 
                 const ACTIONS_REQUIRING_VR_UPDATE = new Set<ModifyAction>([
                     ModifyActionSchema.enum.set,
@@ -509,7 +546,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
         }
 
         setValidationErrors(prev => {
-            let next = { ...prev };
+            const next = { ...prev };
             keysToClear.forEach(key => { delete next[key]; });
             Object.keys(next).filter(k => k.startsWith(baseKey + '.')).forEach(nestedKey => {
                 const suffix = nestedKey.substring(baseKey.length + 1);
@@ -556,7 +593,11 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             }
             return newSet;
         });
-        setValidationErrors(prev => { const { destination_ids, ...rest } = prev; return rest; });
+        setValidationErrors(prev => { 
+            const newErrors = { ...prev };
+            delete newErrors.destination_ids;
+            return newErrors;
+        });
     }, []);
 
     const createMutation = useMutation({
@@ -567,7 +608,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             toast.success(`Rule "${savedRule.name}" created successfully.`);
             onClose();
         },
-        onError: (err: any) => {
+        onError: (err: unknown) => {
             handleApiError(err, 'create');
         }
     });
@@ -581,25 +622,32 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             toast.success(`Rule "${savedRule.name}" updated successfully.`);
             onClose();
         },
-        onError: (err: any, variables) => {
+        onError: (err: unknown, variables) => {
             handleApiError(err, 'update', variables.ruleId);
         }
     });
 
-    const handleApiError = (err: any, action: 'create' | 'update', ruleId?: number) => {
+    const handleApiError = (err: unknown, action: 'create' | 'update', ruleId?: number) => {
         console.error(`Failed to ${action} rule${ruleId ? ` (ID: ${ruleId})` : ''}:`, err);
-        const errorDetail = err.detail?.detail || err.detail;
+        const errorDetail = (err && typeof err === 'object' && 'detail' in err && err.detail && typeof err.detail === 'object' && 'detail' in err.detail) 
+            ? err.detail.detail 
+            : (err && typeof err === 'object' && 'detail' in err) 
+                ? err.detail 
+                : null;
         let errorMessage = `Failed to ${action} rule.`;
-        let backendValidationErrors: Record<string, string | undefined> = {}; // Allow undefined
+        const backendValidationErrors: Record<string, string | undefined> = {}; // Allow undefined
 
-        if (err.status === 422 && Array.isArray(errorDetail)) {
-            errorDetail.forEach((validationError: any) => {
-                const key = (validationError.loc || [])
-                    .slice(1)
-                    .map((item: string | number) => typeof item === 'number' ? `[${item}]` : `${item}`)
-                    .join('.')
-                    .replace(/\.\[/g, '[');
-                backendValidationErrors[key || 'general'] = validationError.msg || 'Invalid input.';
+        if (err && typeof err === 'object' && 'status' in err && err.status === 422 && Array.isArray(errorDetail)) {
+            errorDetail.forEach((validationError: unknown) => {
+                if (validationError && typeof validationError === 'object' && 'loc' in validationError && 'msg' in validationError) {
+                    const key = (Array.isArray(validationError.loc) ? validationError.loc : [])
+                        .slice(1)
+                        .map((item: unknown) => typeof item === 'number' ? `[${item}]` : `${item}`)
+                        .join('.')
+                        .replace(/\.\[/g, '[');
+                    const message = (typeof validationError.msg === 'string') ? validationError.msg : 'Invalid input.';
+                    backendValidationErrors[key || 'general'] = message;
+                }
             });
             errorMessage = "Please fix validation errors from the server.";
             toast.error("Validation Error", { description: errorMessage });
@@ -607,7 +655,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
             errorMessage = errorDetail;
             backendValidationErrors['general'] = errorMessage;
             toast.error("Save Failed", { description: errorMessage });
-        } else if (err.message) {
+        } else if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
             errorMessage = err.message;
             backendValidationErrors['general'] = errorMessage;
             toast.error("Save Failed", { description: errorMessage });
@@ -622,7 +670,7 @@ const RuleFormModal: React.FC<RuleFormModalProps> = ({
     };
 
 
-    const transformPayloadValue = (value: any, op: MatchOperation): any => {
+    const transformPayloadValue = (value: unknown, op: MatchOperation): unknown => {
         if ((op === 'in' || op === 'not_in') && typeof value === 'string') {
             return value.split(',').map(s => s.trim()).filter(Boolean);
         }

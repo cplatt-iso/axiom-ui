@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"; // Import cn for conditional classes
 
 interface RuleFormMatchCriteriaProps {
     matchCriteria: MatchCriterionFormData[];
-    updateMatchCriterion: (index: number, field: keyof MatchCriterionFormData | 'tagInfo', value: any) => void;
+    updateMatchCriterion: (index: number, field: keyof MatchCriterionFormData | 'tagInfo', value: unknown) => void;
     addMatchCriterion: () => void;
     removeMatchCriterion: (index: number) => void;
     isLoading: boolean;

@@ -99,7 +99,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       days: new Set(range.days),
   });
 
-  const handleTimeRangeChange = (index: number, field: keyof TimeRangeState, value: any) => {
+  const handleTimeRangeChange = (index: number, field: keyof TimeRangeState, value: unknown) => {
     setTimeRanges(prevRanges => {
        const newRanges = prevRanges.map((range, i) => {
             if (i === index) {
@@ -107,7 +107,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 if (field === 'days' && typeof value === 'function') {
                     updatedRange.days = value(range.days); 
                 } else {
-                    (updatedRange as any)[field] = value;
+                    (updatedRange as Record<string, unknown>)[field] = value;
                 }
                 return updatedRange;
             }
@@ -208,7 +208,7 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
         setIsLoading(false);
         return;
      }
-     let rangeErrors: Record<string, string> = {};
+     const rangeErrors: Record<string, string> = {};
      rangesForApi.forEach((range, index) => {
          if (range.days.length === 0) rangeErrors[`time_ranges[${index}].days`] = 'Select at least one day.';
          if (!range.start_time.match(/^([01]\d|2[0-3]):([0-5]\d)$/)) rangeErrors[`time_ranges[${index}].start_time`] = 'Invalid HH:MM format.';
@@ -238,14 +238,21 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             const createPayload: ScheduleCreate = commonPayload;
             await createMutation.mutateAsync(createPayload);
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error(`Failed to ${isEditMode ? 'update' : 'create'} schedule:`, err);
-        if (err?.status === 422 && err?.detail) {
+        if (err && typeof err === 'object' && 'status' in err && err.status === 422 && 'detail' in err && err.detail) {
              const backendErrors: Record<string, string> = {};
              if (Array.isArray(err.detail)) {
-                 err.detail.forEach((validationError: any) => {
-                     const key = (validationError.loc || []).slice(1).map((item: string | number) => typeof item === 'number' ? `[${item}]` : `${item}`).join('.').replace(/\.\[/g, '[');
-                     backendErrors[key || 'general'] = validationError.msg || 'Invalid input.';
+                 err.detail.forEach((validationError: unknown) => {
+                     if (validationError && typeof validationError === 'object' && 'loc' in validationError && 'msg' in validationError) {
+                         const key = (Array.isArray(validationError.loc) ? validationError.loc : [])
+                             .slice(1)
+                             .map((item: unknown) => typeof item === 'number' ? `[${item}]` : `${item}`)
+                             .join('.')
+                             .replace(/\.\[/g, '[');
+                         const message = typeof validationError.msg === 'string' ? validationError.msg : 'Invalid input.';
+                         backendErrors[key || 'general'] = message;
+                     }
                  });
              } else if (typeof err.detail === 'string') {
                   backendErrors['general'] = err.detail;
@@ -256,7 +263,10 @@ const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
              setError("Please fix validation errors from the server.");
              toast.error("Validation Error", { description: "Server rejected the input." });
          } else {
-            const message = err?.detail || err?.message || `Failed to ${isEditMode ? 'update' : 'create'} schedule.`;
+            const errorObj = err as { detail?: unknown; message?: string };
+            const message = (typeof errorObj.detail === 'string' ? errorObj.detail : null) || 
+                           errorObj.message || 
+                           `Failed to ${isEditMode ? 'update' : 'create'} schedule.`;
             setError(message);
             toast.error("Save Failed", { description: message });
          }

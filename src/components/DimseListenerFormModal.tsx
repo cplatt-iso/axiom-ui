@@ -53,6 +53,7 @@ const initialFormDefaults: DimseListenerFormData = {
     port: 11112,
     is_enabled: true,
     instance_id: null,
+    listener_type: 'pynetdicom',
     tls_enabled: false,
     tls_cert_secret_name: null,
     tls_key_secret_name: null,
@@ -70,7 +71,7 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
             ae_title: "",
             port: 104,
             is_enabled: true,
-            listener_type: 'pynetdicom', // Add this
+            listener_type: 'pynetdicom',
             tls_enabled: false,
             description: null,
             instance_id: null,
@@ -85,21 +86,20 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
 
     useEffect(() => {
         if (isOpen) {
-            const resetValues = listenerConfig ? {
+            const resetValues: DimseListenerFormData = listenerConfig ? {
                 name: listenerConfig.name ?? '',
                 description: listenerConfig.description ?? null,
                 ae_title: listenerConfig.ae_title ?? '',
                 port: listenerConfig.port ?? 11112,
                 is_enabled: listenerConfig.is_enabled ?? true,
                 instance_id: listenerConfig.instance_id ?? null,
-                listener_type: listenerConfig.listener_type ?? 'pynetdicom', // Add this
+                listener_type: (listenerConfig.listener_type ?? 'pynetdicom') as 'pynetdicom' | 'dcm4che',
                 tls_enabled: listenerConfig.tls_enabled ?? false,
                 tls_cert_secret_name: listenerConfig.tls_cert_secret_name ?? null,
                 tls_key_secret_name: listenerConfig.tls_key_secret_name ?? null,
                 tls_ca_cert_secret_name: listenerConfig.tls_ca_cert_secret_name ?? null,
             } : {
                 ...initialFormDefaults,
-                listener_type: 'pynetdicom', // And here
             };
             form.reset(resetValues);
         }
@@ -112,10 +112,11 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
             queryClient.invalidateQueries({ queryKey: ['dimseListenerConfigs'] });
             onClose();
         },
-        onError: (error: any) => {
-            let specificError = error?.detail || error.message || "Failed to create listener config.";
-             if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
-             toast.error(`Creation failed: ${specificError}`); console.error("Create error:", error?.detail || error);
+        onError: (error: unknown) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            let specificError = (errorObj.detail && typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to create listener config.";
+             if (errorObj.detail && Array.isArray(errorObj.detail) && errorObj.detail[0]) { const errDetail = errorObj.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+             toast.error(`Creation failed: ${specificError}`); console.error("Create error:", errorObj.detail || error);
          },
     });
     const updateMutation = useMutation({
@@ -126,10 +127,11 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
             queryClient.invalidateQueries({ queryKey: ['dimseListenerConfig', data.id] });
             onClose();
         },
-        onError: (error: any, variables) => {
-            let specificError = error?.detail || error.message || "Failed to update listener config.";
-            if (error?.detail && Array.isArray(error.detail) && error.detail[0]) { const errDetail = error.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
-            toast.error(`Update failed for ID ${variables.id}: ${specificError}`); console.error(`Update error for ID ${variables.id}:`, error?.detail || error);
+        onError: (error: unknown, variables) => {
+            const errorObj = error as { detail?: unknown; message?: string };
+            let specificError = (errorObj.detail && typeof errorObj.detail === 'string' ? errorObj.detail : null) || errorObj.message || "Failed to update listener config.";
+            if (errorObj.detail && Array.isArray(errorObj.detail) && errorObj.detail[0]) { const errDetail = errorObj.detail[0]; const field = errDetail.loc?.[1] || 'input'; specificError = `Validation Error on field '${field}': ${errDetail.msg}`; }
+            toast.error(`Update failed for ID ${variables.id}: ${specificError}`); console.error(`Update error for ID ${variables.id}:`, errorObj.detail || error);
          },
     });
 
@@ -245,7 +247,7 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Listener Type</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value || 'pynetdicom'}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select a listener type" />

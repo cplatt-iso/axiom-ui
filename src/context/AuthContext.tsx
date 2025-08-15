@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo } from 'react'; // Import useMemo
+import React, { createContext, useState, useContext, useEffect, ReactNode, useMemo, useCallback } from 'react'; // Import useMemo and useCallback
 
 // --- Keep Interfaces the same ---
 export interface UserProfile {
@@ -105,7 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
     }, []); // Empty dependency array ensures this runs only once on mount
 
-    const login = (profile: UserProfile) => {
+    const login = useCallback((profile: UserProfile) => {
         console.log("AuthProvider: Logging in user", profile);
         setUser(profile); // This will trigger isAuthenticated update
         setIsLoading(false); // Ensure loading is false after login attempt
@@ -117,24 +117,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             roles: profile.roles,
             is_superuser: profile.is_superuser
         }));
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         console.log("AuthProvider: Logging out user");
         setUser(null); // This will trigger isAuthenticated update
         setIsLoading(false); // Ensure loading is false after logout
         localStorage.removeItem('sessionToken');
         localStorage.removeItem('userProfile');
-    };
+    }, []);
 
-    const getToken = (): string | null => {
+    const getToken = useCallback((): string | null => {
         // Check state first, then localStorage as fallback (though should be sync)
         return user?.sessionToken ?? localStorage.getItem('sessionToken');
-    };
+    }, [user?.sessionToken]);
 
-    const isSuperUser = (): boolean => {
+    const isSuperUser = useCallback((): boolean => {
         return user?.is_superuser ?? false;
-    };
+    }, [user?.is_superuser]);
 
 
     // --- Context value now includes isAuthenticated ---
@@ -146,7 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         logout,
         getToken,
         isSuperUser
-    }), [user, isLoading, isAuthenticated]); // Dependencies for context value memoization
+    }), [user, isLoading, isAuthenticated, login, logout, getToken, isSuperUser]); // Dependencies for context value memoization
     // --- End Context value ---
 
     return (

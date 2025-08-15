@@ -68,9 +68,11 @@ const ManageUserRolesModal: React.FC<ManageUserRolesModalProps> = ({
             onUpdateSuccess(); // Call success callback to refresh list
             closeModal(); // Close modal on success
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Failed to update roles:", err);
-            setError(err.message || "Failed to update roles.");
+            setError((err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') 
+                ? err.message 
+                : "Failed to update roles.");
         } finally {
             setIsSaving(false);
         }

@@ -1,11 +1,11 @@
 // src/pages/UserManagementPage.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { UserWithRoles, Role, getUsers, getRoles, updateUser } from '../services/api';
 import UserManagementTable from '../components/UserManagementTable';
 import ManageUserRolesModal from '../components/ManageUserRolesModal';
 import { UserCircleIcon } from '@heroicons/react/24/outline';
 
-const UserManagementPage: React.FC = () => {
+const UserManagementPage = () => {
     const [users, setUsers] = useState<UserWithRoles[]>([]);
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true); // For initial load only
@@ -24,9 +24,12 @@ const UserManagementPage: React.FC = () => {
             setUsers(fetchedUsers);
             setAvailableRoles(fetchedRoles);
             setError(null); // Clear error on success
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Failed to fetch user management data:", err);
-            setError(err.message || "Failed to fetch users or roles.");
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : "Failed to fetch users or roles.";
+            setError(errorMessage);
             setUsers([]); setAvailableRoles([]); // Clear data on error
         } finally {
             if (isInitialLoad.current) {
@@ -56,7 +59,14 @@ const UserManagementPage: React.FC = () => {
         if (!window.confirm(`Are you sure you want to ${actionText} user ${userToToggle.email}?`)) return;
         setUsers(prevUsers => prevUsers.map(user => user.id === userToToggle.id ? { ...user, is_active: newStatus } : user )); setError(null);
         try { await updateUser(userToToggle.id, { is_active: newStatus }); console.log(`User ${userToToggle.email} status toggled successfully.`); /* TODO: notify */ }
-        catch (err: any) { console.error(`Failed to toggle status for user ${userToToggle.email}:`, err); setError(err.message || `Failed to update user status.`); setUsers(originalUsers); /* TODO: notify */ }
+        catch (err: unknown) { 
+            console.error(`Failed to toggle status for user ${userToToggle.email}:`, err); 
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : `Failed to update user status.`;
+            setError(errorMessage); 
+            setUsers(originalUsers); /* TODO: notify */ 
+        }
     };
 
 

@@ -93,7 +93,7 @@ export const dicomWebSourceFormSchema = z.object({
 
 }).superRefine((data, ctx) => {
     // SuperRefine for cross-field validation (auth_type vs auth_config)
-    let parsedAuthConfig: Record<string, any> | null = null;
+    let parsedAuthConfig: Record<string, unknown> | null = null;
 
     // --- USE JSON5 FOR PARSING IN VALIDATION ---
     if (typeof data.auth_config === 'string' && data.auth_config.trim()) {
@@ -104,18 +104,19 @@ export const dicomWebSourceFormSchema = z.object({
                  parsedAuthConfig = null;
                  throw new Error("Input must be a valid JSON object string.");
             }
-        } catch (e: any) {
+        } catch (e: unknown) {
+            const errorMessage = e instanceof Error ? e.message : 'Invalid JSON format';
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 path: ["auth_config"],
                 // Make error message slightly more generic
-                message: `Invalid JSON/JSON5 format: ${e.message}`
+                message: `Invalid JSON/JSON5 format: ${errorMessage}`
             });
             return;
         }
     } else if (typeof data.auth_config === 'object' && data.auth_config !== null) {
         // If it's already an object, use it directly
-        parsedAuthConfig = data.auth_config as Record<string, any>;
+        parsedAuthConfig = data.auth_config as Record<string, unknown>;
     }
     // --- END JSON5 USAGE ---
 

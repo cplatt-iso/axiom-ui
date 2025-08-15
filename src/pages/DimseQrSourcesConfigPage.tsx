@@ -1,5 +1,5 @@
 // src/pages/DimseQrSourcesConfigPage.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     ColumnDef, flexRender, getCoreRowModel, useReactTable, SortingState, getSortedRowModel,
@@ -21,7 +21,7 @@ import DimseQrSourceFormModal from '@/components/DimseQrSourceFormModal';
 import { getScraperTypeStyle } from '@/utils/styleHelpers'; // Import helper for type icon
 
 // SortableHeader component (reuse if not already in a shared util)
-const SortableHeader = ({ column, title }: { column: any, title: string }) => (
+const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
     <Button
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -78,8 +78,12 @@ const DimseQrSourcesConfigPage: React.FC = () => {
             toast.success(`DIMSE Q/R Source "${deletedData.name}" (ID: ${deletedData.id}) deleted successfully.`);
             queryClient.invalidateQueries({ queryKey: ['dimseQrSources'] });
         },
-        onError: (err: any, variables_id) => {
-             const errorDetail = err?.detail || err.message || `Failed to delete DIMSE Q/R Source (ID: ${variables_id})`;
+        onError: (err: unknown, variables_id) => {
+             const errorDetail = err && typeof err === 'object' && 'detail' in err && typeof err.detail === 'string' 
+                ? err.detail
+                : err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message 
+                : `Failed to delete DIMSE Q/R Source (ID: ${variables_id})`;
              toast.error(errorDetail);
              console.error("Deletion error:", err);
         },
@@ -87,7 +91,11 @@ const DimseQrSourcesConfigPage: React.FC = () => {
 
     const handleAdd = () => { setEditingSource(null); setIsModalOpen(true); };
     const handleEdit = (source: DimseQueryRetrieveSourceRead) => { setEditingSource(source); setIsModalOpen(true); };
-    const handleDelete = (id: number, name: string) => { if (window.confirm(`Are you sure you want to delete the DIMSE Q/R source configuration "${name}" (ID: ${id})?`)) { deleteMutation.mutate(id); } };
+    const handleDelete = useCallback((id: number, name: string) => { 
+        if (window.confirm(`Are you sure you want to delete the DIMSE Q/R source configuration "${name}" (ID: ${id})?`)) { 
+            deleteMutation.mutate(id); 
+        } 
+    }, [deleteMutation]);
     const closeModal = () => { setIsModalOpen(false); setEditingSource(null); };
 
     // --- MODIFIED Table Definition ---
@@ -101,7 +109,7 @@ const DimseQrSourcesConfigPage: React.FC = () => {
         { // Type Icon
             id: 'type',
             header: () => <div className="px-2 text-center">Type</div>,
-            cell: ({ }) => {
+            cell: () => {
                 const style = getScraperTypeStyle('dimse-qr'); // Always dimse-qr here
                 return (
                      <Tooltip>
@@ -190,7 +198,7 @@ const DimseQrSourcesConfigPage: React.FC = () => {
              },
              size: 60, // Keep actions narrow
         },
-    ], [deleteMutation]);
+    ], [deleteMutation, handleDelete]);
     // --- END MODIFIED Table Definition ---
 
     const table = useReactTable({

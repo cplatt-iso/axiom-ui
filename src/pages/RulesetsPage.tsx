@@ -26,10 +26,16 @@ const RulesetsPage: React.FC = () => {
             console.log("RulesetsPage: API call successful");
             setRulesets(fetchedRulesets);
             setError(null);
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error fetching rulesets:", err);
-            if (err.status === 401) { setError("Authentication error. Please log in again."); }
-            else { setError(err.message || "Failed to fetch rulesets."); }
+            if (err && typeof err === 'object' && 'status' in err && err.status === 401) { 
+                setError("Authentication error. Please log in again."); 
+            } else { 
+                const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                    ? err.message
+                    : "Failed to fetch rulesets.";
+                setError(errorMessage); 
+            }
             setRulesets([]);
         } finally {
             if (isInitialLoad.current) {
@@ -91,7 +97,15 @@ const RulesetsPage: React.FC = () => {
         if (!window.confirm(`Are you sure you want to delete ruleset "${rulesetToDelete.name}" (ID: ${id})? This will also delete all associated rules.`)) return;
         const originalRulesets = [...rulesets]; setRulesets(prev => prev.filter(rs => rs.id !== id)); setError(null);
         try { await deleteRuleset(id); toast.success(`Ruleset "${rulesetToDelete.name}" deleted.`); /* Don't need fetchData() here as UI is updated optimistically */ }
-        catch (err: any) { console.error(`Failed to delete ruleset ID ${id}:`, err); setRulesets(originalRulesets); const msg = err.message || `Failed to delete ruleset ID ${id}.`; setError(msg); toast.error(msg); }
+        catch (err: unknown) { 
+            console.error(`Failed to delete ruleset ID ${id}:`, err); 
+            setRulesets(originalRulesets); 
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : `Failed to delete ruleset ID ${id}.`;
+            setError(errorMessage); 
+            toast.error(errorMessage); 
+        }
     };
 
     // Toggle Status Handler (remains similar, adds toast)
@@ -100,7 +114,15 @@ const RulesetsPage: React.FC = () => {
         const actionText = newStatus ? 'ACTIVATE' : 'DEACTIVATE'; const rulesetName = rulesets[rulesetIndex].name; if (!window.confirm(`Are you sure you want to ${actionText} ruleset "${rulesetName}"?`)) return;
         setRulesets(prev => prev.map(rs => rs.id === rulesetId ? { ...rs, is_active: newStatus } : rs )); setError(null);
         try { await updateRuleset(rulesetId, { is_active: newStatus }); toast.success(`Ruleset "${rulesetName}" ${newStatus ? 'activated' : 'deactivated'}.`); /* Don't necessarily need fetchData here */ }
-        catch (err: any) { console.error(`Failed to toggle status for ruleset ${rulesetId}:`, err); setRulesets(originalRulesets); const msg = err.message || `Failed to toggle ruleset status.`; setError(msg); toast.error(msg); }
+        catch (err: unknown) { 
+            console.error(`Failed to toggle status for ruleset ${rulesetId}:`, err); 
+            setRulesets(originalRulesets); 
+            const errorMessage = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+                ? err.message
+                : `Failed to toggle ruleset status.`;
+            setError(errorMessage); 
+            toast.error(errorMessage); 
+        }
     };
 
     // --- Render Logic ---
