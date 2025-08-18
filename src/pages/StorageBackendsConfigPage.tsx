@@ -20,7 +20,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Database, Server, Cloud, HardDrive, Wifi, WifiOff, Loader2 } from 'lucide-react';
+import { ArrowsUpDownIcon, EllipsisHorizontalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, ServerIcon, CloudIcon, CircleStackIcon, ComputerDesktopIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
+import { Loader2 } from 'lucide-react'; // Keep Loader2 from lucide as Heroicons doesn't have animated spinner
 import { StorageBackendConfigRead } from '@/schemas';
 import { getStorageBackendConfigs, deleteStorageBackendConfig } from '@/services/api';
 import { toast } from 'sonner';
@@ -36,20 +38,20 @@ const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: bo
     className="-ml-4 h-8"
   >
     {title}
-    <ArrowUpDown className="ml-2 h-4 w-4" />
+    <ArrowsUpDownIcon className="ml-2 h-4 w-4" />
   </Button>
 );
 
 // Helper to get icon and color for backend type
 // --- UPDATED: Returns text and background classes ---
 const getBackendTypeStyle = (backendType: string): { Icon: React.ElementType, textClass: string, bgClass: string } => {
-    switch (backendType?.toLowerCase()) {
-        case 'filesystem': return { Icon: HardDrive, textClass: 'text-blue-700 dark:text-blue-300', bgClass: 'bg-blue-100 dark:bg-blue-900/30' };
-        case 'cstore': return { Icon: Server, textClass: 'text-purple-700 dark:text-purple-300', bgClass: 'bg-purple-100 dark:bg-purple-900/30' };
-        case 'gcs': return { Icon: Cloud, textClass: 'text-orange-700 dark:text-orange-300', bgClass: 'bg-orange-100 dark:bg-orange-900/30' };
-        case 'google_healthcare': return { Icon: Cloud, textClass: 'text-red-700 dark:text-red-300', bgClass: 'bg-red-100 dark:bg-red-900/30' };
-        case 'stow_rs': return { Icon: Server, textClass: 'text-teal-700 dark:text-teal-300', bgClass: 'bg-teal-100 dark:bg-teal-900/30' };
-        default: return { Icon: Database, textClass: 'text-gray-600 dark:text-gray-400', bgClass: 'bg-gray-100 dark:bg-gray-700' };
+    switch (backendType.toLowerCase()) {
+        case 'filesystem': return { Icon: ComputerDesktopIcon, textClass: 'text-blue-700 dark:text-blue-300', bgClass: 'bg-blue-100 dark:bg-blue-900/30' };
+        case 'cstore': return { Icon: ServerIcon, textClass: 'text-purple-700 dark:text-purple-300', bgClass: 'bg-purple-100 dark:bg-purple-900/30' };
+        case 'gcs': return { Icon: CloudIcon, textClass: 'text-orange-700 dark:text-orange-300', bgClass: 'bg-orange-100 dark:bg-orange-900/30' };
+        case 'google_healthcare': return { Icon: CloudIcon, textClass: 'text-red-700 dark:text-red-300', bgClass: 'bg-red-100 dark:bg-red-900/30' };
+        case 'stow_rs': return { Icon: ServerIcon, textClass: 'text-teal-700 dark:text-teal-300', bgClass: 'bg-teal-100 dark:bg-teal-900/30' };
+        default: return { Icon: CircleStackIcon, textClass: 'text-gray-600 dark:text-gray-400', bgClass: 'bg-gray-100 dark:bg-gray-700' };
     }
 };
 // --- END UPDATED ---
@@ -158,7 +160,7 @@ const StorageBackendsConfigPage: React.FC = () => {
             header: () => <div className="text-center">Enabled</div>,
             cell: ({ row }) => (
                 <div className="flex justify-center" title={row.getValue("is_enabled") ? "Enabled" : "Disabled"}>
-                    {row.getValue("is_enabled") ? <Wifi className="h-5 w-5 text-green-500" /> : <WifiOff className="h-5 w-5 text-slate-400" />}
+                    {row.getValue("is_enabled") ? <CheckCircleIcon className="h-5 w-5 text-green-500" /> : <XCircleIcon className="h-5 w-5 text-slate-400" />}
                  </div>
              ),
              enableSorting: false,
@@ -177,19 +179,19 @@ const StorageBackendsConfigPage: React.FC = () => {
                              <DropdownMenuTrigger asChild>
                                  <Button variant="ghost" className="h-8 w-8 p-0" disabled={isDeleting}>
                                      <span className="sr-only">Open menu</span>
-                                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <EllipsisHorizontalIcon className="h-4 w-4" />}
                                  </Button>
                              </DropdownMenuTrigger>
                              <DropdownMenuContent align="end">
                                  <DropdownMenuItem onClick={() => handleEdit(backend)}>
-                                     <Edit className="mr-2 h-4 w-4" /> Edit Config
+                                     <PencilIcon className="mr-2 h-4 w-4" /> Edit Config
                                  </DropdownMenuItem>
                                  <DropdownMenuItem
                                      className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/50"
                                      onClick={() => handleDelete(backend.id, backend.name)}
                                      disabled={isDeleting}
                                  >
-                                     <Trash2 className="mr-2 h-4 w-4" /> Delete Config
+                                     <TrashIcon className="mr-2 h-4 w-4" /> Delete Config
                                  </DropdownMenuItem>
                              </DropdownMenuContent>
                          </DropdownMenu>
@@ -222,7 +224,7 @@ const StorageBackendsConfigPage: React.FC = () => {
              <div className="flex justify-between items-center">
                  <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Manage Storage Backends</h2>
                  <Button size="sm" onClick={handleAdd}>
-                     <PlusCircle className="mr-2 h-4 w-4" /> Add Backend Config
+                     <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Backend Config
                  </Button>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">

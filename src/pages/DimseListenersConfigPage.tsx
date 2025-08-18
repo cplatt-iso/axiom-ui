@@ -18,9 +18,11 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-// Removed Checkbox import as we use icons now
+import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, PlusCircle, Trash2, Edit, ArrowUpDown, Wifi, WifiOff, Loader2 } from 'lucide-react'; // Added Loader2
+import { ArrowsUpDownIcon, EllipsisHorizontalIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PlusCircleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid';
+import { Loader2 } from 'lucide-react'; // Keep Loader2 from lucide as Heroicons doesn't have animated spinner
 import { DimseListenerConfigRead } from '@/schemas';
 import { getDimseListenerConfigs, deleteDimseListenerConfig } from '@/services/api';
 import { toast } from 'sonner';
@@ -36,7 +38,7 @@ const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: bo
     className="-ml-4 h-8" // Reduced height slightly
   >
     {title}
-    <ArrowUpDown className="ml-2 h-4 w-4" />
+    <ArrowsUpDownIcon className="ml-2 h-4 w-4" />
   </Button>
 );
 
@@ -123,12 +125,21 @@ const DimseListenersConfigPage: React.FC = () => {
             size: 60,
         },
         {
+            id: "listener_type",
+            header: "Listener Type",
+            cell: ({ row }) => {
+                const listener = row.original;
+                return <Badge variant="secondary">{listener.listener_type || 'pynetdicom'}</Badge>;
+            },
+            size: 120,
+        },
+        {
             accessorKey: "is_enabled",
             header: () => <div className="text-center">Enabled</div>,
             cell: ({ row }) => (
                 <div className="flex justify-center" title={row.getValue("is_enabled") ? "Enabled" : "Disabled"}>
                     {/* Using icons instead of checkbox for read-only status */}
-                    {row.getValue("is_enabled") ? <Wifi className="h-5 w-5 text-green-500" /> : <WifiOff className="h-5 w-5 text-slate-400" />}
+                    {row.getValue("is_enabled") ? <CheckCircleIcon className="h-5 w-5 text-green-500" /> : <XCircleIcon className="h-5 w-5 text-slate-400" />}
                  </div>
              ),
              enableSorting: false,
@@ -160,19 +171,19 @@ const DimseListenersConfigPage: React.FC = () => {
                              <DropdownMenuTrigger asChild>
                                  <Button variant="ghost" className="h-8 w-8 p-0" disabled={isDeleting}>
                                      <span className="sr-only">Open menu</span>
-                                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+                                      {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <EllipsisHorizontalIcon className="h-4 w-4" />}
                                  </Button>
                              </DropdownMenuTrigger>
                              <DropdownMenuContent align="end">
                                  <DropdownMenuItem onClick={() => handleEdit(listener)}>
-                                     <Edit className="mr-2 h-4 w-4" /> Edit Config
+                                     <PencilIcon className="mr-2 h-4 w-4" /> Edit Config
                                  </DropdownMenuItem>
                                  <DropdownMenuItem
                                      className="text-red-600 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-900/50"
                                      onClick={() => handleDelete(listener.id, listener.name)}
                                      disabled={isDeleting}
                                  >
-                                     <Trash2 className="mr-2 h-4 w-4" /> Delete Config
+                                     <TrashIcon className="mr-2 h-4 w-4" /> Delete Config
                                  </DropdownMenuItem>
                              </DropdownMenuContent>
                          </DropdownMenu>
@@ -205,7 +216,7 @@ const DimseListenersConfigPage: React.FC = () => {
              <div className="flex justify-between items-center">
                  <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">Manage DIMSE Listeners</h2>
                  <Button size="sm" onClick={handleAdd}>
-                     <PlusCircle className="mr-2 h-4 w-4" /> Add Listener Config
+                     <PlusCircleIcon className="mr-2 h-4 w-4" /> Add Listener Config
                  </Button>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">

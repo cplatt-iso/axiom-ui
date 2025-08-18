@@ -44,17 +44,21 @@ export const DimseListenerConfigUpdatePayloadSchema = DimseListenerConfigCreateP
 export type DimseListenerConfigUpdatePayload = z.infer<typeof DimseListenerConfigUpdatePayloadSchema>;
 
 
-// --- Status Schemas (from old schemas.ts) ---
+// --- Status Schemas (updated to match new API response) ---
 export const DimseListenerStatusSchema = z.object({
-    id: z.number(),
-    listener_id: z.string(), // This is likely the 'instance_id' or a unique ID for the running process
-    status: z.string(),
-    status_message: z.string().optional().nullable(),
-    host: z.string().optional().nullable(),
-    port: z.number().int().optional().nullable(),
-    ae_title: z.string().optional().nullable(),
-    last_heartbeat: z.string().datetime(),
-    created_at: z.string().datetime(),
+    config_id: z.number(),
+    name: z.string(),
+    description: z.string().nullable(),
+    listener_type: z.string(),
+    ae_title: z.string(),
+    port: z.number().int(),
+    is_enabled: z.boolean(),
+    instance_id: z.string(),
+    tls_enabled: z.boolean(),
+    runtime_status: z.string().nullable(),
+    status_message: z.string().nullable(),
+    runtime_host: z.string().nullable(),
+    last_heartbeat: z.string().datetime().nullable(),
     received_instance_count: z.number().int().default(0),
     processed_instance_count: z.number().int().default(0),
 });

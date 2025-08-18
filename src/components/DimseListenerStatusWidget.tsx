@@ -20,7 +20,7 @@ const LISTENER_HEARTBEAT_STALE_THRESHOLD_SECONDS = 90;
 
 // Helper function: getListenerDisplayStatus
 const getListenerDisplayStatus = (listener: DimseListenerStatus): { text: string; Icon: React.ElementType; variant: 'default' | 'secondary' | 'destructive' | 'outline' } => {
-    const statusLower = listener.status?.toLowerCase();
+    const statusLower = listener.runtime_status?.toLowerCase();
     const lastHeartbeat = listener.last_heartbeat;
     let heartbeatDate: Date | null = null;
     let isStale = true;
@@ -33,15 +33,15 @@ const getListenerDisplayStatus = (listener: DimseListenerStatus): { text: string
                 const secondsSinceHeartbeat = (now.getTime() - heartbeatDate.getTime()) / 1000;
                 isStale = secondsSinceHeartbeat > LISTENER_HEARTBEAT_STALE_THRESHOLD_SECONDS;
             } else {
-                console.warn(`[DimseListenerWidget] Invalid heartbeat date format for ${listener.listener_id}: ${lastHeartbeat}`);
+                console.warn(`[DimseListenerWidget] Invalid heartbeat date format for ${listener.instance_id}: ${lastHeartbeat}`);
                 isStale = true;
             }
         } catch (e) {
-            console.error(`[DimseListenerWidget] Error parsing heartbeat date for ${listener.listener_id}: ${e}`);
+            console.error(`[DimseListenerWidget] Error parsing heartbeat date for ${listener.instance_id}: ${e}`);
             isStale = true;
         }
     } else {
-        console.warn(`[DimseListenerWidget] No heartbeat timestamp received for ${listener.listener_id}.`);
+        console.warn(`[DimseListenerWidget] No heartbeat timestamp received for ${listener.instance_id}.`);
         isStale = true;
     }
 
@@ -49,6 +49,8 @@ const getListenerDisplayStatus = (listener: DimseListenerStatus): { text: string
     if (statusLower === 'stopped') { return { text: 'Stopped', Icon: WifiOff, variant: 'outline' }; }
     if (statusLower === 'error') { return { text: 'Error', Icon: ServerCrash, variant: 'destructive' }; }
     if (statusLower === 'starting') { return { text: 'Starting', Icon: Power, variant: 'outline' }; }
+    // Handle cases where runtime_status is null (listener not running)
+    if (!listener.runtime_status) { return { text: 'Not Running', Icon: WifiOff, variant: 'outline' }; }
     return { text: 'Unknown', Icon: HelpCircle, variant: 'outline' };
 };
 
@@ -74,6 +76,7 @@ export const DimseListenerStatusWidget: React.FC = () => {
     const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
     // --- END ADDED ---
 
+    // Fetch status data (now includes both config and runtime status)
     const { data: responseData, isLoading, isError, error, refetch, isFetching } = useQuery<DimseListenersStatusResponse, Error>({
         queryKey: ['dimseListenersStatus'],
         queryFn: getDimseListenersStatus,
@@ -106,6 +109,7 @@ export const DimseListenerStatusWidget: React.FC = () => {
                                 <TableHead>Listener ID</TableHead>
                                 <TableHead>AE Title</TableHead>
                                 <TableHead>Port</TableHead>
+                                <TableHead>Engine</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Last Heartbeat</TableHead>
                                 {/* Added Metrics Headers */}
@@ -116,7 +120,9 @@ export const DimseListenerStatusWidget: React.FC = () => {
                         <TableBody>
                             {listeners.map((listener) => {
                                 const displayStatus = getListenerDisplayStatus(listener);
-                                const tooltip = listener.status_message && listener.status?.toLowerCase() !== 'running'
+                                const listenerType = listener.listener_type || 'pynetdicom';
+                                
+                                const tooltip = listener.status_message && listener.runtime_status?.toLowerCase() !== 'running'
                                     ? listener.status_message
                                     : `Status: ${displayStatus.text}. Last heartbeat: ${formatRelativeTime(listener.last_heartbeat)}. AE: ${listener.ae_title ?? 'N/A'}, Port: ${listener.port ?? 'N/A'}`;
 
@@ -128,10 +134,15 @@ export const DimseListenerStatusWidget: React.FC = () => {
                                 );
 
                                 return (
-                                    <TableRow key={listener.listener_id}>
-                                        <TableCell className="font-mono text-xs" title={listener.listener_id}>{listener.listener_id}</TableCell>
+                                    <TableRow key={listener.instance_id}>
+                                        <TableCell className="font-mono text-xs" title={listener.instance_id}>{listener.instance_id}</TableCell>
                                         <TableCell className="font-mono text-xs">{listener.ae_title ?? 'N/A'}</TableCell>
                                         <TableCell className="text-xs text-center">{listener.port ?? 'N/A'}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary" className="text-xs">
+                                                {listenerType}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>{statusNode}</TooltipTrigger>
