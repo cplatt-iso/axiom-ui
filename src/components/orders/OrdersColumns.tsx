@@ -6,6 +6,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ImagingOrder, OrderStatus } from "@/schemas/orderSchema";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { EvidenceIcon } from "./EvidenceIcon";
 
 // This is a little helper to make the statuses look pretty.
 // A lesser coder would put this logic right in the cell render. Not me.
@@ -29,7 +30,17 @@ export const columns: ColumnDef<ImagingOrder>[] = [
   {
     accessorKey: "patient_name",
     header: "Patient Name",
-    cell: ({ row }) => row.getValue("patient_name") || <span className="text-muted-foreground">N/A</span>,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <EvidenceIcon 
+          accessionNumber={row.original.accession_number}
+          patientName={row.original.patient_name || undefined}
+        />
+        <span>
+          {row.getValue("patient_name") || <span className="text-muted-foreground">N/A</span>}
+        </span>
+      </div>
+    ),
   },
   {
     accessorKey: "patient_id",

@@ -18,6 +18,10 @@ import {
 } from '@/schemas/orderSchema';
 
 import {
+    OrderEvidenceApiResponse,
+} from '@/schemas/orderEvidenceSchema';
+
+import {
     FacilityCreate,
     FacilityUpdate,
     FacilityRead,
@@ -178,6 +182,12 @@ export const getOrders = (params: {
 
 export const deleteOrder = (orderId: number): Promise<void> => {
   return apiClient(`/orders/${orderId}`, { method: 'DELETE' });
+};
+
+export const getOrderEvidence = (accessionNumber: string): Promise<OrderEvidenceApiResponse> => {
+  return apiClient('/order-evidence/', { 
+    params: { accession_number: accessionNumber }
+  });
 };
 
 export const deleteAllOrders = async (): Promise<void> => {

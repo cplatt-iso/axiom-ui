@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { TrashIcon } from "lucide-react";
 import { toast } from "sonner";
-import { OrderStatus, OrderStatusEnum, ImagingOrder, OrdersApiResponse } from "@/schemas/orderSchema";
+import { OrderStatus, OrderStatusEnum, OrdersApiResponse } from "@/schemas/orderSchema";
 
 export interface OrderFilters {
   search: string;
@@ -132,21 +132,33 @@ export function OrdersPage() {
         }
       },
       onmessage: (event) => {
-        console.log(`📡 SSE: Received event type: ${event.event}`, event.data);
-        if (event.event === "order_created") {
-          const newOrder: ImagingOrder = JSON.parse(event.data);
-          console.log("🆕 SSE: order_created received", newOrder);
+        const receivedEventType = event.event;
+        console.log(`📡 SSE: Received raw event type: "${receivedEventType}" (length: ${receivedEventType.length})`, event.data);
+
+        const eventType = receivedEventType.trim();
+
+        if (eventType === "heartbeat") {
+          // Ignore heartbeat events
+          return;
+        }
+
+        if (eventType === "order_created" || eventType === "order_updated" || eventType === "order_deleted") {
+          console.log(`🔄 SSE: Invalidating orders query due to ${eventType}`);
           queryClient.invalidateQueries({ queryKey: ["orders"] });
-        } else if (event.event === "order_updated") {
-          const updatedOrder: ImagingOrder = JSON.parse(event.data);
-          console.log("🔄 SSE: order_updated received", updatedOrder);
-          queryClient.invalidateQueries({ queryKey: ["orders"] });
-        } else if (event.event === "order_deleted") {
-          const deletedOrder: { id: number } = JSON.parse(event.data);
-          console.log("🗑️ SSE: order_deleted received", deletedOrder);
-          queryClient.invalidateQueries({ queryKey: ["orders"] });
+        } else if (eventType === "order_evidence_created") {
+          console.log("✅ SSE: Matched event type 'order_evidence_created'");
+          const eventData = JSON.parse(event.data);
+          if (eventData.order && eventData.order.accession_number) {
+            const accessionNumber = eventData.order.accession_number;
+            console.log(`🧾 SSE: Received evidence for accession: ${accessionNumber}. Refetching query.`);
+            // Force a refetch of the specific query for the evidence icon - use the correct query key
+            queryClient.refetchQueries({ queryKey: ['order-evidence-check', accessionNumber] });
+            // Also, invalidate the main orders query to be safe, 
+            // as evidence might change the order's state.
+            queryClient.invalidateQueries({ queryKey: ["orders"] });
+          }
         } else {
-          console.log(`❓ SSE: Unknown event type: ${event.event}`);
+          console.log(`❓ SSE: Unknown event type after trim: "${eventType}"`);
         }
       },
       onerror: (error) => {

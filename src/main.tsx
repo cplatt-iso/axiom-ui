@@ -35,17 +35,21 @@ const queryClient = new QueryClient({
     },
 })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-   <QueryClientProvider client={queryClient}>
-    <BrowserRouter> { /* Wrap with Router */ }
-      <GoogleOAuthProvider clientId={googleClientId}>
-        <AuthProvider> { /* Wrap with Auth Provider */ }
-          <App />
-	  <Toaster richColors position="top-right" />
-        </AuthProvider>
-      </GoogleOAuthProvider>
-    </BrowserRouter>
-   </QueryClientProvider>
-  </StrictMode>,
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+    const root = createRoot(rootElement);
+    root.render(
+        <StrictMode>
+            <GoogleOAuthProvider clientId={googleClientId}>
+                <QueryClientProvider client={queryClient}>
+                    <BrowserRouter>
+                        <AuthProvider>
+                            <App />
+                            <Toaster richColors position="top-right" />
+                        </AuthProvider>
+                    </BrowserRouter>
+                </QueryClientProvider>
+            </GoogleOAuthProvider>
+        </StrictMode>
+    );
+}

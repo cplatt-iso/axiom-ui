@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ImagingOrder } from "@/schemas/orderSchema";
-import { columns } from "./OrdersColumns"; // We import our masterpiece
-import { OrderDetailModal } from "./OrderDetailModal"; // This doesn't exist yet, but we're optimists.
+import { columns } from "./OrdersColumns";
+import { OrderDetailModal } from "./OrderDetailModal";
 
 interface OrdersTableProps {
   data: ImagingOrder[];
@@ -50,7 +50,7 @@ export function OrdersTable({
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    manualPagination: true, // We're fetching data from an API, not the client.
+    manualPagination: true,
   });
 
   return (
@@ -80,8 +80,14 @@ export function OrdersTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onClick={() => setSelectedOrder(row.original)} // Clicky clicky to open the modal
-                  className="cursor-pointer"
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={(e) => {
+                    // Don't open modal if clicking on evidence icon or inside evidence modal
+                    const target = e.target as HTMLElement;
+                    if (!target.closest('button') && !target.closest('[role="dialog"]')) {
+                      setSelectedOrder(row.original);
+                    }
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
