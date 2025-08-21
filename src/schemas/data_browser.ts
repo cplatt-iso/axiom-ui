@@ -56,6 +56,36 @@ export interface StudyResultItem {
     [key: string]: unknown;
 }
 
+export interface SeriesResultItem {
+    StudyInstanceUID: string;
+    SeriesInstanceUID: string;
+    SeriesDate?: string | null;
+    SeriesTime?: string | null;
+    Modality?: string | null;
+    SeriesDescription?: string | null;
+    SeriesNumber?: number | null;
+    NumberOfSeriesRelatedInstances?: number | null;
+    BodyPartExamined?: string | null;
+    source_id: number;
+    source_name: string;
+    source_type: AllowedQuerySourceType | 'Unknown' | 'Error';
+    [key: string]: unknown;
+}
+
+export interface InstanceResultItem {
+    StudyInstanceUID: string;
+    SeriesInstanceUID: string;
+    SOPInstanceUID: string;
+    SOPClassUID?: string | null;
+    InstanceNumber?: number | null;
+    ContentDate?: string | null;
+    ContentTime?: string | null;
+    source_id: number;
+    source_name: string;
+    source_type: AllowedQuerySourceType | 'Unknown' | 'Error';
+    [key: string]: unknown;
+}
+
 export interface DataBrowserQueryResponse {
     query_status: "success" | "error" | "partial";
     message?: string | null;
