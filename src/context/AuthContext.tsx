@@ -15,8 +15,10 @@ export interface AuthContextType {
     user: UserProfile | null;
     isLoading: boolean;
     isAuthenticated: boolean; // <-- Add isAuthenticated state
+    isDeveloperMode: boolean; // <-- Add developer mode state
     login: (profile: UserProfile) => void;
     logout: () => void;
+    toggleDeveloperMode: () => void; // <-- Add developer mode toggle
     getToken: () => string | null;
     isSuperUser: () => boolean;
 }
@@ -31,10 +33,17 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const [user, setUser] = useState<UserProfile | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true); // Start loading
+    const [isDeveloperMode, setIsDeveloperMode] = useState<boolean>(() => {
+        // Check URL parameters and localStorage for developer mode
+        const urlParams = new URLSearchParams(window.location.search);
+        const fromUrl = urlParams.get('dev') === 'true';
+        const fromStorage = localStorage.getItem('developerMode') === 'true';
+        return fromUrl || fromStorage;
+    });
 
-    // --- Derive isAuthenticated based on user state ---
+    // --- Derive isAuthenticated based on user state OR developer mode ---
     // Use useMemo to prevent unnecessary recalculations
-    const isAuthenticated = useMemo(() => !!user, [user]);
+    const isAuthenticated = useMemo(() => isDeveloperMode || !!user, [user, isDeveloperMode]);
     // --- End Derive ---
 
     // Load user from localStorage on initial mount
@@ -136,17 +145,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return user?.is_superuser ?? false;
     }, [user?.is_superuser]);
 
+    const toggleDeveloperMode = useCallback(() => {
+        setIsDeveloperMode(prev => {
+            const newMode = !prev;
+            localStorage.setItem('developerMode', newMode.toString());
+            console.log(`Developer mode ${newMode ? 'enabled' : 'disabled'}`);
+            return newMode;
+        });
+    }, []);
 
-    // --- Context value now includes isAuthenticated ---
+    // Effect to handle URL parameter for developer mode
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('dev') === 'true') {
+            setIsDeveloperMode(true);
+            localStorage.setItem('developerMode', 'true');
+            console.log('Developer mode enabled via URL parameter');
+        }
+    }, []);
+
+
+    // --- Context value now includes isAuthenticated and developer mode ---
     const contextValue = useMemo(() => ({
         user,
         isLoading,
         isAuthenticated, // Pass derived value
+        isDeveloperMode,
         login,
         logout,
+        toggleDeveloperMode,
         getToken,
         isSuperUser
-    }), [user, isLoading, isAuthenticated, login, logout, getToken, isSuperUser]); // Dependencies for context value memoization
+    }), [user, isLoading, isAuthenticated, isDeveloperMode, login, logout, toggleDeveloperMode, getToken, isSuperUser]); // Dependencies for context value memoization
     // --- End Context value ---
 
     return (

@@ -1,5 +1,5 @@
 // frontend/src/components/DicomTagCombobox.tsx
-import React, { useState, useEffect, useMemo, Fragment } from 'react';
+import React, { useState, useEffect, useMemo, Fragment, useRef } from 'react';
 import { Combobox, Transition } from '@headlessui/react';
 import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid';
 import { DicomTagInfo, findMatchingTags, getTagInfoByKeyword, getTagInfo } from '../dicom/dictionary';
@@ -30,6 +30,8 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
     inputId,
 }) => {
     const [query, setQuery] = useState('');
+    const [inputRect, setInputRect] = useState<DOMRect | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // This function is explicitly typed to return DicomTagInfo | null
     const resolveTagInfo = (val: string | undefined): DicomTagInfo | null => {
@@ -59,7 +61,7 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
         if (query !== expectedDisplayForValue) {
             setQuery(expectedDisplayForValue);
         }
-    }, [valueFromParent, query]);
+    }, [valueFromParent]); // Removed 'query' to prevent infinite loop
 
     // Explicitly type selectedDicomTagObjectForCombobox to DicomTagInfo | null
     // The error message says line 45. Please adjust this line number based on your actual file.
@@ -72,6 +74,22 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
     const filteredTags = useMemo(() => {
         return findMatchingTags(query);
     }, [query]);
+
+    const updateInputRect = () => {
+        if (inputRef.current) {
+            setInputRect(inputRef.current.getBoundingClientRect());
+        }
+    };
+
+    useEffect(() => {
+        updateInputRect();
+        window.addEventListener('scroll', updateInputRect);
+        window.addEventListener('resize', updateInputRect);
+        return () => {
+            window.removeEventListener('scroll', updateInputRect);
+            window.removeEventListener('resize', updateInputRect);
+        };
+    }, []);
 
     const handleComboboxSelectionChange = (newlySelectedDicomTagObject: DicomTagInfo | null) => {
         informParentOfSelection(newlySelectedDicomTagObject);
@@ -87,16 +105,19 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
             {({ open }) => (
                 <div className="relative">
                     <Combobox.Input
+                        ref={inputRef}
                         id={inputId}
                         className={`${inputClassName} pr-10 w-full`}
                         displayValue={(tag: DicomTagInfo | null) => displayInputValue(tag)}
                         onChange={(event) => {
                             const typedValue = event.target.value;
                             setQuery(typedValue);
+                            updateInputRect(); // Update position when typing
                             if (typedValue === '' && selectedDicomTagObjectForCombobox !== null) {
                                 informParentOfSelection(null); 
                             }
                         }}
+                        onFocus={updateInputRect} // Update position when focused
                         placeholder="Type Tag Name or Number..."
                         autoComplete="off"
                         required={required}
@@ -114,15 +135,23 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
                     </Combobox.Button>
                     <Transition
                         as={Fragment}
-                        show={open && (filteredTags.length > 0 || (query.length > 0 && filteredTags.length === 0))}
+                        show={open}
                         leave="transition ease-in duration-100"
                         leaveFrom="opacity-100"
                         leaveTo="opacity-0"
                     >
-                        <Combobox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm">
-                            {filteredTags.length === 0 && query !== '' ? (
-                                <div className="relative cursor-default select-none px-4 py-2 text-gray-700 dark:text-gray-300">
-                                    Nothing found for "{query}".
+                                                <Combobox.Options 
+                            className="fixed z-[60] max-h-48 overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-xl ring-1 ring-black/5 dark:ring-white/10 focus:outline-none sm:text-sm border border-gray-200 dark:border-gray-600"
+                            style={{
+                                top: inputRect ? inputRect.bottom + window.scrollY + 4 : 'auto',
+                                left: inputRect ? inputRect.left + window.scrollX : 'auto',
+                                width: inputRect ? inputRect.width : 'auto',
+                                minWidth: '200px'
+                            }}
+                        >
+                            {filteredTags.length === 0 ? (
+                                <div className="relative cursor-default select-none px-4 py-3 text-gray-700 dark:text-gray-300">
+                                    {query === '' ? 'Start typing to search DICOM tags...' : `Nothing found for "${query}".`}
                                 </div>
                             ) : (
                                 filteredTags.map((tag) => (
@@ -130,7 +159,7 @@ export const DicomTagCombobox: React.FC<DicomTagComboboxProps> = ({
                                         key={tag.keyword} 
                                         value={tag} // tag is DicomTagInfo
                                         className={({ active }) =>
-                                            `relative cursor-default select-none py-2 pl-10 pr-4 ${
+                                            `relative cursor-default select-none py-3 pl-10 pr-4 ${
                                                 active ? 'bg-indigo-600 text-white' : 'text-gray-900 dark:text-gray-100'
                                             }`
                                         }

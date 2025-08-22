@@ -6,7 +6,7 @@ import { ArrowLeftIcon, PlusIcon } from '@heroicons/react/24/solid';
 import { getRulesetById, getRulesByRuleset, deleteRule, updateRule, Ruleset, Rule } from '../services/api'; // Import types
 import { useAuth } from '../context/AuthContext';
 import RuleListTable from '../components/RuleListTable';
-import RuleFormModal from '../components/RuleFormModal';
+import RuleWizardModal from '../components/RuleWizardModal';
 
 const RulesetDetailPage: React.FC = () => {
     const { rulesetId } = useParams<{ rulesetId: string }>();
@@ -135,9 +135,9 @@ const RulesetDetailPage: React.FC = () => {
                     onDelete={handleDeleteRule}
                     onToggleStatus={handleToggleRuleStatus}
                 />
-                {/* Rule Form Modal */}
+                {/* Rule Wizard Modal */}
                 {!isNaN(numericRulesetId) && (
-                    <RuleFormModal
+                    <RuleWizardModal
                         isOpen={isRuleModalOpen}
                         onClose={handleCloseRuleModal}
                         onSuccess={handleRuleSaveSuccess}

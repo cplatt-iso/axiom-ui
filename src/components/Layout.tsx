@@ -4,6 +4,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from './ThemeToggle';
 import UserMenu from './UserMenu';
+import DeveloperModeIndicator from './DeveloperModeIndicator';
 import {
     Bars3Icon, XMarkIcon, UsersIcon, CircleStackIcon, SquaresPlusIcon,
     TableCellsIcon, // For Data Browser
@@ -218,6 +219,9 @@ const Layout: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Developer Mode Indicator */}
+                <DeveloperModeIndicator />
 
                 {/* Page Content */}
                 <main className="flex-1">

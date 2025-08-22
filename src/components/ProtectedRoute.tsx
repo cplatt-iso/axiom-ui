@@ -9,13 +9,13 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children }) => {
-    const { user, isLoading, isAuthenticated } = useAuth();
+    const { user, isLoading, isAuthenticated, isDeveloperMode } = useAuth();
     const location = useLocation();
 
     // --- Keep console logs for debugging if needed ---
     console.log(`--- ProtectedRoute Check (${location.pathname}) ---`);
     console.log("Props:", { allowedRoles });
-    console.log("Auth State:", { isAuthenticated, isLoading });
+    console.log("Auth State:", { isAuthenticated, isLoading, isDeveloperMode });
     console.log("User Object:", user);
     // --- End Logs ---
 
@@ -34,7 +34,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ allowedRoles, children 
     }
 
     if (!isAuthenticated) {
-        console.log(`ProtectedRoute: Not authenticated (isAuthenticated: ${isAuthenticated}). Redirecting to /login.`);
+        console.log(`ProtectedRoute: Not authenticated (isAuthenticated: ${isAuthenticated}, developerMode: ${isDeveloperMode}). Redirecting to /login.`);
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
