@@ -6,6 +6,7 @@ import { CheckIcon } from '@heroicons/react/20/solid';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { convertSourceNamesToFrontendIds, convertFrontendIdsToSourceNames } from '@/utils/ruleHelpers';
 
 import {
     createRule,
@@ -306,18 +307,32 @@ const RuleWizardModal: React.FC<RuleWizardModalProps> = ({
         }
     }, [currentStep, validateCurrentStep]);
 
+    // Convert source names to frontend IDs when editing an existing rule and sources are loaded
+    useEffect(() => {
+        if (isOpen && existingRule && combinedSources && existingRule.applicable_sources) {
+            const frontendIds = convertSourceNamesToFrontendIds(existingRule.applicable_sources, combinedSources);
+            setFormData(prev => ({
+                ...prev,
+                selectedSources: frontendIds,
+            }));
+        }
+    }, [isOpen, existingRule, combinedSources]);
+
     const handleSubmit = useCallback(async () => {
         if (!validateCurrentStep()) return;
 
         setIsSubmitting(true);
         try {
+            // Convert frontend source IDs to actual source names for the backend
+            const actualSourceNames = convertFrontendIdsToSourceNames(formData.selectedSources, combinedSources || []);
+            
             const ruleData: RuleCreate | RuleUpdate = {
                 name: formData.name,
                 description: formData.description || undefined,
                 priority: formData.priority,
                 is_active: formData.isActive,
                 schedule_id: formData.selectedScheduleId || undefined,
-                applicable_sources: formData.selectedSources,
+                applicable_sources: actualSourceNames,
                 match_criteria: formData.matchCriteria.map(mc => ({
                     tag: mc.tag,
                     op: mc.op,
@@ -344,7 +359,7 @@ const RuleWizardModal: React.FC<RuleWizardModalProps> = ({
         } finally {
             setIsSubmitting(false);
         }
-    }, [formData, existingRule, rulesetId, validateCurrentStep, createMutation, updateMutation]);
+    }, [formData, existingRule, rulesetId, validateCurrentStep, createMutation, updateMutation, combinedSources]);
 
     const isLoading = sourcesLoading || schedulesLoading || destinationsLoading || crosswalkMapsLoading;
 

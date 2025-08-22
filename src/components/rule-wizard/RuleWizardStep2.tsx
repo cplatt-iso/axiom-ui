@@ -1,4 +1,3 @@
-// src/components/rule-wizard/RuleWizardStep2.tsx
 import React from 'react';
 import { 
     FunnelIcon, 
@@ -25,7 +24,7 @@ import { cn } from '@/lib/utils';
 import { MatchCriterionFormData, MatchOperation, MatchOperationSchema, AssociationMatchCriterionFormData, AssociationParameter, associationParameterSchema } from '@/schemas';
 import DicomTagCombobox from '../DicomTagCombobox';
 import { DicomTagInfo } from '@/dicom/dictionary';
-import { isValueRequired } from '@/utils/ruleHelpers';
+import { isValueRequired, getSourceTypeFromSource, createSourceFrontendId, SOURCE_TYPE_LABELS } from '@/utils/ruleHelpers';
 
 interface WizardFormData {
     name: string;
@@ -56,42 +55,6 @@ const SOURCE_TYPE_ICONS = {
     dimse_qr: CircleStackIcon,
     file_system: ServerIcon,
 } as const;
-
-const SOURCE_TYPE_LABELS = {
-    dicom_web: 'DICOM Web',
-    dimse_listener: 'DIMSE Listener',
-    dimse_qr: 'DIMSE Query/Retrieve',
-    file_system: 'File System',
-} as const;
-
-const getSourceTypeFromSource = (source: any): keyof typeof SOURCE_TYPE_ICONS => {
-    // Use the type field added by the normalized data, fall back to name-based detection
-    if (source.type) {
-        switch (source.type) {
-            case 'dicomweb': return 'dicom_web';
-            case 'dimse_listener': return 'dimse_listener';
-            case 'dimse_qr': return 'dimse_qr';
-            case 'known': 
-                // For known sources, detect from the name
-                const nameString = String(source.name || '').toUpperCase();
-                if (nameString.includes('ORTHANC') || nameString.includes('DICOMWEB')) return 'dicom_web';
-                if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER')) return 'dimse_listener';
-                if (nameString.includes('DIMSE') || nameString.includes('SCP') || nameString.includes('C-STORE') || 
-                    nameString.includes('TLS') || nameString.includes('PACS') || nameString.includes('SPANNER')) return 'dimse_qr';
-                return 'file_system';
-            default: return 'file_system';
-        }
-    }
-    
-    // Fallback to name-based detection for backward compatibility
-    const nameString = String(source.name || source.id || '').toUpperCase();
-    if (nameString.includes('DICOMWEB') || nameString.includes('ORTHANC')) return 'dicom_web';
-    if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER')) return 'dimse_listener';
-    if (nameString.includes('DIMSE') || nameString.includes('SCP') || nameString.includes('C-STORE') || 
-        nameString.includes('TLS') || nameString.includes('PACS') || nameString.includes('SPANNER')) return 'dimse_qr';
-    
-    return 'file_system';
-};
 
 const RuleWizardStep2: React.FC<RuleWizardStep2Props> = ({
     formData,
@@ -236,12 +199,8 @@ const RuleWizardStep2: React.FC<RuleWizardStep2Props> = ({
                 const sourceType = getSourceTypeFromSource(source);
                 const IconComponent = SOURCE_TYPE_ICONS[sourceType];
                 
-                // Create a more robust unique identifier that includes source type to avoid collisions
-                const uniqueId = source.id !== undefined && source.id !== null 
-                    ? `${sourceType}-id-${source.id}` 
-                    : source.name 
-                        ? `${sourceType}-name-${encodeURIComponent(source.name)}`
-                        : `${sourceType}-index-${index}`;
+                // Create a unique identifier using the shared function
+                const uniqueId = createSourceFrontendId(source, index);
                 
                 const isSelected = formData.selectedSources.includes(uniqueId);                                return (
                                     <div
