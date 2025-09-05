@@ -6,6 +6,7 @@ import StatusWidget from '../components/StatusWidget';
 import DimseListenerStatusWidget from '../components/DimseListenerStatusWidget';
 import ScraperStatusWidget from '@/components/ScraperStatusWidget';
 import DiskUsageWidget from '../components/DiskUsageWidget';
+import RecentErrorsWidget from '../components/RecentErrorsWidget';
 
 const DashboardPage: React.FC = () => {
     // Use React Query for dashboard status with optimized caching
@@ -52,6 +53,17 @@ const DashboardPage: React.FC = () => {
                 <StatusWidget title="API Service" statusData={getComponentStatus('api_service')} isLoading={isLoadingStatus} />
                 <StatusWidget title="Processing Workers" statusData={getComponentStatus('celery_workers')} isLoading={isLoadingStatus} />
                 <DiskUsageWidget />
+            </div>
+
+            {/* Recent Issues Widget */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-1">
+                    <RecentErrorsWidget />
+                </div>
+                {/* Placeholder for additional dashboard widgets */}
+                <div className="lg:col-span-2">
+                    {/* Future: Service performance metrics, processing queue status, etc. */}
+                </div>
             </div>
 
             {/* Service Status Widgets */}

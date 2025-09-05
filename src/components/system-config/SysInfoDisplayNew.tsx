@@ -341,53 +341,6 @@ const SysInfoDisplay: React.FC = () => {
                                 <div className="text-gray-600 dark:text-gray-400 mb-1">OAuth:</div>
                                 <StatusBadge status={systemInfo.google_oauth_configured ? 'connected' : 'error'} />
                             </div>
-                            <div>
-                                <div className="text-gray-600 dark:text-gray-400 mb-1">Elasticsearch:</div>
-                                <div className="flex justify-between items-center">
-                                    <span className="font-mono">{systemInfo.elasticsearch_host}:{systemInfo.elasticsearch_port}</span>
-                                    <StatusBadge status={systemInfo.elasticsearch_configured ? 'connected' : 'error'} />
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Elasticsearch Logging */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center text-base">
-                            <DatabaseIcon className="mr-2 h-4 w-4" />
-                            Elasticsearch Logging
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">Host:</span>
-                                <span className="font-mono">{systemInfo.elasticsearch_host}:{systemInfo.elasticsearch_port}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">Index Pattern:</span>
-                                <span className="font-mono">{systemInfo.elasticsearch_index_pattern}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">TLS Enabled:</span>
-                                <StatusBadge status={systemInfo.elasticsearch_tls_enabled ? 'connected' : 'error'} />
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">Auth Enabled:</span>
-                                <StatusBadge status={systemInfo.elasticsearch_auth_enabled ? 'connected' : 'error'} />
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-600 dark:text-gray-400">Cert Verification:</span>
-                                <StatusBadge status={systemInfo.elasticsearch_cert_verification ? 'connected' : 'error'} />
-                            </div>
-                        </div>
-                        <div className="pt-2 border-t">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600 dark:text-gray-400">Service Status:</span>
-                                <StatusBadge status={systemInfo.elasticsearch_configured ? 'connected' : 'error'} />
-                            </div>
                         </div>
                     </CardContent>
                 </Card>

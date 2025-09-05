@@ -14,6 +14,7 @@ import { getDimseListenersStatus } from '@/services/api';
 import { DimseListenerStatus, DimseListenersStatusResponse } from '@/schemas';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Import Tooltip
+import { LogViewerModal } from '@/components/logs';
 
 // Constants
 const LISTENER_HEARTBEAT_STALE_THRESHOLD_SECONDS = 90;
@@ -172,15 +173,23 @@ export const DimseListenerStatusWidget: React.FC = () => {
                  <CardTitle className="text-base font-semibold">
                     DIMSE Listener Status
                  </CardTitle>
-                 <Button
-                     variant="ghost" size="sm"
-                     onClick={() => refetch()}
-                     disabled={isFetching || combinedIsLoading} // Use combined loading state
-                     aria-label="Refresh listener status"
-                     className="text-muted-foreground hover:text-foreground"
-                 >
-                      <ArrowPathIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-                 </Button>
+                 <div className="flex items-center gap-2">
+                     <LogViewerModal
+                         service="dimse-listener"
+                         buttonText="View Logs"
+                         buttonSize="sm"
+                         buttonVariant="ghost"
+                     />
+                     <Button
+                         variant="ghost" size="sm"
+                         onClick={() => refetch()}
+                         disabled={isFetching || combinedIsLoading} // Use combined loading state
+                         aria-label="Refresh listener status"
+                         className="text-muted-foreground hover:text-foreground"
+                     >
+                          <ArrowPathIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                     </Button>
+                 </div>
             </CardHeader>
             <CardContent className="p-0">
                  {renderContent()}

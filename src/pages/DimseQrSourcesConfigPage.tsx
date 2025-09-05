@@ -19,6 +19,7 @@ import { getDimseQrSources, deleteDimseQrSource } from '@/services/api';
 import { toast } from 'sonner';
 import DimseQrSourceFormModal from '@/components/DimseQrSourceFormModal';
 import { getScraperTypeStyle } from '@/utils/styleHelpers'; // Import helper for type icon
+import { LogViewerModal } from '@/components/logs';
 
 // SortableHeader component (reuse if not already in a shared util)
 const SortableHeader = ({ column, title }: { column: { toggleSorting: (desc?: boolean) => void; getIsSorted: () => string | false }, title: string }) => (
@@ -219,9 +220,17 @@ const DimseQrSourcesConfigPage: React.FC = () => {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h2 className="text-xl font-semibold">Manage DIMSE Q/R Sources</h2>
-                    <Button size="sm" onClick={handleAdd}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add Q/R Source
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <LogViewerModal
+                            service="dimse-qr-poller"
+                            buttonText="View Logs"
+                            buttonSize="sm"
+                            buttonVariant="outline"
+                        />
+                        <Button size="sm" onClick={handleAdd}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Q/R Source
+                        </Button>
+                    </div>
                 </div>
                 <p className="text-sm text-muted-foreground">
                     Configure remote DIMSE peers for Query/Retrieve operations. Status indicates if automatic polling is active.

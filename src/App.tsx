@@ -42,14 +42,15 @@ import { OrdersPage } from './pages/OrdersPage';
 // --- ADDED: Import New System Config Page ---
 import SystemConfigurationPage from './pages/SystemConfigurationPage'; // Placeholder page
 import SysInfoDisplay from './components/system-config/SysInfoDisplay';
-import SysProcessingSettings from './components/system-config/SysProcessingSettings';
-import SysLimitsSettings from './components/system-config/SysLimitsSettings';
-import SysExternalServices from './components/system-config/SysExternalServices';
 import SysAdminActions from './components/system-config/SysAdminActions';
+import RuntimeConfigurationManager from './components/system-config/RuntimeConfigurationManager';
+import LoggingConfiguration from './components/system-config/LoggingConfiguration';
+import LogManagementLayout from './pages/LogManagementLayout';
 import GoogleHealthcareSourcesConfigPage from './pages/GoogleHealthcareSourcesConfigPage';
 import FacilityModalityConfigPage from './pages/FacilityModalityConfigPage';
 import FacilitiesConfigPage from './pages/FacilitiesConfigPage';
 import ModalitiesConfigPage from './pages/ModalitiesConfigPage';
+import AdminLogsPage from './pages/AdminLogsPage';
 
 // --- ADDED: Import Query Spanning Pages ---
 import QuerySpanningLayout from './pages/QuerySpanningLayout';
@@ -155,11 +156,14 @@ function AppContent() {
                         <Route path="/admin/system-config" element={<SystemConfigurationPage />}>
                             <Route index element={<Navigate to="info" replace />} />
                             <Route path="info" element={<SysInfoDisplay />} />
-                            <Route path="processing" element={<SysProcessingSettings />} />
-                            <Route path="limits" element={<SysLimitsSettings />} />
-                            <Route path="services" element={<SysExternalServices />} />
+                            <Route path="runtime-config" element={<RuntimeConfigurationManager />} />
+                            <Route path="logs" element={<LoggingConfiguration />} />
+                            <Route path="log-management" element={<LogManagementLayout />} />
                             <Route path="admin-actions" element={<SysAdminActions />} />
                         </Route>
+                        
+                        {/* Admin Logs Page */}
+                        <Route path="/admin/logs" element={<AdminLogsPage />} />
                         <Route path="/settings/ai-prompts" element={<AiPromptConfigsPage />} />                                                
 
                         {/* Facility and Modality Configuration Section */}

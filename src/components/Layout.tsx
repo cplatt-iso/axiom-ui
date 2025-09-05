@@ -11,6 +11,7 @@ import {
     ArchiveBoxIcon, // For Inventory Tool
     ExclamationTriangleIcon,
     ClipboardDocumentListIcon, // <-- I HAVE ARRIVED.
+    DocumentTextIcon, // For System Logs
     // --- ADDED Icons for Reorganization ---
     AdjustmentsHorizontalIcon, // For Routing Config (renamed from Cog6ToothIcon)
     WrenchScrewdriverIcon, // For System Config
@@ -57,6 +58,8 @@ const Layout: React.FC = () => {
         { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
         // Added System Configuration
         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
+        // Added System Logs
+        { name: 'System Logs', href: '/admin/logs', icon: DocumentTextIcon },
         // Added Facility & Modality Configuration
         { name: 'Facilities & Modalities', href: '/admin/facility-modality-config', icon: BuildingOfficeIcon },
         // Added Query Spanning

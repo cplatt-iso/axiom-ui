@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getDicomWebPollersStatus, getDimseQrSourcesStatus, getGoogleHealthcareSourcesStatus } from '@/services/api';
 import { UnifiedScraperStatus } from '@/types/scrapers';
 import { getScraperTypeStyle, ScraperType } from '@/utils/styleHelpers';
+import { LogViewerModal } from '@/components/logs';
 
 // Helper to format connection details
 const formatConnectionDetails = (scraper: UnifiedScraperStatus): string => {
@@ -329,9 +330,17 @@ const ScraperStatusWidget: React.FC = () => {
 
     return (
         <Card className="col-span-1 md:col-span-2 dark:bg-gray-800 shadow-sm">
-            <CardHeader>
-                <CardTitle>Data Source Status</CardTitle>
-                <CardDescription>Overview of DICOMweb, DIMSE Q/R, and Google Healthcare data sources with health checks.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div>
+                    <CardTitle>Data Source Status</CardTitle>
+                    <CardDescription>Overview of DICOMweb, DIMSE Q/R, and Google Healthcare data sources with health checks.</CardDescription>
+                </div>
+                <LogViewerModal
+                    service="scraper"
+                    buttonText="View Logs"
+                    buttonSize="sm"
+                    buttonVariant="ghost"
+                />
             </CardHeader>
             <CardContent>
                 {isLoading && (

@@ -10,10 +10,10 @@ interface SystemConfigTab {
 }
 
 const systemConfigTabs: SystemConfigTab[] = [
-    { value: 'info', label: 'Information', path: 'info' },
-    { value: 'processing', label: 'Processing', path: 'processing' },
-    { value: 'limits', label: 'Limits', path: 'limits' },
-    { value: 'services', label: 'Services', path: 'services' },
+    { value: 'info', label: 'System Information', path: 'info' },
+    { value: 'runtime-config', label: 'Runtime Configuration', path: 'runtime-config' },
+    { value: 'logs', label: 'Logging Configuration', path: 'logs' },
+    { value: 'log-management', label: 'Log Management', path: 'log-management' },
     { value: 'admin-actions', label: 'Admin Actions', path: 'admin-actions' },
 ];
 
@@ -43,7 +43,7 @@ const SystemConfigurationPage: React.FC = () => {
             </div>
 
             <Tabs value={activeTabValue} onValueChange={handleTabChange} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                <TabsList className="grid w-full grid-cols-5 gap-2">
                     {systemConfigTabs.map((tab) => (
                         <TabsTrigger key={tab.value} value={tab.value} className="w-full">
                             {tab.label}

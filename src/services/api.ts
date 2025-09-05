@@ -117,7 +117,13 @@ import {
     ServiceControlRequest,
     ServiceControlResponse,
 
-    DiskUsageStats // from system.ts
+    DiskUsageStats, // from system.ts
+
+    // From systemConfigSchema.ts (via index.ts)
+    SystemConfigRead,
+    SystemConfigUpdatePayload,
+    SystemConfigBulkUpdatePayload,
+    SystemConfigReloadResponse,
 } from '@/schemas/';
 
 import { 
@@ -131,6 +137,34 @@ import {
     DataBrowserQueryRequest,
     DataBrowserQueryResponse
 } from '../schemas/data_browser';
+
+import {
+    LogQueryRequest,
+    LogResponse,
+    LogServicesResponse
+} from '@/schemas/loggingSchema';
+import type { 
+    LoggingConfig, 
+    LoggingConfigResponse, 
+    ElasticsearchConfig, 
+    FluentdConfig,
+    ConnectionTestResult
+} from '@/schemas/loggingSchema';
+
+import type {
+    LogRetentionPolicyCreate,
+    LogRetentionPolicyResponse,
+    LogRetentionPolicyUpdate,
+    LogArchivalRuleCreate,
+    LogArchivalRuleResponse,
+    LogArchivalRuleUpdate,
+    ElasticsearchPolicy,
+    ElasticsearchIndex,
+    LogStatistics,
+    LogManagementHealth,
+    SyncPoliciesResponse,
+    ApplyTemplatesResponse,
+} from '@/schemas/logManagementSchema';
 
 // --- API Configuration ---
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -490,6 +524,47 @@ export const deleteCrosswalkMap = (id: number): Promise<CrosswalkMapRead> => {
 export const getSystemInfo = async (): Promise<SystemInfo> => {
     return apiClient<SystemInfo>('/system/info');
 };
+
+// ====== System Configuration Management ======
+export const getSystemConfigCategories = async (): Promise<string[]> => {
+    return apiClient<string[]>('/system-config/categories', { useAuth: true });
+};
+
+export const getSystemConfigs = async (category?: string): Promise<SystemConfigRead[]> => {
+    const params = category ? { category } : undefined;
+    return apiClient<SystemConfigRead[]>('/system-config/', { params, useAuth: true });
+};
+
+export const updateSystemConfig = async (settingKey: string, data: SystemConfigUpdatePayload): Promise<SystemConfigRead> => {
+    return apiClient<SystemConfigRead>(`/system-config/${settingKey}`, { 
+        method: 'PUT', 
+        body: JSON.stringify(data),
+        useAuth: true 
+    });
+};
+
+export const bulkUpdateSystemConfigs = async (data: SystemConfigBulkUpdatePayload): Promise<SystemConfigRead[]> => {
+    return apiClient<SystemConfigRead[]>('/system-config/bulk-update', { 
+        method: 'POST', 
+        body: JSON.stringify(data),
+        useAuth: true 
+    });
+};
+
+export const resetSystemConfig = async (settingKey: string): Promise<void> => {
+    return apiClient<void>(`/system-config/${settingKey}`, { 
+        method: 'DELETE',
+        useAuth: true 
+    });
+};
+
+export const reloadSystemConfig = async (): Promise<SystemConfigReloadResponse> => {
+    return apiClient<SystemConfigReloadResponse>('/system-config/reload', { 
+        method: 'POST',
+        useAuth: true 
+    });
+};
+
 export const suggestRule = async (requestData: RuleGenRequest): Promise<RuleGenResponse> => {
     return apiClient<RuleGenResponse>('/ai-assist/suggest-rule', { method: 'POST', body: JSON.stringify(requestData), useAuth: true, });
 };
@@ -1361,6 +1436,210 @@ export const importSpannerConfigs = (file: File): Promise<{
     return apiClient<{ imported: number; skipped: number; errors: string[] }>('/config/spanner/import', { 
         method: 'POST', 
         body: formData 
+    });
+};
+
+// === Logging API ===
+
+export const getLogs = (params: LogQueryRequest): Promise<LogResponse> => {
+    return apiClient<LogResponse>('/logs/', {
+        method: 'GET',
+        params: {
+            ...(params.start_time && { start_time: params.start_time }),
+            ...(params.end_time && { end_time: params.end_time }),
+            ...(params.level && { level: params.level }),
+            ...(params.service && { service: params.service }),
+            ...(params.container_name && { container_name: params.container_name }),
+            ...(params.search_text && { search_text: params.search_text }),
+            limit: (params.limit || 100).toString(),
+            offset: (params.offset || 0).toString(),
+        }
+    });
+};
+
+export const queryLogs = (params: LogQueryRequest): Promise<LogResponse> => {
+    return apiClient<LogResponse>('/logs/', {
+        method: 'POST',
+        body: JSON.stringify(params)
+    });
+};
+
+export const getRecentLogs = (params: { 
+    minutes: number; 
+    limit?: number; 
+    level?: string; 
+    service?: string;
+    container?: string;
+}): Promise<LogResponse> => {
+    return apiClient<LogResponse>('/logs/recent', {
+        method: 'GET',
+        params: {
+            minutes: params.minutes.toString(),
+            ...(params.limit && { limit: params.limit.toString() }),
+            ...(params.level && { level: params.level }),
+            ...(params.service && { service: params.service }),
+            ...(params.container && { container: params.container })
+        }
+    });
+};
+
+export const getLogServices = (): Promise<LogServicesResponse> => {
+    return apiClient<LogServicesResponse>('/logs/services', {
+        method: 'GET'
+    });
+};
+
+// === Logging Configuration API ===
+
+export const saveLoggingConfig = (config: LoggingConfig): Promise<LoggingConfigResponse> => {
+    return apiClient<LoggingConfigResponse>('/system-config/logging', {
+        method: 'POST',
+        body: JSON.stringify(config),
+        useAuth: true
+    });
+};
+
+export const testElasticsearchConnection = (config: ElasticsearchConfig): Promise<ConnectionTestResult> => {
+    return apiClient<ConnectionTestResult>('/system-config/test-elasticsearch', {
+        method: 'POST',
+        body: JSON.stringify(config),
+        useAuth: true
+    });
+};
+
+// === Log Management API ===
+
+export const getRetentionPolicies = (params?: {
+    skip?: number;
+    limit?: number;
+    active_only?: boolean;
+}): Promise<LogRetentionPolicyResponse[]> => {
+    return apiClient<LogRetentionPolicyResponse[]>('/log-management/retention-policies', {
+        method: 'GET',
+        params: {
+            ...(params?.skip !== undefined && { skip: params.skip.toString() }),
+            ...(params?.limit !== undefined && { limit: params.limit.toString() }),
+            ...(params?.active_only !== undefined && { active_only: params.active_only.toString() }),
+        }
+    });
+};
+
+export const createRetentionPolicy = (policy: LogRetentionPolicyCreate): Promise<LogRetentionPolicyResponse> => {
+    return apiClient<LogRetentionPolicyResponse>('/log-management/retention-policies', {
+        method: 'POST',
+        body: JSON.stringify(policy),
+        useAuth: true
+    });
+};
+
+export const getRetentionPolicy = (policyId: number): Promise<LogRetentionPolicyResponse> => {
+    return apiClient<LogRetentionPolicyResponse>(`/log-management/retention-policies/${policyId}`, {
+        method: 'GET'
+    });
+};
+
+export const updateRetentionPolicy = (policyId: number, policy: LogRetentionPolicyUpdate): Promise<LogRetentionPolicyResponse> => {
+    return apiClient<LogRetentionPolicyResponse>(`/log-management/retention-policies/${policyId}`, {
+        method: 'PUT',
+        body: JSON.stringify(policy),
+        useAuth: true
+    });
+};
+
+export const deleteRetentionPolicy = (policyId: number): Promise<void> => {
+    return apiClient<void>(`/log-management/retention-policies/${policyId}`, {
+        method: 'DELETE',
+        useAuth: true
+    });
+};
+
+export const getArchivalRules = (params?: {
+    skip?: number;
+    limit?: number;
+    active_only?: boolean;
+}): Promise<LogArchivalRuleResponse[]> => {
+    return apiClient<LogArchivalRuleResponse[]>('/log-management/archival-rules', {
+        method: 'GET',
+        params: {
+            ...(params?.skip !== undefined && { skip: params.skip.toString() }),
+            ...(params?.limit !== undefined && { limit: params.limit.toString() }),
+            ...(params?.active_only !== undefined && { active_only: params.active_only.toString() }),
+        }
+    });
+};
+
+export const createArchivalRule = (rule: LogArchivalRuleCreate): Promise<LogArchivalRuleResponse> => {
+    return apiClient<LogArchivalRuleResponse>('/log-management/archival-rules', {
+        method: 'POST',
+        body: JSON.stringify(rule),
+        useAuth: true
+    });
+};
+
+export const getArchivalRule = (ruleId: number): Promise<LogArchivalRuleResponse> => {
+    return apiClient<LogArchivalRuleResponse>(`/log-management/archival-rules/${ruleId}`, {
+        method: 'GET'
+    });
+};
+
+export const updateArchivalRule = (ruleId: number, rule: LogArchivalRuleUpdate): Promise<LogArchivalRuleResponse> => {
+    return apiClient<LogArchivalRuleResponse>(`/log-management/archival-rules/${ruleId}`, {
+        method: 'PUT',
+        body: JSON.stringify(rule),
+        useAuth: true
+    });
+};
+
+export const deleteArchivalRule = (ruleId: number): Promise<void> => {
+    return apiClient<void>(`/log-management/archival-rules/${ruleId}`, {
+        method: 'DELETE',
+        useAuth: true
+    });
+};
+
+export const syncPoliciesToElasticsearch = (): Promise<SyncPoliciesResponse> => {
+    return apiClient<SyncPoliciesResponse>('/log-management/elasticsearch/sync-policies', {
+        method: 'POST',
+        useAuth: true
+    });
+};
+
+export const applyIndexTemplates = (): Promise<ApplyTemplatesResponse> => {
+    return apiClient<ApplyTemplatesResponse>('/log-management/elasticsearch/apply-templates', {
+        method: 'POST',
+        useAuth: true
+    });
+};
+
+export const getElasticsearchPolicies = (): Promise<ElasticsearchPolicy[]> => {
+    return apiClient<ElasticsearchPolicy[]>('/log-management/elasticsearch/ilm-policies', {
+        method: 'GET'
+    });
+};
+
+export const getElasticsearchIndices = (): Promise<ElasticsearchIndex[]> => {
+    return apiClient<ElasticsearchIndex[]>('/log-management/elasticsearch/indices', {
+        method: 'GET'
+    });
+};
+
+export const getLogStatistics = (): Promise<LogStatistics> => {
+    return apiClient<LogStatistics>('/log-management/statistics', {
+        method: 'GET'
+    });
+};
+
+export const getLogManagementHealth = (): Promise<LogManagementHealth> => {
+    return apiClient<LogManagementHealth>('/log-management/health', {
+        method: 'GET'
+    });
+};
+
+export const testFluentdConnection = (config: FluentdConfig): Promise<ConnectionTestResult> => {
+    return apiClient<ConnectionTestResult>('/system-config/test-fluentd', {
+        method: 'POST',
+        body: JSON.stringify(config),
+        useAuth: true
     });
 };
 
