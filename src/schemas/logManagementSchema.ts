@@ -92,6 +92,7 @@ export const LogArchivalRuleResponseSchema = LogArchivalRuleCreateSchema.extend(
 });
 
 export type LogArchivalRuleResponse = z.infer<typeof LogArchivalRuleResponseSchema>;
+export type LogArchivalRule = LogArchivalRuleResponse;
 
 // Log Archival Rule Update Schema
 export const LogArchivalRuleUpdateSchema = z.object({
@@ -146,7 +147,7 @@ export type ElasticsearchIndex = z.infer<typeof ElasticsearchIndexSchema>;
 // STATISTICS AND HEALTH SCHEMAS
 // ===============================
 
-// Log Statistics Schema
+// Log Statistics Schema (for future use when API implements this format)
 export const LogStatisticsSchema = z.object({
     total_indices: z.number().int(),
     total_size_bytes: z.number().int(),
@@ -172,6 +173,138 @@ export const LogStatisticsSchema = z.object({
 });
 
 export type LogStatistics = z.infer<typeof LogStatisticsSchema>;
+
+// Actual API Response Schema (current implementation)
+export const ElasticsearchStatsSchema = z.object({
+    cluster_name: z.string(),
+    status: z.string(),
+    nodes: z.number(),
+    indices_count: z.number(),
+    docs_count: z.number(),
+    store_size_bytes: z.number(),
+    timestamp: z.string(),
+});
+
+export const AxiomIndexSchema = z.object({
+    name: z.string(),
+    docs_count: z.number(),
+    size_bytes: z.number(),
+    primaries: z.number(),
+});
+
+export const AxiomIndicesStatsSchema = z.object({
+    total_indices: z.number(),
+    total_docs: z.number(),
+    total_size_bytes: z.number(),
+    indices: z.array(AxiomIndexSchema),
+});
+
+// Enhanced Analytics Schemas
+export const StorageDistributionSchema = z.object({
+    total_storage_gb: z.number(),
+    by_tier: z.object({
+        hot: z.object({
+            size_bytes: z.number(),
+            size_gb: z.number(),
+            percentage: z.number(),
+        }),
+        warm: z.object({
+            size_bytes: z.number(),
+            size_gb: z.number(),
+            percentage: z.number(),
+        }),
+        cold: z.object({
+            size_bytes: z.number(),
+            size_gb: z.number(),
+            percentage: z.number(),
+        }),
+        archived: z.object({
+            size_bytes: z.number(),
+            size_gb: z.number(),
+            percentage: z.number(),
+        }),
+    }),
+});
+
+export const IngestionTrendsSchema = z.object({
+    last_30_days: z.array(z.object({
+        date: z.string(),
+        document_count: z.number(),
+    })),
+    average_daily_documents: z.number(),
+    average_daily_storage_gb: z.number(),
+    total_documents_30d: z.number(),
+});
+
+export const RetentionComplianceItemSchema = z.object({
+    index: z.string(),
+    is_compliant: z.boolean(),
+    policy: z.string(),
+    creation_date: z.string(),
+});
+
+export const RetentionComplianceSchema = z.object({
+    compliant_indices: z.number(),
+    non_compliant_indices: z.number(),
+    total_indices: z.number(),
+    compliance_percentage: z.number(),
+    details: z.array(RetentionComplianceItemSchema),
+});
+
+export const ServiceBreakdownSchema = z.object({
+    total_documents: z.number(),
+    services: z.array(z.object({
+        service: z.string(),
+        document_count: z.number(),
+        percentage: z.number(),
+    })),
+});
+
+export const LogLevelsSchema = z.object({
+    total_logs: z.number(),
+    distribution: z.record(z.object({
+        count: z.number(),
+        percentage: z.number(),
+    })),
+});
+
+export const AnalyticsSchema = z.object({
+    storage_distribution: StorageDistributionSchema,
+    ingestion_trends: IngestionTrendsSchema,
+    retention_compliance: RetentionComplianceSchema,
+    service_breakdown: ServiceBreakdownSchema,
+    log_levels: LogLevelsSchema,
+});
+
+export const SummarySchema = z.object({
+    total_storage_tb: z.number(),
+    daily_ingestion_gb: z.number(),
+    compliance_percentage: z.number(),
+    total_services: z.number(),
+    most_active_service: z.string(),
+});
+
+export const LogStatisticsResponseSchema = z.object({
+    timestamp: z.string(),
+    version: z.string(),
+    elasticsearch: ElasticsearchStatsSchema,
+    axiom_indices: AxiomIndicesStatsSchema,
+    analytics: AnalyticsSchema,
+    summary: SummarySchema,
+});
+
+export type ElasticsearchStats = z.infer<typeof ElasticsearchStatsSchema>;
+export type AxiomIndex = z.infer<typeof AxiomIndexSchema>;
+export type AxiomIndicesStats = z.infer<typeof AxiomIndicesStatsSchema>;
+export type StorageDistribution = z.infer<typeof StorageDistributionSchema>;
+export type IngestionTrends = z.infer<typeof IngestionTrendsSchema>;
+export type RetentionCompliance = z.infer<typeof RetentionComplianceSchema>;
+export type RetentionComplianceItem = z.infer<typeof RetentionComplianceItemSchema>;
+export type ServiceBreakdown = z.infer<typeof ServiceBreakdownSchema>;
+export type LogLevels = z.infer<typeof LogLevelsSchema>;
+export type Analytics = z.infer<typeof AnalyticsSchema>;
+export type Summary = z.infer<typeof SummarySchema>;
+export type LogStatisticsResponse = z.infer<typeof LogStatisticsResponseSchema>;
 
 // Health Check Schema
 export const LogManagementHealthSchema = z.object({
@@ -242,3 +375,146 @@ export const ListArchivalRulesQuerySchema = z.object({
 });
 
 export type ListArchivalRulesQuery = z.infer<typeof ListArchivalRulesQuerySchema>;
+
+// ===============================
+// ENHANCED ANALYTICS SCHEMAS
+// ===============================
+
+// Enhanced Storage Distribution Schema (for new dashboard analytics)
+const EnhancedStorageDistributionSchema = z.object({
+  total_tb: z.number(),
+  by_tier: z.record(z.object({
+    size_tb: z.number(),
+    percentage: z.number()
+  }))
+});
+
+// Enhanced Ingestion Trends Schema with detailed metrics
+const EnhancedIngestionTrendsSchema = z.object({
+  daily_average_gb: z.number(),
+  total_documents_30d: z.number(),
+  trends: z.array(z.object({
+    date: z.string(),
+    document_count: z.number(),
+    storage_bytes: z.number(),
+    storage_gb: z.number(),
+    indices_count: z.number(),
+    avg_doc_size_bytes: z.number()
+  }))
+});
+
+// Enhanced Retention Compliance Schema
+const EnhancedRetentionComplianceSchema = z.object({
+  percentage: z.number(),
+  compliant_indices: z.number(),
+  non_compliant_indices: z.number(),
+  total_indices: z.number()
+});
+
+// Enhanced Service Breakdown Schema with percentages
+const EnhancedServiceBreakdownSchema = z.object({
+  top_10: z.array(z.object({
+    service: z.string(),
+    document_count: z.number(),
+    document_percentage: z.number(),
+    storage_gb: z.number(),
+    storage_percentage: z.number(),
+    index_count: z.number()
+  })),
+  total_services: z.number()
+});
+
+// Enhanced Log Levels Schema
+const EnhancedLogLevelsSchema = z.record(z.object({
+  count: z.number(),
+  percentage: z.number()
+}));
+
+// Policy Efficiency Schema
+const PolicyEfficiencySchema = z.object({
+  coverage_percentage: z.number(),
+  efficiency_score: z.number(),
+  uncovered_indices_count: z.number(),
+  uncovered_storage_gb: z.number(),
+  policy_count: z.number(),
+  recommendations: z.array(z.string())
+});
+
+// Dashboard Analytics Schema (enhanced version)
+export const dashboardAnalyticsSchema = z.object({
+  timestamp: z.string(),
+  storage: EnhancedStorageDistributionSchema,
+  log_levels: EnhancedLogLevelsSchema,
+  ingestion: EnhancedIngestionTrendsSchema,
+  compliance: EnhancedRetentionComplianceSchema,
+  services: EnhancedServiceBreakdownSchema,
+  policy_efficiency: PolicyEfficiencySchema
+});
+
+// Retention Efficiency Analytics Schemas
+const PolicyBreakdownSchema = z.object({
+  policy_name: z.string(),
+  patterns: z.array(z.string()),
+  tier: z.string(),
+  retention_days: z.number(),
+  covered_indices: z.number(),
+  covered_storage_gb: z.number(),
+  covered_documents: z.number(),
+  efficiency_score: z.number(),
+  sample_indices: z.array(z.string())
+});
+
+const OverallEfficiencySchema = z.object({
+  coverage_percentage: z.number(),
+  total_policies: z.number(),
+  active_policies: z.number(),
+  uncovered_indices: z.number(),
+  uncovered_storage_gb: z.number()
+});
+
+const ImprovementOpportunitySchema = z.object({
+  type: z.string(),
+  description: z.string(),
+  impact: z.string(),
+  priority: z.string()
+});
+
+export const retentionEfficiencySchema = z.object({
+  timestamp: z.string(),
+  overall_efficiency: OverallEfficiencySchema,
+  policy_breakdown: z.array(PolicyBreakdownSchema),
+  uncovered_samples: z.array(z.string()),
+  recommendations: z.array(z.string()),
+  improvement_opportunities: z.array(ImprovementOpportunitySchema)
+});
+
+// Legacy schema for backward compatibility with /statistics endpoint
+export const logManagementSchema = z.object({
+  timestamp: z.string(),
+  storage_distribution: StorageDistributionSchema,
+  ingestion_trends: z.object({
+    last_30_days: z.array(z.object({
+      date: z.string(),
+      document_count: z.number(),
+      storage_bytes: z.number(),
+      storage_gb: z.number()
+    }))
+  }),
+  retention_compliance: RetentionComplianceSchema,
+  service_breakdown: z.object({
+    services: z.array(z.object({
+      service: z.string(),
+      document_count: z.number(),
+      storage_gb: z.number(),
+      index_count: z.number()
+    }))
+  }),
+  log_levels: LogLevelsSchema
+});
+
+export type LogManagementData = z.infer<typeof logManagementSchema>;
+export type DashboardAnalyticsData = z.infer<typeof dashboardAnalyticsSchema>;
+export type RetentionEfficiencyData = z.infer<typeof retentionEfficiencySchema>;
+export type PolicyBreakdown = z.infer<typeof PolicyBreakdownSchema>;
+export type OverallEfficiency = z.infer<typeof OverallEfficiencySchema>;
+export type ImprovementOpportunity = z.infer<typeof ImprovementOpportunitySchema>;

@@ -58,8 +58,6 @@ const Layout: React.FC = () => {
         { name: 'Routing Config', href: '/admin/routing-config', icon: AdjustmentsHorizontalIcon },
         // Added System Configuration
         { name: 'System Config', href: '/admin/system-config', icon: WrenchScrewdriverIcon },
-        // Added System Logs
-        { name: 'System Logs', href: '/admin/logs', icon: DocumentTextIcon },
         // Added Facility & Modality Configuration
         { name: 'Facilities & Modalities', href: '/admin/facility-modality-config', icon: BuildingOfficeIcon },
         // Added Query Spanning
@@ -67,6 +65,12 @@ const Layout: React.FC = () => {
         { name: "AI Prompts", href: "/settings/ai-prompts", icon: BrainCircuit },
     ];
     // --- END UPDATED Admin Navigation ---
+
+    // --- NEW Experimental Features Navigation (Admin Only) ---
+    const experimentalNavigation: NavItem[] = [
+        { name: 'System Logs', href: '/admin/logs', icon: DocumentTextIcon },
+    ];
+    // --- END Experimental Features Navigation ---
 
     // --- End Navigation Definitions ---
 
@@ -166,6 +170,18 @@ const Layout: React.FC = () => {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Conditional Experimental Features Section */}
+                                {isAdmin && (
+                                    <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                        <h3 className="px-2 mb-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider" id="experimental-nav-headline-mobile">
+                                            Experimental Features
+                                        </h3>
+                                        <div className="space-y-1">
+                                            {experimentalNavigation.map((item) => renderNavLink(item, true))}
+                                        </div>
+                                    </div>
+                                )}
                             </nav>
                         </div>
                     </div>
@@ -196,7 +212,18 @@ const Layout: React.FC = () => {
                                     <div className="space-y-1">
                                         {adminNavigation.map((item) => renderNavLink(item, false))}
                                     </div>
+                                </div>
+                            )}
 
+                            {/* Conditional Experimental Features Section */}
+                            {isAdmin && (
+                                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                    <h3 className="px-3 mb-2 text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 tracking-wider" id="experimental-nav-headline-desktop">
+                                        Experimental Features
+                                    </h3>
+                                    <div className="space-y-1">
+                                        {experimentalNavigation.map((item) => renderNavLink(item, false))}
+                                    </div>
                                 </div>
                             )}
                         </nav>

@@ -160,7 +160,7 @@ import type {
     LogArchivalRuleUpdate,
     ElasticsearchPolicy,
     ElasticsearchIndex,
-    LogStatistics,
+    LogStatisticsResponse,
     LogManagementHealth,
     SyncPoliciesResponse,
     ApplyTemplatesResponse,
@@ -1623,8 +1623,8 @@ export const getElasticsearchIndices = (): Promise<ElasticsearchIndex[]> => {
     });
 };
 
-export const getLogStatistics = (): Promise<LogStatistics> => {
-    return apiClient<LogStatistics>('/log-management/statistics', {
+export const getLogStatistics = (): Promise<LogStatisticsResponse> => {
+    return apiClient<LogStatisticsResponse>('/log-management/statistics', {
         method: 'GET'
     });
 };
