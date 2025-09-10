@@ -1,0 +1,32 @@
+services:
+  axiom-frontend:
+    build: 
+      context: .
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL:-https://axiom.trazen.org/api/v1}
+        - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+        - VITE_ENVIRONMENT=${VITE_ENVIRONMENT:-production}
+    container_name: axiom-frontend
+    ports:
+      - "5173:5173"
+    networks:
+      - default
+      - shared
+      - web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5173/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    driver: bridge
+  shared:
+    external: true
+    name: axiom_shared_network
+  web:
+    external: true
+    name: npm_web

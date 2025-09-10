@@ -29,7 +29,7 @@ export const DimseListenerConfigCreatePayloadSchema = z.object({
     port: z.number().int().gt(0).lt(65536),
     is_enabled: z.boolean().optional().default(true),
     instance_id: z.string().optional().nullable(),
-    listener_type: z.enum(['pynetdicom', 'dcm4che']).default('pynetdicom'),
+    listener_type: z.enum(['pynetdicom', 'dcm4che', 'dicom-rs']).default('pynetdicom'),
     tls_enabled: z.boolean().default(false),
     tls_cert_secret_name: z.string().optional().nullable(),
     tls_key_secret_name: z.string().optional().nullable(),
@@ -87,7 +87,7 @@ export const dimseListenerFormSchema = z.object({
         .refine(val => val === null || val === undefined || (typeof val === 'string' && val.trim() === val), {
             message: "Instance ID cannot have leading/trailing spaces",
         }),
-    listener_type: z.enum(['pynetdicom', 'dcm4che']),
+    listener_type: z.enum(['pynetdicom', 'dcm4che', 'dicom-rs']),
     tls_enabled: z.boolean(),
     tls_cert_secret_name: z.string().optional().nullable(),
     tls_key_secret_name: z.string().optional().nullable(),

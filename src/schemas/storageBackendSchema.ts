@@ -19,7 +19,7 @@ export const stowRsAuthTypeEnum = z.enum([
 ]);
 export type StowRsAuthType = z.infer<typeof stowRsAuthTypeEnum>;
 
-export const senderTypeEnum = z.enum(["pynetdicom", "dcm4che"]);
+export const senderTypeEnum = z.enum(["pynetdicom", "dcm4che", "dicom-rs"]);
 export type SenderType = z.infer<typeof senderTypeEnum>;
 
 // --- Constants ---

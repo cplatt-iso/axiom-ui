@@ -487,6 +487,7 @@ const StorageBackendFormModal: React.FC<StorageBackendFormModalProps> = ({ isOpe
                                                     <SelectContent>
                                                         <SelectItem value="pynetdicom">pynetdicom</SelectItem>
                                                         <SelectItem value="dcm4che">dcm4che</SelectItem>
+                                                        <SelectItem value="dicom-rs">dicom-rs</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                                 <FormDescription>

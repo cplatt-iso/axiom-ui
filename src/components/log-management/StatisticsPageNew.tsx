@@ -15,8 +15,7 @@ import {
   CheckCircle, 
   Info, 
   BarChart3,
-  RefreshCw,
-  HardDrive
+  RefreshCw
 } from 'lucide-react';
 import { 
   DashboardAnalyticsData, 

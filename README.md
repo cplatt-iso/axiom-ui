@@ -251,14 +251,49 @@ The frontend integrates with a comprehensive FastAPI backend providing:
 
 ## Production Deployment
 
-### Docker Support
+### Docker Support (New)
+A complete Docker setup has been provided for containerized deployment:
+
+#### **Docker Compose (Recommended)**
+```bash
+# Copy environment configuration
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start the service
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop the service
+docker compose down
+```
+
+#### **Manual Docker Commands**
 ```bash
 # Build production image
 docker build -t axiom-frontend .
 
 # Run container
-docker run -p 80:80 axiom-frontend
+docker run -p 5173:5173 axiom-frontend
+
+# Run with environment variables
+docker run -p 5173:5173 \
+  -e VITE_API_BASE_URL=https://api.axiom.healthcare \
+  -e VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id \
+  axiom-frontend
 ```
+
+The Docker setup includes:
+- **Multi-stage build** for optimized image size
+- **Nginx** for production-ready static file serving
+- **SPA routing support** for React Router
+- **Gzip compression** and security headers
+- **Health check endpoint** at `/health`
+- **Network integration** with Axiom shared network
+- **Auto-restart** unless manually stopped
+- **Production optimizations** for medical imaging applications
 
 ### Environment Configuration
 ```bash
@@ -269,9 +304,9 @@ VITE_ENVIRONMENT=production
 ```
 
 ### Health & Monitoring
-- **Health Check Endpoint:** `/health`
-- **Build Info:** `/build-info`
-- **Performance Monitoring:** Integrated with backend telemetry
+- **Health Check Endpoint:** `/health` (when using Docker)
+- **Application Monitoring:** Integrated with backend telemetry
+- **Performance Metrics:** Bundle size monitoring and optimization recommendations
 
 ## Healthcare Compliance
 

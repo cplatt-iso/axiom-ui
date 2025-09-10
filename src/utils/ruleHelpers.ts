@@ -49,7 +49,7 @@ export const getSourceTypeFromSource = (source: any): SourceTypeKey => {
                 // For known sources, detect from the name
                 const nameString = String(source.name || '').toUpperCase();
                 if (nameString.includes('ORTHANC') || nameString.includes('DICOMWEB')) return 'dicom_web';
-                if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER')) return 'dimse_listener';
+                if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER') || nameString.includes('DICOM-RS')) return 'dimse_listener';
                 if (nameString.includes('DIMSE') || nameString.includes('SCP') || nameString.includes('C-STORE') || 
                     nameString.includes('TLS') || nameString.includes('PACS') || nameString.includes('SPANNER')) return 'dimse_qr';
                 return 'file_system';
@@ -60,7 +60,7 @@ export const getSourceTypeFromSource = (source: any): SourceTypeKey => {
     // Fallback to name-based detection for backward compatibility
     const nameString = String(source.name || source.id || '').toUpperCase();
     if (nameString.includes('DICOMWEB') || nameString.includes('ORTHANC')) return 'dicom_web';
-    if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER')) return 'dimse_listener';
+    if (nameString.includes('DCM4CHE') || nameString.includes('LISTENER') || nameString.includes('DICOM-RS')) return 'dimse_listener';
     if (nameString.includes('DIMSE') || nameString.includes('SCP') || nameString.includes('C-STORE') || 
         nameString.includes('TLS') || nameString.includes('PACS') || nameString.includes('SPANNER')) return 'dimse_qr';
     

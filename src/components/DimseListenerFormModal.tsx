@@ -93,7 +93,7 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
                 port: listenerConfig.port ?? 11112,
                 is_enabled: listenerConfig.is_enabled ?? true,
                 instance_id: listenerConfig.instance_id ?? null,
-                listener_type: (listenerConfig.listener_type ?? 'pynetdicom') as 'pynetdicom' | 'dcm4che',
+                listener_type: (listenerConfig.listener_type ?? 'pynetdicom') as 'pynetdicom' | 'dcm4che' | 'dicom-rs',
                 tls_enabled: listenerConfig.tls_enabled ?? false,
                 tls_cert_secret_name: listenerConfig.tls_cert_secret_name ?? null,
                 tls_key_secret_name: listenerConfig.tls_key_secret_name ?? null,
@@ -256,6 +256,7 @@ const DimseListenerFormModal: React.FC<DimseListenerFormModalProps> = ({ isOpen,
                                         <SelectContent>
                                             <SelectItem value="pynetdicom">pynetdicom</SelectItem>
                                             <SelectItem value="dcm4che">dcm4che</SelectItem>
+                                            <SelectItem value="dicom-rs">dicom-rs</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormDescription>
